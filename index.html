@@ -47,7 +47,7 @@
         }
 
         .segment-cell.cell-selected {
-            background: #e8f2e8;
+            background: #b2ebf2;
         }
 
         .segment-cell.cell-playing {
@@ -64,6 +64,7 @@
             display: flex;
             flex-direction: column;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
         }
 
         .title-bar {
@@ -402,12 +403,13 @@
         }
 
         .piano-container {
-            position: absolute;
+            position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
             height: 30vh;
             display: flex;
+            z-index: 1;
         }
 
         .white-key {
