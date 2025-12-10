@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chord Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -67,15 +70,40 @@
             width: 100%;
             background: transparent;
             border: none;
-            padding: 8px 12px 2px 12px;
+            padding: 6px 12px 0 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
             z-index: 12;
-            letter-spacing: -0.01em;
-            font-weight: 600;
+            letter-spacing: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .title-link {
+            font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            color: #111;
+            text-decoration: none;
+            margin-right: 6px;
+        }
+
+        .title-by {
             font-size: 0.95rem;
+            font-weight: 500;
+            color: #111;
+        }
+
+        .title-by .by-link {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #d9d4cc;
+            padding-bottom: 1px;
+        }
+
+        .title-by .by-link:hover {
+            border-bottom-color: #111;
         }
 
         .top-bar {
@@ -328,6 +356,34 @@
             border-color: #222;
         }
 
+        .info-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .info-modal a {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #c8c2b8;
+        }
+
+        .info-modal a:hover {
+            border-bottom-color: #111;
+        }
+
         @media (max-width: 768px) {
             .top-bar {
                 flex-direction: row;
@@ -406,7 +462,10 @@
     </style>
 </head>
 <body>
-    <div class="title-bar">Chord Canvas</div>
+    <div class="title-bar">
+        <a class="title-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Chord Canvas</a>
+        <span class="title-by"> by <a class="by-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Beats Away</a></span>
+    </div>
     <div class="top-bar">
         <select id="noteSelect">
             <option value="">Select note</option>
@@ -473,6 +532,10 @@
             <button id="settingsCancel" class="btn-ghost">Cancel</button>
             <button id="settingsSave" class="btn-primary">Save</button>
         </div>
+    </div>
+    <div id="infoModal" class="info-modal" role="dialog" aria-modal="true" aria-label="About">
+        Developed by <a href="https://youtube.com/beatsaway" target="_blank">BeatsAway</a> <br>
+        <a href="https://buymeacoffee.com/beatsaway" target="_blank">Support this developer</a>
     </div>
     <div class="segments-container">
         <div class="segment-row" id="row0">
@@ -935,6 +998,31 @@
                 // Update save button state
                 updateSaveButtonState(rootNote, quality, chordType);
                 
+                // If all three dropdowns have values and there are selected cells, replace them
+                if (rootNote && quality && chordType && selectedCells.size > 0) {
+                    const chord = {
+                        note: rootNote,
+                        quality: quality,
+                        type: chordType,
+                        chordKey: `${quality}-${chordType}`
+                    };
+                    
+                    // Replace values in selected cells
+                    selectedCells.forEach(idx => {
+                        if (idx >= 0 && idx < cellValues.length) {
+                            cellValues[idx] = chord;
+                        }
+                    });
+                    
+                    // Update cell displays
+                    updateCells();
+                    
+                    // Update play button state
+                    setTimeout(() => {
+                        updatePlayButtonState();
+                    }, 0);
+                }
+                
                 document.querySelectorAll('.key-highlighted').forEach(key => {
                     key.classList.remove('key-highlighted');
                 });
@@ -1146,6 +1234,15 @@
                         if (typeof updatePlayButtonState === 'function') {
                             updatePlayButtonState();
                         }
+
+                        // Play the chord assigned to this cell (if any)
+                        const chord = cellValues[idx];
+                        if (chord && chord.chordKey) {
+                            ensureAudioReady();
+                            const cellDurationMs = (60000 / playbackBpm) * 4;
+                            const durationSec = cellDurationMs / 1000;
+                            playChord(chord.note, chord.chordKey, durationSec);
+                        }
                     }
                 });
 
@@ -1214,15 +1311,7 @@
                     };
                     savedChords.push(chord);
                     
-                if (selectedCells.size > 0) {
-                    // Replace values in selected cells
-                    selectedCells.forEach(idx => {
-                        if (idx >= 0 && idx < cellValues.length) {
-                            cellValues[idx] = chord;
-                        }
-                    });
-                } else {
-                    // Append chord to cellValues array (make it the last item)
+                    // Always append to the last available cell (ignore selected cells)
                     const firstEmptyIndex = cellValues.findIndex(val => val === null);
                     if (firstEmptyIndex !== -1) {
                         cellValues[firstEmptyIndex] = chord;
@@ -1233,12 +1322,9 @@
                             cellValues.shift(); // Remove first item if exceeds 64
                         }
                     }
-                }
                     
                     // Update cell displays
                     updateCells();
-                // Clear selection after update
-                clearSelection();
                     
                     // Update play button state after saving chord
                     // Will be called after updatePlayButtonState is defined
@@ -1262,6 +1348,8 @@
             const keySelect = document.getElementById('keySelect');
             const settingsSave = document.getElementById('settingsSave');
             const settingsCancel = document.getElementById('settingsCancel');
+            const titleLink = document.querySelector('.title-link');
+            const infoModal = document.getElementById('infoModal');
             
             // Initialize cells display
             updateCells();
@@ -1419,6 +1507,7 @@
             function closeSettings() {
                 settingsOverlay.style.display = 'none';
                 settingsModal.style.display = 'none';
+                infoModal.style.display = 'none';
             }
 
             settingsCancel.addEventListener('click', () => {
@@ -1439,6 +1528,15 @@
                 }
                 closeSettings();
             });
+
+            // Title click (Chord Canvas) opens info modal (only the link, not the whole bar)
+            if (titleLink) {
+                titleLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    settingsOverlay.style.display = 'block';
+                    infoModal.style.display = 'block';
+                });
+            }
 
             noteSelect.addEventListener('change', updateChord);
             chordTypeSelect.addEventListener('change', updateChord);
