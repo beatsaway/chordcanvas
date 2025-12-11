@@ -18,9 +18,9 @@
         .segments-container {
             position: absolute;
             left: 0;
-            bottom: 30vh; /* sits right above the piano row */
+            bottom: 15vh; /* sits right above the piano row */
             width: 100%;
-            height: 20vh; /* narrower than piano */
+            height: 35vh; /* increased height for taller cells */
             display: flex;
             flex-direction: column;
         }
@@ -113,7 +113,7 @@
             border: none;
             padding: 8px 12px;
             display: flex;
-            gap: 8px;
+            gap: 0;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
@@ -122,21 +122,21 @@
 
         select {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 0.85rem;
-            padding: 8px 12px;
+            font-size: 0.8rem;
+            padding: 6px 10px;
             background: #fff;
-            border: 1px solid #dcd7cf;
+            border: 1px solid #e0e0e0;
             color: #111;
             cursor: pointer;
             appearance: none;
             background-image: none;
-            min-width: 140px;
-            transition: border-color 0.12s ease, background-color 0.12s ease;
-            border-radius: 4px;
+            min-width: 120px;
+            transition: border-color 0.1s ease;
+            border-radius: 2px;
         }
 
         select:hover {
-            border-color: #c8c2b8;
+            border-color: #b0b0b0;
         }
 
         select:focus {
@@ -146,10 +146,10 @@
 
         .save-button {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 1.05rem;
-            font-weight: 500;
-            width: 34px;
-            height: 34px;
+            font-size: 0.9rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
             background: #111;
             color: #ffffff;
             border: 1px solid #111;
@@ -157,20 +157,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.12s ease;
+            transition: background-color 0.1s ease;
             flex-shrink: 0;
-            border-radius: 4px;
+            border-radius: 2px;
         }
 
         .save-button:hover:not(:disabled) {
-            background: #222;
-            border-color: #222;
+            background: #333;
         }
 
         .save-button:disabled {
-            background: #e7e4de;
-            color: #9a958a;
-            border-color: #e7e4de;
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
             cursor: not-allowed;
         }
 
@@ -180,29 +179,28 @@
 
         .play-button {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 1rem;
-            font-weight: 500;
-            width: 34px;
-            height: 34px;
-            background: #111;
-            color: #ffffff;
-            border: 1px solid #111;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #90EE90;
+            color: #111;
+            border: 1px solid #90EE90;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.12s ease;
+            transition: background-color 0.1s ease;
             flex-shrink: 0;
-            border-radius: 4px;
+            border-radius: 2px;
         }
 
         .play-button:hover {
-            background: #222;
-            border-color: #222;
+            background: #7dd87d;
         }
 
         .play-button:active {
-            background: #0a0a0a;
+            background: #6bc26b;
         }
 
         .play-button.playing {
@@ -211,47 +209,45 @@
         }
 
         .play-button.playing:hover {
-            background: #cf3f1e;
-            border-color: #cf3f1e;
+            background: #d03a1a;
         }
 
         .play-button:disabled {
-            background: #f0eeea;
-            color: #b0a99d;
-            border-color: #f0eeea;
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
             cursor: not-allowed;
         }
 
         .play-button:disabled:hover {
-            background: #e7e4de;
-            border-color: #e7e4de;
+            background: #f5f5f5;
         }
 
         .settings-button {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 1rem;
-            font-weight: 500;
-            width: 34px;
-            height: 34px;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
             background: #ffffff;
             color: #111;
-            border: 1px solid #d9d4cc;
+            border: 1px solid #e0e0e0;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.12s ease;
+            transition: background-color 0.1s ease, border-color 0.1s ease;
             flex-shrink: 0;
-            border-radius: 4px;
+            border-radius: 2px;
         }
 
         .settings-button:hover {
-            background: #f5f3ee;
-            border-color: #cfc9be;
+            background: #f8f8f8;
+            border-color: #b0b0b0;
         }
 
         .settings-button:active {
-            background: #ebe7df;
+            background: #f0f0f0;
         }
 
         /* Settings modal */
@@ -390,15 +386,15 @@
                 flex-direction: row;
                 flex-wrap: wrap;
                 padding: 12px 16px;
-                gap: 12px;
+                gap: 0;
             }
 
             select {
                 flex: 1;
                 min-width: 0;
-                font-size: 0.8rem;
-                padding: 10px 12px;
-                padding-right: 32px;
+                font-size: 0.75rem;
+                padding: 6px 10px;
+                padding-right: 28px;
             }
         }
 
@@ -407,7 +403,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 30vh;
+            height: 15vh;
             display: flex;
             z-index: 1;
         }
@@ -419,6 +415,23 @@
             border: 1px solid #ccc;
             flex-shrink: 0;
             position: relative;
+        }
+
+        .key-solfege {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .black-key .key-solfege {
+            color: #aaa;
+            font-size: 0.75rem;
+            bottom: 2px;
         }
 
         .black-key {
@@ -511,23 +524,28 @@
             </div>
         </div>
         <div class="settings-field">
-            <label for="keySelect">Key signature</label>
+            <label for="keySelect" style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap;">
+                <span>Key signature</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 400;">
+                    (<input type="checkbox" id="showSolfegeCheckbox" style="margin: 0; vertical-align: middle;"> show solfa names on piano)
+                </span>
+            </label>
             <select id="keySelect" class="settings-select">
-                <option value="C">C</option>
-                <option value="G">G</option>
-                <option value="D">D</option>
-                <option value="A">A</option>
-                <option value="E">E</option>
-                <option value="B">B</option>
-                <option value="F#">F#</option>
-                <option value="C#">C#</option>
-                <option value="F">F</option>
-                <option value="Bb">Bb</option>
-                <option value="Eb">Eb</option>
-                <option value="Ab">Ab</option>
-                <option value="Db">Db</option>
-                <option value="Gb">Gb</option>
-                <option value="Cb">Cb</option>
+                <option value="C">C major / A minor</option>
+                <option value="G">G major / E minor</option>
+                <option value="D">D major / B minor</option>
+                <option value="A">A major / F# minor</option>
+                <option value="E">E major / C# minor</option>
+                <option value="B">B major / G# minor</option>
+                <option value="F#">F# major / D# minor</option>
+                <option value="C#">C# major / A# minor</option>
+                <option value="F">F major / D minor</option>
+                <option value="Bb">Bb major / G minor</option>
+                <option value="Eb">Eb major / C minor</option>
+                <option value="Ab">Ab major / F minor</option>
+                <option value="Db">Db major / Bb minor</option>
+                <option value="Gb">Gb major / Eb minor</option>
+                <option value="Cb">Cb major / Ab minor</option>
             </select>
         </div>
         <div class="settings-actions">
@@ -798,6 +816,83 @@
             'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
             'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
         };
+
+        // Solfege names
+        const solfegeNames = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Ti'];
+        
+        // Global settings for solfege display
+        let keySignature = 'C';
+        let showSolfege = false;
+
+        // Get solfege name for a note in a given key signature
+        function getSolfegeName(noteName, keySignature) {
+            // Get the root note index for the key signature
+            const keyRootIndex = noteToIndex[keySignature];
+            if (keyRootIndex === undefined) return '';
+            
+            // Get the note index (handle both sharp and flat versions)
+            let noteIndex = noteToIndex[noteName];
+            if (noteIndex === undefined) {
+                // Try alternative names
+                if (noteName === 'Cb') noteIndex = 11; // B
+                else if (noteName === 'Fb') noteIndex = 4; // E
+                else if (noteName === 'E#') noteIndex = 5; // F
+                else if (noteName === 'B#') noteIndex = 0; // C
+                else return '';
+            }
+            
+            // Calculate the interval from the key root (in semitones)
+            let interval = (noteIndex - keyRootIndex + 12) % 12;
+            
+            // Major scale intervals: 0=Do, 2=Re, 4=Mi, 5=Fa, 7=Sol, 9=La, 11=Ti
+            // Map to diatonic solfege for scale degrees
+            const diatonicMap = {
+                0: 'Do', 2: 'Re', 4: 'Mi', 5: 'Fa', 7: 'Sol', 9: 'La', 11: 'Ti'
+            };
+            
+            // If it's a scale degree, return diatonic solfege
+            if (diatonicMap[interval] !== undefined) {
+                return diatonicMap[interval];
+            }
+            
+            // For chromatic notes (sharps/flats), use chromatic solfege
+            const chromaticMap = {
+                1: 'Di', 3: 'Ri', 6: 'Fi', 8: 'Si', 10: 'Li'
+            };
+            
+            return chromaticMap[interval] || '';
+        }
+
+        // Update piano keys with solfege names
+        function updatePianoKeysSolfege() {
+            updatePianoKeysSolfegeWithValues(keySignature, showSolfege);
+        }
+
+        // Update piano keys with solfege names using provided values (for preview)
+        function updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege) {
+            const keys = document.querySelectorAll('.white-key, .black-key');
+            keys.forEach(key => {
+                // Remove existing solfege label
+                const existingSolfege = key.querySelector('.key-solfege');
+                if (existingSolfege) {
+                    existingSolfege.remove();
+                }
+                
+                // Add solfege label if enabled
+                if (tempShowSolfege) {
+                    const noteName = key.dataset.noteName;
+                    if (noteName) {
+                        const solfege = getSolfegeName(noteName, tempKeySignature);
+                        if (solfege) {
+                            const solfegeLabel = document.createElement('div');
+                            solfegeLabel.className = 'key-solfege';
+                            solfegeLabel.textContent = solfege;
+                            key.appendChild(solfegeLabel);
+                        }
+                    }
+                }
+            });
+        }
 
         // Initialize Web Audio API
         function initAudio() {
@@ -1073,7 +1168,7 @@
             let currentPlayIndex = 0;
             let playSequence = [];
             let playbackBpm = 120; // default BPM
-            let keySignature = 'C'; // default key signature for future use
+            // keySignature and showSolfege are defined at top level
 
         // Track selected cells
         const selectedCells = new Set();
@@ -1106,16 +1201,16 @@
             const majorMap = {
                 triad: '',
                 '6th': '6',
-                '7th': '7',
-                '9th': '9',
-                '11th': '11',
-                '13th': '13',
+                '7th': 'M7',
+                '9th': 'M9',
+                '11th': 'M11',
+                '13th': 'M13',
                 add9: 'add9',
                 add11: 'add11',
                 '6/9': '6/9',
-                '7sharp11': '7#11',
-                '9sharp11': '9#11',
-                '13sharp11': '13#11'
+                '7sharp11': 'M7#11',
+                '9sharp11': 'M9#11',
+                '13sharp11': 'M13#11'
             };
 
             const minorMap = {
@@ -1220,7 +1315,8 @@
                 // make draggable
                 cell.setAttribute('draggable', 'true');
 
-                cell.addEventListener('click', () => {
+                cell.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering body click handler
                     const idx = Number(cell.dataset.index);
                     const hasAnyValue = cellValues.some(val => val !== null);
                     // Allow selection if cell has a value, or if at least one cell has a value
@@ -1348,6 +1444,7 @@
             const bpmSlider = document.getElementById('bpmSlider');
             const bpmValue = document.getElementById('bpmValue');
             const keySelect = document.getElementById('keySelect');
+            const showSolfegeCheckbox = document.getElementById('showSolfegeCheckbox');
             const settingsSave = document.getElementById('settingsSave');
             const settingsCancel = document.getElementById('settingsCancel');
             const titleLink = document.querySelector('.title-link');
@@ -1356,6 +1453,19 @@
             // Initialize cells display
             updateCells();
         attachCellListeners();
+
+            // Deselect cells when clicking on empty space
+            document.body.addEventListener('click', (e) => {
+                // Check if the click target is a cell or inside a cell
+                const clickedCell = e.target.closest('.segment-cell');
+                // Also check if clicking on interactive elements (buttons, selects, modals)
+                const isInteractiveElement = e.target.closest('button, select, .settings-modal, .info-modal, .settings-overlay');
+                
+                // Only clear selection if clicking on empty space (not on a cell or interactive element)
+                if (!clickedCell && !isInteractiveElement) {
+                    clearSelection();
+                }
+            });
 
             // Function to check if there's anything to play
             function hasChordsToPlay() {
@@ -1466,8 +1576,16 @@
                     
                     // Determine starting point
                     if (selectedCells.size > 0) {
-                        // Play from first selected cell
-                        playSequence = Array.from(selectedCells).sort((a, b) => a - b).filter(idx => cellValues[idx] !== null);
+                        // Play all cells from first selected to last selected (inclusive range)
+                        const selectedArray = Array.from(selectedCells).sort((a, b) => a - b);
+                        const firstSelected = selectedArray[0];
+                        const lastSelected = selectedArray[selectedArray.length - 1];
+                        playSequence = [];
+                        for (let i = firstSelected; i <= lastSelected; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
                     } else {
                         // Play from first cell with value
                         playSequence = [];
@@ -1492,18 +1610,42 @@
             playButton.disabled = true;
             updatePlayButtonState();
 
+            // Store original values for cancel functionality
+            let originalKeySignature = keySignature;
+            let originalShowSolfege = showSolfege;
+
             // Settings button to adjust BPM
             settingsButton.addEventListener('click', () => {
+                // Store original values
+                originalKeySignature = keySignature;
+                originalShowSolfege = showSolfege;
+                
                 // Populate current values
                 bpmSlider.value = playbackBpm;
                 bpmValue.textContent = playbackBpm.toString();
                 keySelect.value = keySignature;
+                showSolfegeCheckbox.checked = showSolfege;
                 settingsOverlay.style.display = 'block';
                 settingsModal.style.display = 'block';
             });
 
             bpmSlider.addEventListener('input', () => {
                 bpmValue.textContent = bpmSlider.value;
+            });
+
+            // Real-time updates for solfege display (temporary, only applied on save)
+            showSolfegeCheckbox.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
+            });
+
+            keySelect.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
             });
 
             function closeSettings() {
@@ -1513,10 +1655,18 @@
             }
 
             settingsCancel.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
                 closeSettings();
             });
 
             settingsOverlay.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
                 closeSettings();
             });
 
@@ -1525,6 +1675,8 @@
                 const clamped = Math.min(300, Math.max(20, value));
                 playbackBpm = clamped;
                 keySignature = keySelect.value;
+                showSolfege = showSolfegeCheckbox.checked;
+                updatePianoKeysSolfege();
                 if (isPlaying) {
                     stopPlayback();
                 }
@@ -1621,6 +1773,9 @@
         // Initialize
         initAudio();
         setupChordControls();
+        
+        // Update solfege names on piano keys if enabled
+        updatePianoKeysSolfege();
     </script>
 </body>
 </html>
