@@ -79,6 +79,29 @@
             z-index: 12;
             letter-spacing: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            position: relative;
+        }
+
+        .menu-toggle {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: #111;
+            cursor: pointer;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.1s ease;
+            z-index: 13;
+        }
+
+        .menu-toggle:hover {
+            opacity: 0.7;
         }
 
         .title-link {
@@ -126,7 +149,7 @@
             padding: 6px 10px;
             background: #fff;
             border: 1px solid #e0e0e0;
-            color: #111;
+            color: #2d7a2d;
             cursor: pointer;
             appearance: none;
             background-image: none;
@@ -422,7 +445,7 @@
             bottom: 4px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             color: #666;
             font-weight: 500;
             pointer-events: none;
@@ -430,7 +453,7 @@
 
         .black-key .key-solfege {
             color: #aaa;
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             bottom: 2px;
         }
 
@@ -478,6 +501,7 @@
 </head>
 <body>
     <div class="title-bar">
+        <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">☰</button>
         <a class="title-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Chord Canvas</a>
         <span class="title-by"> by <a class="by-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Beats Away</a></span>
     </div>
@@ -696,7 +720,7 @@
             major: [
                 { value: 'triad', label: 'Triad' },
                 { value: '6th', label: '6th' },
-                { value: '7th', label: '7th (Maj7)' },
+                { value: '7th', label: '7th' },
                 { value: '9th', label: '9th' },
                 { value: '11th', label: '11th' },
                 { value: '13th', label: '13th' },
@@ -1051,8 +1075,12 @@
             const noteSelect = document.getElementById('noteSelect');
             const qualitySelect = document.getElementById('qualitySelect');
             const chordTypeSelect = document.getElementById('chordTypeSelect');
+            
+            // Flag to track if we're still in initial setup (skip audio during this)
+            let isInitialSetup = true;
 
             function ensureAudioReady() {
+                // Initialize audio context on first user interaction
                 if (!audioContext) {
                     initAudio();
                 }
@@ -1062,8 +1090,14 @@
             }
 
             // Update chord type dropdown based on quality selection
-            qualitySelect.addEventListener('change', () => {
-                ensureAudioReady();
+            qualitySelect.addEventListener('change', (e) => {
+                // Only mark as user interaction if it's not a programmatic event
+                if (e.isTrusted) {
+                    isInitialSetup = false;
+                }
+                if (!isInitialSetup) {
+                    ensureAudioReady();
+                }
                 const quality = qualitySelect.value;
                 chordTypeSelect.innerHTML = '<option value="">Select type</option>';
                 
@@ -1086,8 +1120,6 @@
             });
 
             function updateChord() {
-                ensureAudioReady();
-                
                 const rootNote = noteSelect.value;
                 const quality = qualitySelect.value;
                 const chordType = chordTypeSelect.value;
@@ -1124,24 +1156,29 @@
                     key.classList.remove('key-highlighted');
                 });
 
-                if (rootNote && quality && chordType) {
-                    const chordKey = `${quality}-${chordType}`;
-                    playChord(rootNote, chordKey);
-                } else if (rootNote) {
-                    highlightNote(rootNote);
-                    
-                    // Play the note sound
-                    const rootNoteName = rootNote.replace(/\/.*/, '').trim();
-                    const rootIndex = noteToIndex[rootNoteName];
-                    if (rootIndex !== undefined) {
-                        const rootNoteInMiddleOctave = 12 + rootIndex;
-                        const noteFreq = pianoNotes[rootNoteInMiddleOctave].freq;
-                        const keyElement = document.querySelector(`[data-note-id="${rootNoteInMiddleOctave}"]`);
+                // Only initialize audio and play when user actually interacts (not on page load)
+                if (!isInitialSetup) {
+                    if (rootNote && quality && chordType) {
+                        ensureAudioReady();
+                        const chordKey = `${quality}-${chordType}`;
+                        playChord(rootNote, chordKey);
+                    } else if (rootNote) {
+                        ensureAudioReady();
+                        highlightNote(rootNote);
                         
-                        if (keyElement) {
-                            playNote(noteFreq, keyElement);
-                        } else {
-                            playNote(noteFreq, null);
+                        // Play the note sound
+                        const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+                        const rootIndex = noteToIndex[rootNoteName];
+                        if (rootIndex !== undefined) {
+                            const rootNoteInMiddleOctave = 12 + rootIndex;
+                            const noteFreq = pianoNotes[rootNoteInMiddleOctave].freq;
+                            const keyElement = document.querySelector(`[data-note-id="${rootNoteInMiddleOctave}"]`);
+                            
+                            if (keyElement) {
+                                playNote(noteFreq, keyElement);
+                            } else {
+                                playNote(noteFreq, null);
+                            }
                         }
                     }
                 }
@@ -1396,6 +1433,9 @@
             // Save chord button handler
             const saveButton = document.getElementById('saveButton');
             saveButton.addEventListener('click', () => {
+                // Initialize audio on plus button click
+                ensureAudioReady();
+                
                 const rootNote = noteSelect.value;
                 const quality = qualitySelect.value;
                 const chordType = chordTypeSelect.value;
@@ -1438,6 +1478,7 @@
             
             // Get button references early
             const playButton = document.getElementById('playButton');
+            const menuToggle = document.getElementById('menuToggle');
             const settingsButton = document.getElementById('settingsButton');
             const settingsOverlay = document.getElementById('settingsOverlay');
             const settingsModal = document.getElementById('settingsModal');
@@ -1449,6 +1490,12 @@
             const settingsCancel = document.getElementById('settingsCancel');
             const titleLink = document.querySelector('.title-link');
             const infoModal = document.getElementById('infoModal');
+            
+            // Menu toggle button (placeholder for future use)
+            menuToggle.addEventListener('click', () => {
+                // TODO: Add menu toggle functionality
+                console.log('Menu toggle clicked');
+            });
             
             // Initialize cells display
             updateCells();
@@ -1562,6 +1609,9 @@
 
             playButton.addEventListener('click', () => {
                 if (playButton.disabled) return;
+                
+                // Initialize audio on play button click
+                ensureAudioReady();
                 
                 if (isPlaying) {
                     // Stop playback
@@ -1692,22 +1742,32 @@
                 });
             }
 
-            noteSelect.addEventListener('change', updateChord);
-            chordTypeSelect.addEventListener('change', updateChord);
+            noteSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
+            chordTypeSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
             
             // Initial button state
             updateSaveButtonState(noteSelect.value, qualitySelect.value, chordTypeSelect.value);
 
-            // Set default selection: C major 7
+            // Set default selection: C major 7 (without triggering audio)
             noteSelect.value = 'C';
             qualitySelect.value = 'major';
-            qualitySelect.dispatchEvent(new Event('change'));
+            qualitySelect.dispatchEvent(new Event('change')); // This won't set isInitialSetup=false because e.isTrusted is false
             // After options are populated, set to 7th if available
             const defaultChordType = '7th';
             if (Array.from(chordTypeSelect.options).some(opt => opt.value === defaultChordType)) {
                 chordTypeSelect.value = defaultChordType;
             }
-            updateChord();
+            updateChord(); // This will skip audio because isInitialSetup is still true
         }
 
         // Piano pattern: black keys appear between C-D, D-E, F-G, G-A, A-B
@@ -1770,8 +1830,7 @@
             }
         });
 
-        // Initialize
-        initAudio();
+        // Initialize (audio context will be initialized on user interaction)
         setupChordControls();
         
         // Update solfege names on piano keys if enabled
