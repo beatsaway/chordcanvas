@@ -2635,13 +2635,8 @@
             }
         });
 
-        // Function to shrink keys in a zone
+        // Function to shrink keys in a zone (additive for multitouch)
         function shrinkZoneKeys(zone) {
-            // Remove shrink from all keys first
-            document.querySelectorAll('.white-key, .black-key').forEach(key => {
-                key.classList.remove('zone-shrink');
-            });
-            
             // Add shrink to keys in the clicked zone (stays until released)
             if (zone) {
                 document.querySelectorAll(`[data-zone="${zone}"]`).forEach(key => {
@@ -2650,15 +2645,44 @@
             }
         }
         
-        // Function to remove shrink from all keys
-        function removeZoneShrink() {
+        // Function to remove shrink from a specific zone
+        function removeZoneShrink(zone) {
+            if (zone) {
+                document.querySelectorAll(`[data-zone="${zone}"]`).forEach(key => {
+                    key.classList.remove('zone-shrink');
+                });
+            }
+        }
+        
+        // Function to update shrink visuals based on active touches
+        function updateShrinkVisuals() {
+            // Remove all shrinks first
             document.querySelectorAll('.white-key, .black-key').forEach(key => {
                 key.classList.remove('zone-shrink');
             });
+            
+            // Add shrink for all active zones
+            const activeZones = new Set();
+            activeTouches.forEach(touch => {
+                if (touch.zone) {
+                    activeZones.add(touch.zone);
+                }
+            });
+            if (mouseActive && mouseZone) {
+                activeZones.add(mouseZone);
+            }
+            
+            activeZones.forEach(zone => {
+                shrinkZoneKeys(zone);
+            });
         }
         
-        // Track active oscillators for current touch/click
-        let currentZoneOscillators = [];
+        // Track active oscillators per touch/zone for multitouch support
+        // Map: touchId -> { zone, oscillators }
+        let activeTouches = new Map();
+        let mouseActive = false;
+        let mouseOscillators = [];
+        let mouseZone = null;
         
         // Three zones: left (A), mid (B), right (C)
         container.addEventListener('mousedown', (e) => {
@@ -2678,25 +2702,29 @@
             // Three zones: left (A), mid (B), right (C)
             const zone = getClickZone(e);
             
+            // Stop any previous mouse oscillators
+            stopOscillators(mouseOscillators);
+            mouseActive = true;
+            mouseZone = zone; // Track mouse zone
+            
             // Visual feedback: shrink keys in the clicked zone
             shrinkZoneKeys(zone);
             
-            // Stop any previous oscillators
-            stopOscillators(currentZoneOscillators);
-            
             // Start playing and store oscillators
             if (window.playCurrentChord) {
-                currentZoneOscillators = window.playCurrentChord(zone);
+                mouseOscillators = window.playCurrentChord(zone);
             }
         });
         
         container.addEventListener('mouseup', (e) => {
             if (window.liveMode) {
-                // Stop all oscillators when mouse is released (with 0.1s tail)
-                stopOscillators(currentZoneOscillators);
-                currentZoneOscillators = [];
-                // Remove shrink visual
-                removeZoneShrink();
+                // Stop mouse oscillators when mouse is released (with 0.1s tail)
+                stopOscillators(mouseOscillators);
+                mouseOscillators = [];
+                mouseActive = false;
+                mouseZone = null;
+                // Update shrink visuals
+                updateShrinkVisuals();
             }
         });
         
@@ -2714,38 +2742,73 @@
                 audioContext.resume();
             }
             
-            // Three zones: left (A), mid (B), right (C)
-            const zone = getClickZone(e);
+            // Handle each touch point separately for multitouch support
+            Array.from(e.changedTouches).forEach(touch => {
+                const touchId = touch.identifier;
+                
+                // Create a synthetic event for zone detection
+                const syntheticEvent = {
+                    clientX: touch.clientX,
+                    touches: [touch]
+                };
+                
+                // Three zones: left (A), mid (B), right (C)
+                const zone = getClickZone(syntheticEvent);
+                
+                // Start playing and store oscillators for this touch
+                let oscillators = [];
+                if (window.playCurrentChord) {
+                    oscillators = window.playCurrentChord(zone);
+                }
+                
+                // Store this touch
+                activeTouches.set(touchId, {
+                    zone: zone,
+                    oscillators: oscillators
+                });
+            });
             
-            // Visual feedback: shrink keys in the clicked zone
-            shrinkZoneKeys(zone);
-            
-            // Stop any previous oscillators
-            stopOscillators(currentZoneOscillators);
-            
-            // Start playing and store oscillators
-            if (window.playCurrentChord) {
-                currentZoneOscillators = window.playCurrentChord(zone);
-            }
+            // Update shrink visuals for all active zones
+            updateShrinkVisuals();
         });
         
         container.addEventListener('touchend', (e) => {
             if (window.liveMode) {
-                // Stop all oscillators when touch is released (with 0.1s tail)
-                stopOscillators(currentZoneOscillators);
-                currentZoneOscillators = [];
-                // Remove shrink visual
-                removeZoneShrink();
+                // Handle each ended touch separately
+                Array.from(e.changedTouches).forEach(touch => {
+                    const touchId = touch.identifier;
+                    const touchData = activeTouches.get(touchId);
+                    
+                    if (touchData) {
+                        // Stop oscillators for this specific touch (with 0.1s tail)
+                        stopOscillators(touchData.oscillators);
+                        // Remove this touch
+                        activeTouches.delete(touchId);
+                    }
+                });
+                
+                // Update shrink visuals
+                updateShrinkVisuals();
             }
         });
         
         container.addEventListener('touchcancel', (e) => {
             if (window.liveMode) {
-                // Stop all oscillators if touch is cancelled (with 0.1s tail)
-                stopOscillators(currentZoneOscillators);
-                currentZoneOscillators = [];
-                // Remove shrink visual
-                removeZoneShrink();
+                // Handle each cancelled touch separately
+                Array.from(e.changedTouches).forEach(touch => {
+                    const touchId = touch.identifier;
+                    const touchData = activeTouches.get(touchId);
+                    
+                    if (touchData) {
+                        // Stop oscillators for this specific touch (with 0.1s tail)
+                        stopOscillators(touchData.oscillators);
+                        // Remove this touch
+                        activeTouches.delete(touchId);
+                    }
+                });
+                
+                // Update shrink visuals
+                updateShrinkVisuals();
             }
         });
 
