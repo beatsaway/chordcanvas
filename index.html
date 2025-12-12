@@ -546,6 +546,16 @@
             pointer-events: none;
         }
 
+        /* Hide UI elements in live mode */
+        body.live-mode #noteSelect,
+        body.live-mode #qualitySelect,
+        body.live-mode #chordTypeSelect,
+        body.live-mode #saveButton,
+        body.live-mode #playButton,
+        body.live-mode #settingsButton {
+            display: none;
+        }
+
         /* Disable interactions in live mode */
         body.live-mode select,
         body.live-mode button:not(.menu-toggle),
@@ -1084,10 +1094,7 @@
         }
 
         function clearKeyHighlights() {
-            // Don't modify key visuals in live mode
-            if (window.liveMode) {
-                return;
-            }
+            // Clear highlights in both play mode and live mode
             document.querySelectorAll('.key-highlighted').forEach(key => {
                 key.classList.remove('key-highlighted');
             });
@@ -1188,12 +1195,17 @@
             const chord = window.currentLiveChord;
             const oscillators = [];
             
+            // Clear previous highlights before adding new ones (same as playChord does)
+            clearKeyHighlights();
+            
             // Play all notes in the palette
             chord.noteIndices.forEach(noteIndex => {
                 if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
                     const note = pianoNotes[noteIndex];
                     const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
                     if (keyElement) {
+                        // Add green highlight to key (same as playChord does)
+                        keyElement.classList.add('key-highlighted');
                         const osc = playNoteContinuous(note.freq, keyElement, volumeMultiplier);
                         oscillators.push(osc);
                     } else {
@@ -2763,6 +2775,20 @@
             });
         }
         
+        // Helper function to clear highlights when all interactions have ended
+        function clearHighlightsIfNoActiveInteractions() {
+            // Only clear if there are no active touches and mouse is not active
+            if (activeTouches.size === 0 && !mouseActive) {
+                // Use a small delay to allow for fade-out, but clear highlights
+                setTimeout(() => {
+                    // Double-check that no new interactions started
+                    if (activeTouches.size === 0 && !mouseActive) {
+                        clearKeyHighlights();
+                    }
+                }, 150); // Slightly longer than max release time (100ms)
+            }
+        }
+        
         // Simple: tap anywhere on piano to trigger full chord palette
         container.addEventListener('mousedown', (e) => {
             if (!window.liveMode || !window.currentLiveChord) {
@@ -2822,6 +2848,8 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
+                // Clear highlights if no other interactions are active
+                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2832,6 +2860,8 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
+                // Clear highlights if no other interactions are active
+                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2910,6 +2940,8 @@
                         activeTouches.delete(touchId);
                     }
                 });
+                // Clear highlights if no other interactions are active
+                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2928,6 +2960,8 @@
                         activeTouches.delete(touchId);
                     }
                 });
+                // Clear highlights if no other interactions are active
+                clearHighlightsIfNoActiveInteractions();
             }
         });
 
@@ -2937,5 +2971,5 @@
         // Update solfege names on piano keys if enabled
         updatePianoKeysSolfege();
     </script>
-</body> 
+</body>
 </html>
