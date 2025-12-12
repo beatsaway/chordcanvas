@@ -774,6 +774,7 @@
         <div class="white-key"></div>
     </div>
 
+    <script src="watersynth.js"></script>
     <script>
         // Piano note frequencies (C4 as base)
         const notes = [
@@ -798,7 +799,7 @@
         
         const pianoNotes = [...lowerOctave, ...middleOctave, ...upperOctave];
 
-        let audioContext;
+        let waterSynth = null;
         let activeOscillators = {};
 
         // Chord type options for each quality
@@ -1002,100 +1003,65 @@
             });
         }
 
-        // Audio nodes for preventing clipping
-        let masterGain = null;
-        let compressor = null;
-        
-        // Initialize Web Audio API
+        // Initialize WaterSynth
         function initAudio() {
             try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Create master gain and compressor to prevent clipping with multitouch
-                masterGain = audioContext.createGain();
-                compressor = audioContext.createDynamicsCompressor();
-                
-                // Configure compressor to prevent clipping
-                compressor.threshold.value = -12; // Start compressing at -12dB
-                compressor.knee.value = 6; // Smooth compression curve
-                compressor.ratio.value = 12; // High ratio for limiting effect
-                compressor.attack.value = 0.003; // Fast attack
-                compressor.release.value = 0.1; // Quick release
-                
-                // Connect: masterGain -> compressor -> destination
-                masterGain.connect(compressor);
-                compressor.connect(audioContext.destination);
-                
-                // Set master gain level
-                masterGain.gain.value = 1.0;
+                if (!waterSynth) {
+                    waterSynth = new WaterSynth();
+                }
+                // Resume audio context if suspended
+                if (waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                    waterSynth.audioContext.resume();
+                }
             } catch (e) {
-                console.error('Web Audio API not supported');
+                console.error('Web Audio API not supported:', e);
             }
         }
 
         // Play a note
         function playNote(frequency, keyElement, stopExisting = true, duration = 1.5) {
-            if (!audioContext) {
+            if (!waterSynth) {
                 initAudio();
             }
             
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (waterSynth && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
             }
 
-            if (stopExisting) {
+            if (stopExisting && keyElement) {
                 stopNote(keyElement);
             }
 
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            // Route through master gain and compressor to prevent clipping
-            if (masterGain) {
-                gainNode.connect(masterGain);
-            } else {
-                gainNode.connect(audioContext.destination);
-            }
-
-            oscillator.frequency.value = frequency;
-            oscillator.type = 'sine';
-
-            const now = audioContext.currentTime;
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
-            oscillator.start(now);
-            oscillator.stop(now + duration);
-
-            const keyId = keyElement ? keyElement.dataset.noteId : null;
-            if (keyId) {
-                if (stopExisting) {
-                    activeOscillators[keyId] = { oscillator, gainNode };
-                } else {
-                    if (!activeOscillators[keyId]) {
-                        activeOscillators[keyId] = [];
-                    }
-                    if (Array.isArray(activeOscillators[keyId])) {
-                        activeOscillators[keyId].push({ oscillator, gainNode });
-                    } else {
-                        activeOscillators[keyId] = [{ oscillator, gainNode }];
-                    }
-                }
+            // Use WaterSynth's playNote method
+            if (waterSynth) {
+                waterSynth.playNote(frequency, duration);
             }
         }
 
         // Stop a note
         function stopNote(keyElement) {
+            if (!keyElement) return;
             const keyId = keyElement.dataset.noteId;
             if (activeOscillators[keyId]) {
                 const oscillators = Array.isArray(activeOscillators[keyId]) 
                     ? activeOscillators[keyId] 
                     : [activeOscillators[keyId]];
                 oscillators.forEach(osc => {
-                    if (osc.oscillator) {
-                        osc.oscillator.stop();
+                    if (osc && osc.gainNode && waterSynth && waterSynth.audioContext) {
+                        try {
+                            const now = waterSynth.audioContext.currentTime;
+                            osc.gainNode.gain.cancelScheduledValues(now);
+                            osc.gainNode.gain.setValueAtTime(osc.gainNode.gain.value, now);
+                            osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                            if (osc.oscillator) {
+                                osc.oscillator.stop(now + 0.1);
+                            }
+                            if (osc.noise) {
+                                osc.noise.stop(now + 0.1);
+                            }
+                        } catch (e) {
+                            // Oscillator might already be stopped
+                        }
                     }
                 });
                 delete activeOscillators[keyId];
@@ -1139,48 +1105,29 @@
 
         // Play a note continuously (until stopped)
         function playNoteContinuous(frequency, keyElement) {
-            if (!audioContext) {
+            if (!waterSynth) {
                 initAudio();
             }
             
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (waterSynth && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
             }
 
-            // Don't stop existing oscillators - allow them to layer and fade out naturally
-            // stopNote(keyElement);
-
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            // Route through master gain and compressor to prevent clipping
-            if (masterGain) {
-                gainNode.connect(masterGain);
-            } else {
-                gainNode.connect(audioContext.destination);
+            // Use WaterSynth's createSustainedNote method
+            if (waterSynth) {
+                const note = waterSynth.createSustainedNote(frequency);
+                const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
+                if (!activeOscillators[keyId]) {
+                    activeOscillators[keyId] = [];
+                }
+                if (Array.isArray(activeOscillators[keyId])) {
+                    activeOscillators[keyId].push(note);
+                } else {
+                    activeOscillators[keyId] = [note];
+                }
+                return note;
             }
-
-            oscillator.frequency.value = frequency;
-            oscillator.type = 'sine';
-
-            const now = audioContext.currentTime;
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01);
-
-            oscillator.start(now);
-
-            const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
-            if (!activeOscillators[keyId]) {
-                activeOscillators[keyId] = [];
-            }
-            if (Array.isArray(activeOscillators[keyId])) {
-                activeOscillators[keyId].push({ oscillator, gainNode });
-            } else {
-                activeOscillators[keyId] = [{ oscillator, gainNode }];
-            }
-            
-            return { oscillator, gainNode };
+            return null;
         }
 
         // Play full chord palette (all notes)
@@ -1213,12 +1160,12 @@
         
         // Stop oscillators with 0.1s release tail
         function stopOscillators(oscillators) {
-            if (oscillators && Array.isArray(oscillators) && audioContext) {
-                const now = audioContext.currentTime;
+            if (oscillators && Array.isArray(oscillators) && waterSynth && waterSynth.audioContext) {
+                const now = waterSynth.audioContext.currentTime;
                 const releaseTime = 0.1; // 0.1 second release tail
                 
                 oscillators.forEach(osc => {
-                    if (osc.oscillator && osc.gainNode) {
+                    if (osc && osc.gainNode) {
                         try {
                             // Fade out over 0.1s
                             const currentGain = osc.gainNode.gain.value;
@@ -1227,7 +1174,12 @@
                             osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
                             
                             // Stop oscillator after fade
-                            osc.oscillator.stop(now + releaseTime);
+                            if (osc.oscillator) {
+                                osc.oscillator.stop(now + releaseTime);
+                            }
+                            if (osc.noise) {
+                                osc.noise.stop(now + releaseTime);
+                            }
                         } catch (e) {
                             // Oscillator might already be stopped
                         }
@@ -1351,11 +1303,11 @@
             }
 
             // Normal mode: play sounds
-            if (!audioContext) {
+            if (!waterSynth) {
                 initAudio();
             }
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
             }
 
             // Clear previous highlights
@@ -1469,11 +1421,11 @@
 
             function ensureAudioReady() {
                 // Initialize audio context on first user interaction
-                if (!audioContext) {
+                if (!waterSynth) {
                     initAudio();
                 }
-                if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
+                if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                    waterSynth.audioContext.resume();
                 }
             }
             
@@ -2656,11 +2608,11 @@
             
             if (window.ensureAudioReady) {
                 window.ensureAudioReady();
-            } else if (!audioContext) {
+            } else if (!waterSynth) {
                 initAudio();
             }
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
             }
             
             // Stop any previous mouse oscillators
@@ -2696,11 +2648,11 @@
             
             if (window.ensureAudioReady) {
                 window.ensureAudioReady();
-            } else if (!audioContext) {
+            } else if (!waterSynth) {
                 initAudio();
             }
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume();
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
             }
             
             // Handle each touch point separately for multitouch support
