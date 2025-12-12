@@ -531,13 +531,6 @@
             background: #90EE90 !important;
         }
 
-        /* Zone shrink effect for live mode */
-        .white-key.zone-shrink,
-        .black-key.zone-shrink {
-            transform: scale(0.95);
-            transition: transform 0.15s ease-out;
-        }
-
         /* Live mode palette - green notes that can be clicked */
         .key-palette {
             background: #90EE90 !important;
@@ -564,6 +557,12 @@
         body.live-mode .menu-toggle {
             opacity: 1;
             pointer-events: auto;
+        }
+
+        /* Disable transitions on piano keys to prevent visual changes */
+        .white-key,
+        .black-key {
+            transition: none !important;
         }
     </style>
 </head>
@@ -1085,6 +1084,10 @@
         }
 
         function clearKeyHighlights() {
+            // Don't modify key visuals in live mode
+            if (window.liveMode) {
+                return;
+            }
             document.querySelectorAll('.key-highlighted').forEach(key => {
                 key.classList.remove('key-highlighted');
             });
@@ -1120,7 +1123,8 @@
         }
 
         // Play a note continuously (until stopped)
-        function playNoteContinuous(frequency, keyElement) {
+        // volumeMultiplier: 0.0 to 1.0 (1.0 = 0dB, 0.158 = -16dB)
+        function playNoteContinuous(frequency, keyElement, volumeMultiplier = 1.0) {
             if (!waterSynth) {
                 initAudio();
             }
@@ -1132,6 +1136,20 @@
             // Use WaterSynth's createSustainedNote method
             if (waterSynth) {
                 const note = waterSynth.createSustainedNote(frequency);
+                
+                // Apply volume multiplier to gain node
+                if (note.gainNode && volumeMultiplier !== 1.0) {
+                    const now = waterSynth.audioContext.currentTime;
+                    // Cancel existing scheduled values and scale the envelope
+                    note.gainNode.gain.cancelScheduledValues(now);
+                    note.gainNode.gain.setValueAtTime(0, now);
+                    // Reapply the envelope with volume scaling
+                    const attackTime = 0.02;
+                    note.gainNode.gain.linearRampToValueAtTime(0.4 * volumeMultiplier, now + attackTime);
+                    note.gainNode.gain.linearRampToValueAtTime(0.5 * volumeMultiplier, now + attackTime + 0.01);
+                    note.gainNode.gain.exponentialRampToValueAtTime(0.35 * volumeMultiplier, now + 0.15);
+                }
+                
                 const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
                 if (!activeOscillators[keyId]) {
                     activeOscillators[keyId] = [];
@@ -1148,7 +1166,8 @@
 
         // Play full chord palette (all notes)
         // Returns array of oscillators that can be stopped later
-        function playCurrentChord() {
+        // volumeMultiplier: 0.0 to 1.0 (1.0 = 0dB, 0.158 = -16dB)
+        function playCurrentChord(volumeMultiplier = 1.0) {
             if (!window.currentLiveChord || !window.currentLiveChord.noteIndices) {
                 return [];
             }
@@ -1162,10 +1181,10 @@
                     const note = pianoNotes[noteIndex];
                     const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
                     if (keyElement) {
-                        const osc = playNoteContinuous(note.freq, keyElement);
+                        const osc = playNoteContinuous(note.freq, keyElement, volumeMultiplier);
                         oscillators.push(osc);
                     } else {
-                        const osc = playNoteContinuous(note.freq, null);
+                        const osc = playNoteContinuous(note.freq, null, volumeMultiplier);
                         oscillators.push(osc);
                     }
                 }
@@ -1374,7 +1393,10 @@
                         const bassKeyElement = document.querySelector(`[data-note-id="${bassNoteInLowerOctave}"]`);
                         
                         if (bassKeyElement) {
-                            bassKeyElement.classList.add('key-highlighted');
+                            // Don't add visual highlight in live mode
+                            if (!window.liveMode) {
+                                bassKeyElement.classList.add('key-highlighted');
+                            }
                             playNote(bassFreq, bassKeyElement, false, durationSec);
                         } else {
                             playNote(bassFreq, null, false, durationSec);
@@ -1405,8 +1427,10 @@
                     const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
                     
                     if (keyElement) {
-                        // Highlight the key
-                        keyElement.classList.add('key-highlighted');
+                        // Don't add visual highlight in live mode
+                        if (!window.liveMode) {
+                            keyElement.classList.add('key-highlighted');
+                        }
                         // Play the note
                         playNote(noteFreq, keyElement, false, durationSec);
                     } else {
@@ -1424,6 +1448,11 @@
             const rootNoteName = rootNote.replace(/\/.*/, '').trim();
             const rootIndex = noteToIndex[rootNoteName];
             if (rootIndex === undefined) return;
+
+            // Don't add visual highlights in live mode
+            if (window.liveMode) {
+                return;
+            }
 
             // Clear previous highlights
             clearKeyHighlights();
@@ -1988,6 +2017,8 @@
                 const chordType = chordTypeSelect.value;
                 
                 if (rootNote && quality && chordType) {
+                    let chord = null; // Declare chord outside blocks
+                    
                     // If there are selected cells, update those cells
                     if (selectedCells.size > 0) {
                         selectedCells.forEach(idx => {
@@ -1995,7 +2026,7 @@
                                 const existingChord = cellValues[idx];
                                 // Preserve passing chord if it exists
                                 const preservedPassingChord = existingChord && existingChord.passingChord ? existingChord.passingChord : '';
-                                const chord = {
+                                chord = {
                                     note: rootNote,
                                     quality: quality,
                                     type: chordType,
@@ -2008,7 +2039,7 @@
                         });
                     } else {
                         // No selected cells - add to first empty cell
-                        const chord = {
+                        chord = {
                             note: rootNote,
                             quality: quality,
                             type: chordType,
@@ -2038,9 +2069,11 @@
                         updatePlayButtonState();
                     }, 0);
                     
-                    console.log('Saved chord:', chord);
-                    console.log('All saved chords:', savedChords);
-                    console.log('Cell values:', cellValues);
+                    if (chord) {
+                        console.log('Saved chord:', chord);
+                        console.log('All saved chords:', savedChords);
+                        console.log('Cell values:', cellValues);
+                    }
                 }
             });
             
@@ -2611,25 +2644,27 @@
             }
         });
 
-        // Function to shrink all keys (simple visual feedback)
-        function shrinkAllKeys() {
-            document.querySelectorAll('.white-key, .black-key').forEach(key => {
-                key.classList.add('zone-shrink');
-            });
-        }
-        
-        // Function to remove shrink from all keys
-        function removeAllShrink() {
-            document.querySelectorAll('.white-key, .black-key').forEach(key => {
-                key.classList.remove('zone-shrink');
-            });
-        }
-        
         // Track active oscillators per touch for multitouch support
-        // Map: touchId -> { oscillators }
+        // Map: touchId -> { oscillators, initialY }
         let activeTouches = new Map();
         let mouseActive = false;
         let mouseOscillators = [];
+        let mouseInitialY = 0;
+        
+        // Calculate volume multiplier from Y position (0dB at bottom, -16dB at top)
+        // Returns value between 0.158 (top, -16dB) and 1.0 (bottom, 0dB)
+        function calculateVolumeFromY(y, containerElement) {
+            const rect = containerElement.getBoundingClientRect();
+            const relativeY = y - rect.top;
+            const height = rect.height;
+            // Normalize: 0 at bottom, 1 at top
+            const normalizedY = 1 - (relativeY / height);
+            // Clamp between 0 and 1
+            const clampedY = Math.max(0, Math.min(1, normalizedY));
+            // Map: 0 (bottom) = 1.0 (0dB), 1 (top) = 0.158 (-16dB)
+            // Linear interpolation: volume = 1.0 - (clampedY * 0.842)
+            return 1.0 - (clampedY * 0.842);
+        }
         
         // Simple: tap anywhere on piano to trigger full chord palette
         container.addEventListener('mousedown', (e) => {
@@ -2650,12 +2685,14 @@
             stopOscillators(mouseOscillators);
             mouseActive = true;
             
-            // Visual feedback: shrink all keys
-            shrinkAllKeys();
+            // Calculate volume based on initial tap position (Y coordinate)
+            mouseInitialY = e.clientY;
+            const volumeMultiplier = calculateVolumeFromY(mouseInitialY, container);
             
             // Start playing full chord and store oscillators
+            // Visual feedback is provided by the existing green palette highlight
             if (window.playCurrentChord) {
-                mouseOscillators = window.playCurrentChord();
+                mouseOscillators = window.playCurrentChord(volumeMultiplier);
             }
         });
         
@@ -2665,10 +2702,6 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
-                // Remove shrink visual
-                if (activeTouches.size === 0) {
-                    removeAllShrink();
-                }
             }
         });
         
@@ -2690,22 +2723,23 @@
             Array.from(e.changedTouches).forEach(touch => {
                 const touchId = touch.identifier;
                 
+                // Calculate volume based on initial tap position (Y coordinate)
+                const initialY = touch.clientY;
+                const volumeMultiplier = calculateVolumeFromY(initialY, container);
+                
                 // Start playing full chord and store oscillators for this touch
                 let oscillators = [];
                 if (window.playCurrentChord) {
-                    oscillators = window.playCurrentChord();
+                    oscillators = window.playCurrentChord(volumeMultiplier);
                 }
                 
-                // Store this touch
+                // Store this touch with initial Y position (for reference, but won't change volume)
                 activeTouches.set(touchId, {
-                    oscillators: oscillators
+                    oscillators: oscillators,
+                    initialY: initialY
                 });
             });
-            
-            // Visual feedback: shrink all keys if any touch is active
-            if (activeTouches.size > 0 || mouseActive) {
-                shrinkAllKeys();
-            }
+            // Visual feedback is provided by the existing green palette highlight
         });
         
         container.addEventListener('touchend', (e) => {
@@ -2722,11 +2756,6 @@
                         activeTouches.delete(touchId);
                     }
                 });
-                
-                // Remove shrink visual if no touches are active
-                if (activeTouches.size === 0 && !mouseActive) {
-                    removeAllShrink();
-                }
             }
         });
         
@@ -2744,11 +2773,6 @@
                         activeTouches.delete(touchId);
                     }
                 });
-                
-                // Remove shrink visual if no touches are active
-                if (activeTouches.size === 0 && !mouseActive) {
-                    removeAllShrink();
-                }
             }
         });
 
