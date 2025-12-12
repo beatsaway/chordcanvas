@@ -15,6 +15,7 @@ class PatternPlayer {
     this.bpm = 120;
     this.excite = 0.7;
     this.currentPattern = {};
+    this.animationFrameId = null; // Track animation frame for cleanup
     
     // LFO settings
     this.lfoBeats = 8;
@@ -309,6 +310,11 @@ class PatternPlayer {
 
   stop() {
     this.looping = false;
+    // Cancel any pending animation frame
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
   }
 
   schedule() {
@@ -324,7 +330,7 @@ class PatternPlayer {
       this.nextNoteTime += stepDur;
     }
     
-    requestAnimationFrame(() => this.schedule());
+    this.animationFrameId = requestAnimationFrame(() => this.schedule());
   }
 
   _playPatternStep(step, when) {
@@ -497,6 +503,7 @@ class RealDrumApp {
     const meterData = new Uint8Array(meterAnalyser.fftSize);
     this.drumMachine.master.connect(meterAnalyser);
     
+    let meterAnimationFrameId = null;
     const updateMeter = () => {
       meterAnalyser.getByteTimeDomainData(meterData);
       let peak = 0;
@@ -506,9 +513,17 @@ class RealDrumApp {
       }
       const pct = Math.min(100, Math.max(4, peak * 180));
       meterFill.style.width = pct + '%';
-      requestAnimationFrame(updateMeter);
+      meterAnimationFrameId = requestAnimationFrame(updateMeter);
     };
     updateMeter();
+    
+    // Store cleanup function
+    this._stopMeter = () => {
+      if (meterAnimationFrameId !== null) {
+        cancelAnimationFrame(meterAnimationFrameId);
+        meterAnimationFrameId = null;
+      }
+    };
   }
 }
 
