@@ -2765,6 +2765,11 @@
                 return;
             }
             
+            // Only handle left mouse button (button === 0)
+            if (e.button !== 0) return;
+            
+            e.preventDefault(); // Prevent default behavior
+            
             if (window.ensureAudioReady) {
                 window.ensureAudioReady();
             } else if (!waterSynth) {
@@ -2792,7 +2797,9 @@
         });
         
         container.addEventListener('mousemove', (e) => {
-            if (window.liveMode && mouseActive && mouseOscillators.length > 0) {
+            // Only update if mouse button is actually pressed (e.buttons === 1 for left button)
+            if (window.liveMode && mouseActive && mouseOscillators.length > 0 && e.buttons === 1) {
+                e.preventDefault(); // Prevent any default behavior
                 // Update volume and pitch continuously during drag
                 const volumeMultiplier = calculateVolumeFromY(e.clientY, container);
                 const pitchMultiplier = calculatePitchFromX(e.clientX, container);
@@ -2802,7 +2809,11 @@
         });
         
         container.addEventListener('mouseup', (e) => {
-            if (window.liveMode) {
+            // Only handle left mouse button (button === 0)
+            if (e.button !== 0) return;
+            
+            if (window.liveMode && mouseActive) {
+                e.preventDefault();
                 // Stop mouse oscillators when mouse is released (with dynamic tail)
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
@@ -2811,8 +2822,9 @@
         });
         
         container.addEventListener('mouseleave', (e) => {
-            if (window.liveMode && mouseActive) {
-                // Stop mouse oscillators when mouse leaves container (with dynamic tail)
+            // Only stop if mouse button was pressed (e.buttons === 1)
+            if (window.liveMode && mouseActive && e.buttons === 1) {
+                // Stop mouse oscillators when mouse leaves container while dragging (with dynamic tail)
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
@@ -2823,6 +2835,8 @@
             if (!window.liveMode || !window.currentLiveChord) {
                 return;
             }
+            
+            e.preventDefault(); // Prevent scrolling and other default behaviors
             
             if (window.ensureAudioReady) {
                 window.ensureAudioReady();
@@ -2879,13 +2893,14 @@
         
         container.addEventListener('touchend', (e) => {
             if (window.liveMode) {
+                e.preventDefault(); // Prevent default behavior
                 // Handle each ended touch separately
                 Array.from(e.changedTouches).forEach(touch => {
                     const touchId = touch.identifier;
                     const touchData = activeTouches.get(touchId);
                     
                     if (touchData) {
-                        // Stop oscillators for this specific touch (with 0.1s tail)
+                        // Stop oscillators for this specific touch (with dynamic tail)
                         stopOscillators(touchData.oscillators);
                         // Remove this touch
                         activeTouches.delete(touchId);
@@ -2896,13 +2911,14 @@
         
         container.addEventListener('touchcancel', (e) => {
             if (window.liveMode) {
+                e.preventDefault(); // Prevent default behavior
                 // Handle each cancelled touch separately
                 Array.from(e.changedTouches).forEach(touch => {
                     const touchId = touch.identifier;
                     const touchData = activeTouches.get(touchId);
                     
                     if (touchData) {
-                        // Stop oscillators for this specific touch (with 0.1s tail)
+                        // Stop oscillators for this specific touch (with dynamic tail)
                         stopOscillators(touchData.oscillators);
                         // Remove this touch
                         activeTouches.delete(touchId);
