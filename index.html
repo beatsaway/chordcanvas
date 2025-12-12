@@ -1183,81 +1183,30 @@
             return { oscillator, gainNode };
         }
 
-        // Play palette parts: A (lowest), B (lower part of remaining), C (higher part of remaining)
+        // Play full chord palette (all notes)
         // Returns array of oscillators that can be stopped later
-        function playCurrentChord(zone) {
-            if (!window.currentLiveChord) {
+        function playCurrentChord() {
+            if (!window.currentLiveChord || !window.currentLiveChord.noteIndices) {
                 return [];
             }
             
             const chord = window.currentLiveChord;
             const oscillators = [];
             
-            if (zone === 'left') {
-                // Left zone: Play A (lowest note + octave lower version)
-                if (chord.noteA !== null && chord.noteA !== undefined) {
-                    const noteIndex = chord.noteA;
-                    // Play the lowest note
-                    if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
-                        const note = pianoNotes[noteIndex];
-                        const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
-                        if (keyElement) {
-                            const osc = playNoteContinuous(note.freq, keyElement);
-                            oscillators.push(osc);
-                        } else {
-                            const osc = playNoteContinuous(note.freq, null);
-                            oscillators.push(osc);
-                        }
-                    }
-                    // Play octave lower version
-                    const octaveLowerIndex = noteIndex - 12;
-                    if (octaveLowerIndex >= 0 && octaveLowerIndex < pianoNotes.length) {
-                        const lowerNote = pianoNotes[octaveLowerIndex];
-                        const lowerKeyElement = document.querySelector(`[data-note-id="${octaveLowerIndex}"]`);
-                        if (lowerKeyElement) {
-                            const osc = playNoteContinuous(lowerNote.freq, lowerKeyElement);
-                            oscillators.push(osc);
-                        } else {
-                            const osc = playNoteContinuous(lowerNote.freq, null);
-                            oscillators.push(osc);
-                        }
+            // Play all notes in the palette
+            chord.noteIndices.forEach(noteIndex => {
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    const note = pianoNotes[noteIndex];
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        const osc = playNoteContinuous(note.freq, keyElement);
+                        oscillators.push(osc);
+                    } else {
+                        const osc = playNoteContinuous(note.freq, null);
+                        oscillators.push(osc);
                     }
                 }
-            } else if (zone === 'mid') {
-                // Mid zone: Play B (lower part of remaining notes)
-                if (chord.notesB && chord.notesB.length > 0) {
-                    chord.notesB.forEach(noteIndex => {
-                        if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
-                            const note = pianoNotes[noteIndex];
-                            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
-                            if (keyElement) {
-                                const osc = playNoteContinuous(note.freq, keyElement);
-                                oscillators.push(osc);
-                            } else {
-                                const osc = playNoteContinuous(note.freq, null);
-                                oscillators.push(osc);
-                            }
-                        }
-                    });
-                }
-            } else if (zone === 'right') {
-                // Right zone: Play C (higher part of remaining notes)
-                if (chord.notesC && chord.notesC.length > 0) {
-                    chord.notesC.forEach(noteIndex => {
-                        if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
-                            const note = pianoNotes[noteIndex];
-                            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
-                            if (keyElement) {
-                                const osc = playNoteContinuous(note.freq, keyElement);
-                                oscillators.push(osc);
-                            } else {
-                                const osc = playNoteContinuous(note.freq, null);
-                                oscillators.push(osc);
-                            }
-                        }
-                    });
-                }
-            }
+            });
             
             return oscillators;
         }
@@ -2679,56 +2628,27 @@
             }
         });
 
-        // Function to shrink keys in a zone (additive for multitouch)
-        function shrinkZoneKeys(zone) {
-            // Add shrink to keys in the clicked zone (stays until released)
-            if (zone) {
-                document.querySelectorAll(`[data-zone="${zone}"]`).forEach(key => {
-                    key.classList.add('zone-shrink');
-                });
-            }
+        // Function to shrink all keys (simple visual feedback)
+        function shrinkAllKeys() {
+            document.querySelectorAll('.white-key, .black-key').forEach(key => {
+                key.classList.add('zone-shrink');
+            });
         }
         
-        // Function to remove shrink from a specific zone
-        function removeZoneShrink(zone) {
-            if (zone) {
-                document.querySelectorAll(`[data-zone="${zone}"]`).forEach(key => {
-                    key.classList.remove('zone-shrink');
-                });
-            }
-        }
-        
-        // Function to update shrink visuals based on active touches
-        function updateShrinkVisuals() {
-            // Remove all shrinks first
+        // Function to remove shrink from all keys
+        function removeAllShrink() {
             document.querySelectorAll('.white-key, .black-key').forEach(key => {
                 key.classList.remove('zone-shrink');
             });
-            
-            // Add shrink for all active zones
-            const activeZones = new Set();
-            activeTouches.forEach(touch => {
-                if (touch.zone) {
-                    activeZones.add(touch.zone);
-                }
-            });
-            if (mouseActive && mouseZone) {
-                activeZones.add(mouseZone);
-            }
-            
-            activeZones.forEach(zone => {
-                shrinkZoneKeys(zone);
-            });
         }
         
-        // Track active oscillators per touch/zone for multitouch support
-        // Map: touchId -> { zone, oscillators }
+        // Track active oscillators per touch for multitouch support
+        // Map: touchId -> { oscillators }
         let activeTouches = new Map();
         let mouseActive = false;
         let mouseOscillators = [];
-        let mouseZone = null;
         
-        // Three zones: left (A), mid (B), right (C)
+        // Simple: tap anywhere on piano to trigger full chord palette
         container.addEventListener('mousedown', (e) => {
             if (!window.liveMode || !window.currentLiveChord) {
                 return;
@@ -2743,20 +2663,16 @@
                 audioContext.resume();
             }
             
-            // Three zones: left (A), mid (B), right (C)
-            const zone = getClickZone(e);
-            
             // Stop any previous mouse oscillators
             stopOscillators(mouseOscillators);
             mouseActive = true;
-            mouseZone = zone; // Track mouse zone
             
-            // Visual feedback: shrink keys in the clicked zone
-            shrinkZoneKeys(zone);
+            // Visual feedback: shrink all keys
+            shrinkAllKeys();
             
-            // Start playing and store oscillators
+            // Start playing full chord and store oscillators
             if (window.playCurrentChord) {
-                mouseOscillators = window.playCurrentChord(zone);
+                mouseOscillators = window.playCurrentChord();
             }
         });
         
@@ -2766,9 +2682,10 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
-                mouseZone = null;
-                // Update shrink visuals
-                updateShrinkVisuals();
+                // Remove shrink visual
+                if (activeTouches.size === 0) {
+                    removeAllShrink();
+                }
             }
         });
         
@@ -2790,30 +2707,22 @@
             Array.from(e.changedTouches).forEach(touch => {
                 const touchId = touch.identifier;
                 
-                // Create a synthetic event for zone detection
-                const syntheticEvent = {
-                    clientX: touch.clientX,
-                    touches: [touch]
-                };
-                
-                // Three zones: left (A), mid (B), right (C)
-                const zone = getClickZone(syntheticEvent);
-                
-                // Start playing and store oscillators for this touch
+                // Start playing full chord and store oscillators for this touch
                 let oscillators = [];
                 if (window.playCurrentChord) {
-                    oscillators = window.playCurrentChord(zone);
+                    oscillators = window.playCurrentChord();
                 }
                 
                 // Store this touch
                 activeTouches.set(touchId, {
-                    zone: zone,
                     oscillators: oscillators
                 });
             });
             
-            // Update shrink visuals for all active zones
-            updateShrinkVisuals();
+            // Visual feedback: shrink all keys if any touch is active
+            if (activeTouches.size > 0 || mouseActive) {
+                shrinkAllKeys();
+            }
         });
         
         container.addEventListener('touchend', (e) => {
@@ -2831,8 +2740,10 @@
                     }
                 });
                 
-                // Update shrink visuals
-                updateShrinkVisuals();
+                // Remove shrink visual if no touches are active
+                if (activeTouches.size === 0 && !mouseActive) {
+                    removeAllShrink();
+                }
             }
         });
         
@@ -2851,8 +2762,10 @@
                     }
                 });
                 
-                // Update shrink visuals
-                updateShrinkVisuals();
+                // Remove shrink visual if no touches are active
+                if (activeTouches.size === 0 && !mouseActive) {
+                    removeAllShrink();
+                }
             }
         });
 
