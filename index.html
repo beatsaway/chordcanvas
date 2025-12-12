@@ -2697,8 +2697,8 @@
             let halfSteps = 0;
             
             if (normalizedX < 0.3) {
-                // Left zone: 0-30% = -5 to 0 half steps
-                halfSteps = -5 * (normalizedX / 0.3);
+                // Left zone: 0-30% = -5 to 0 half steps (more left = lower pitch)
+                halfSteps = -5 * ((0.3 - normalizedX) / 0.3);
             } else if (normalizedX > 0.7) {
                 // Right zone: 70-100% = 0 to +5 half steps
                 halfSteps = 5 * ((normalizedX - 0.7) / 0.3);
@@ -2723,17 +2723,21 @@
                             osc.originalGainSustain = 0.35; // Default sustain gain
                         }
                         
-                        const currentGain = osc.gainNode.gain.value;
-                        // Cancel scheduled values and apply new volume
+                        // Cancel ALL scheduled values to prevent any fade-outs or decays
                         osc.gainNode.gain.cancelScheduledValues(now);
-                        osc.gainNode.gain.setValueAtTime(currentGain, now);
-                        // Scale to new volume multiplier smoothly
-                        const targetGain = Math.min(currentGain, osc.originalGainPeak) * volumeMultiplier;
+                        
+                        // Get current gain value
+                        const currentGain = osc.gainNode.gain.value;
+                        
+                        // Calculate target sustain level with volume multiplier
                         const sustainLevel = osc.originalGainSustain * volumeMultiplier;
-                        osc.gainNode.gain.linearRampToValueAtTime(targetGain, now + 0.01);
-                        // Update sustain level and maintain it indefinitely
-                        osc.gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15);
-                        osc.gainNode.gain.setValueAtTime(sustainLevel, now + 0.15 + 0.001);
+                        
+                        // Immediately set current value, then smoothly ramp to target
+                        osc.gainNode.gain.setValueAtTime(currentGain, now);
+                        // Very short ramp for smooth transition (5ms)
+                        osc.gainNode.gain.linearRampToValueAtTime(sustainLevel, now + 0.005);
+                        // Immediately maintain sustain level indefinitely - NO decay, NO fade
+                        osc.gainNode.gain.setValueAtTime(sustainLevel, now + 0.005 + 0.0001);
                     } catch (e) {
                         // Ignore errors
                     }
