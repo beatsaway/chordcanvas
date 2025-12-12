@@ -1155,9 +1155,12 @@
                     note.gainNode.gain.setValueAtTime(0, now);
                     // Reapply the envelope with volume scaling
                     const attackTime = 0.02;
+                    const sustainLevel = 0.35 * volumeMultiplier;
                     note.gainNode.gain.linearRampToValueAtTime(0.4 * volumeMultiplier, now + attackTime);
                     note.gainNode.gain.linearRampToValueAtTime(0.5 * volumeMultiplier, now + attackTime + 0.01);
-                    note.gainNode.gain.exponentialRampToValueAtTime(0.35 * volumeMultiplier, now + 0.15);
+                    note.gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15);
+                    // Explicitly maintain sustain level indefinitely (until stopped)
+                    note.gainNode.gain.setValueAtTime(sustainLevel, now + 0.15 + 0.001);
                 }
                 
                 const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
@@ -2726,9 +2729,11 @@
                         osc.gainNode.gain.setValueAtTime(currentGain, now);
                         // Scale to new volume multiplier smoothly
                         const targetGain = Math.min(currentGain, osc.originalGainPeak) * volumeMultiplier;
+                        const sustainLevel = osc.originalGainSustain * volumeMultiplier;
                         osc.gainNode.gain.linearRampToValueAtTime(targetGain, now + 0.01);
-                        // Update sustain level
-                        osc.gainNode.gain.exponentialRampToValueAtTime(osc.originalGainSustain * volumeMultiplier, now + 0.15);
+                        // Update sustain level and maintain it indefinitely
+                        osc.gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15);
+                        osc.gainNode.gain.setValueAtTime(sustainLevel, now + 0.15 + 0.001);
                     } catch (e) {
                         // Ignore errors
                     }
