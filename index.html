@@ -1137,6 +1137,13 @@
             if (waterSynth) {
                 const note = waterSynth.createSustainedNote(frequency);
                 
+                // Store original frequency for pitch glide
+                note.baseFrequency = frequency;
+                
+                // Store original gain values for volume updates
+                note.originalGainPeak = 0.5;
+                note.originalGainSustain = 0.35;
+                
                 // Apply volume multiplier to gain node
                 if (note.gainNode && volumeMultiplier !== 1.0) {
                     const now = waterSynth.audioContext.currentTime;
@@ -2645,11 +2652,10 @@
         });
 
         // Track active oscillators per touch for multitouch support
-        // Map: touchId -> { oscillators, initialY }
+        // Map: touchId -> { oscillators, baseFrequencies }
         let activeTouches = new Map();
         let mouseActive = false;
         let mouseOscillators = [];
-        let mouseInitialY = 0;
         
         // Calculate volume multiplier from Y position (0dB at bottom, -16dB at top)
         // Returns value between 0.158 (top, -16dB) and 1.0 (bottom, 0dB)
@@ -2664,6 +2670,80 @@
             // Map: 0 (bottom) = 1.0 (0dB), 1 (top) = 0.158 (-16dB)
             // Linear interpolation: volume = 1.0 - (clampedY * 0.842)
             return 1.0 - (clampedY * 0.842);
+        }
+        
+        // Calculate pitch glide from X position
+        // Middle 40% (30-70%) = safe zone (0 half steps)
+        // Left 30% (0-30%) = -5 to 0 half steps
+        // Right 30% (70-100%) = 0 to +5 half steps
+        // Returns frequency multiplier (1.0 = no change, <1.0 = lower, >1.0 = higher)
+        function calculatePitchFromX(x, containerElement) {
+            const rect = containerElement.getBoundingClientRect();
+            const relativeX = x - rect.left;
+            const width = rect.width;
+            const normalizedX = relativeX / width; // 0 = left edge, 1 = right edge
+            
+            let halfSteps = 0;
+            
+            if (normalizedX < 0.3) {
+                // Left zone: 0-30% = -5 to 0 half steps
+                halfSteps = -5 * (normalizedX / 0.3);
+            } else if (normalizedX > 0.7) {
+                // Right zone: 70-100% = 0 to +5 half steps
+                halfSteps = 5 * ((normalizedX - 0.7) / 0.3);
+            }
+            // Middle zone: 30-70% = 0 half steps (safe zone)
+            
+            // Convert half steps to frequency multiplier: 2^(halfSteps/12)
+            return Math.pow(2, halfSteps / 12);
+        }
+        
+        // Update volume for oscillators
+        function updateOscillatorsVolume(oscillators, volumeMultiplier) {
+            if (!oscillators || !waterSynth) return;
+            const now = waterSynth.audioContext.currentTime;
+            
+            oscillators.forEach(osc => {
+                if (osc && osc.gainNode) {
+                    try {
+                        // Store original gain envelope values if not already stored
+                        if (!osc.originalGainPeak) {
+                            osc.originalGainPeak = 0.5; // Default peak gain
+                            osc.originalGainSustain = 0.35; // Default sustain gain
+                        }
+                        
+                        const currentGain = osc.gainNode.gain.value;
+                        // Cancel scheduled values and apply new volume
+                        osc.gainNode.gain.cancelScheduledValues(now);
+                        osc.gainNode.gain.setValueAtTime(currentGain, now);
+                        // Scale to new volume multiplier smoothly
+                        const targetGain = Math.min(currentGain, osc.originalGainPeak) * volumeMultiplier;
+                        osc.gainNode.gain.linearRampToValueAtTime(targetGain, now + 0.01);
+                        // Update sustain level
+                        osc.gainNode.gain.exponentialRampToValueAtTime(osc.originalGainSustain * volumeMultiplier, now + 0.15);
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                }
+            });
+        }
+        
+        // Update pitch for oscillators
+        function updateOscillatorsPitch(oscillators, pitchMultiplier) {
+            if (!oscillators || !waterSynth) return;
+            const now = waterSynth.audioContext.currentTime;
+            
+            oscillators.forEach(osc => {
+                if (osc && osc.oscillator && osc.baseFrequency) {
+                    try {
+                        const newFrequency = osc.baseFrequency * pitchMultiplier;
+                        osc.oscillator.frequency.cancelScheduledValues(now);
+                        osc.oscillator.frequency.setValueAtTime(newFrequency, now);
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                }
+            });
         }
         
         // Simple: tap anywhere on piano to trigger full chord palette
@@ -2685,14 +2765,26 @@
             stopOscillators(mouseOscillators);
             mouseActive = true;
             
-            // Calculate volume based on initial tap position (Y coordinate)
-            mouseInitialY = e.clientY;
-            const volumeMultiplier = calculateVolumeFromY(mouseInitialY, container);
+            // Calculate volume and pitch based on initial tap position
+            const volumeMultiplier = calculateVolumeFromY(e.clientY, container);
+            const pitchMultiplier = calculatePitchFromX(e.clientX, container);
             
             // Start playing full chord and store oscillators
             // Visual feedback is provided by the existing green palette highlight
             if (window.playCurrentChord) {
                 mouseOscillators = window.playCurrentChord(volumeMultiplier);
+                // Apply initial pitch
+                updateOscillatorsPitch(mouseOscillators, pitchMultiplier);
+            }
+        });
+        
+        container.addEventListener('mousemove', (e) => {
+            if (window.liveMode && mouseActive && mouseOscillators.length > 0) {
+                // Update volume and pitch continuously during drag
+                const volumeMultiplier = calculateVolumeFromY(e.clientY, container);
+                const pitchMultiplier = calculatePitchFromX(e.clientX, container);
+                updateOscillatorsVolume(mouseOscillators, volumeMultiplier);
+                updateOscillatorsPitch(mouseOscillators, pitchMultiplier);
             }
         });
         
@@ -2723,23 +2815,43 @@
             Array.from(e.changedTouches).forEach(touch => {
                 const touchId = touch.identifier;
                 
-                // Calculate volume based on initial tap position (Y coordinate)
-                const initialY = touch.clientY;
-                const volumeMultiplier = calculateVolumeFromY(initialY, container);
+                // Calculate volume and pitch based on initial tap position
+                const volumeMultiplier = calculateVolumeFromY(touch.clientY, container);
+                const pitchMultiplier = calculatePitchFromX(touch.clientX, container);
                 
                 // Start playing full chord and store oscillators for this touch
                 let oscillators = [];
                 if (window.playCurrentChord) {
                     oscillators = window.playCurrentChord(volumeMultiplier);
+                    // Apply initial pitch
+                    updateOscillatorsPitch(oscillators, pitchMultiplier);
                 }
                 
-                // Store this touch with initial Y position (for reference, but won't change volume)
+                // Store this touch
                 activeTouches.set(touchId, {
-                    oscillators: oscillators,
-                    initialY: initialY
+                    oscillators: oscillators
                 });
             });
             // Visual feedback is provided by the existing green palette highlight
+        });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!window.liveMode) return;
+            
+            e.preventDefault(); // Prevent scrolling
+            
+            // Update volume and pitch for each active touch
+            Array.from(e.changedTouches).forEach(touch => {
+                const touchId = touch.identifier;
+                const touchData = activeTouches.get(touchId);
+                
+                if (touchData && touchData.oscillators) {
+                    const volumeMultiplier = calculateVolumeFromY(touch.clientY, container);
+                    const pitchMultiplier = calculatePitchFromX(touch.clientX, container);
+                    updateOscillatorsVolume(touchData.oscillators, volumeMultiplier);
+                    updateOscillatorsPitch(touchData.oscillators, pitchMultiplier);
+                }
+            });
         });
         
         container.addEventListener('touchend', (e) => {
