@@ -116,6 +116,16 @@ class WaterSynth {
         noise.start(now);
         osc.stop(now + finalDecayTime + 0.2);
         noise.stop(now + 0.15);
+        
+        // Cleanup: disconnect nodes after they stop to prevent accumulation
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
+        noise.onended = () => {
+            noise.disconnect();
+            noiseGain.disconnect();
+        };
     }
 
     // Play a note using the water droplet synthesis
@@ -163,6 +173,16 @@ class WaterSynth {
         noise.start(now);
         osc.stop(now + finalDecayTime);
         noise.stop(now + 0.15);
+        
+        // Cleanup: disconnect nodes after they stop to prevent accumulation
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
+        noise.onended = () => {
+            noise.disconnect();
+            noiseGain.disconnect();
+        };
         
         return osc;
     }
@@ -222,6 +242,30 @@ class WaterSynth {
         osc.start(now);
         noise.start(now);
         noise.stop(now + 0.15); // Shorter noise
+        
+        // Cleanup function to disconnect all nodes when stopped
+        const cleanup = () => {
+            try {
+                osc.disconnect();
+                gain.disconnect();
+                panNode.disconnect();
+                noise.disconnect();
+                noiseGain.disconnect();
+            } catch (e) {
+                // Nodes might already be disconnected
+            }
+        };
+        
+        // Set up cleanup handlers
+        osc.onended = cleanup;
+        noise.onended = () => {
+            try {
+                noise.disconnect();
+                noiseGain.disconnect();
+            } catch (e) {
+                // Nodes might already be disconnected
+            }
+        };
         
         return { oscillator: osc, gainNode: gain, panNode: panNode, noise: noise, noiseGain: noiseGain };
     }
