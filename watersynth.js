@@ -27,7 +27,7 @@ class WaterSynth {
         // Connect dry path (main signal - clearer)
         this.masterGain.connect(this.dryGain);
         this.dryGain.connect(this.compressor);
-        this.dryGain.gain.value = 0.3; // Less dry signal for more reverb
+        this.dryGain.gain.value = 0.18; // Reduced to match quietest live mode sustain (0.35 * 0.158 ≈ 0.055, scaled for 0.3 sustain)
         
         // Connect wet path (reverb - very loud reverb)
         this.masterGain.connect(this.globalEQ);
@@ -131,27 +131,36 @@ class WaterSynth {
     }
 
     // Play a note using the water droplet synthesis
-    playNote(frequency, duration, pitchDrop = 0.2, decayTime = 0.2, noiseAmount = 0.2, reverbAmount = 0.7) {
+    playNote(frequency, duration, pitchDrop = 0.02, decayTime = 0.2, noiseAmount = 0.03, reverbAmount = 0.7) {
         const now = this.audioContext.currentTime;
         
-        // Add natural variations to the parameters
-        const finalPitchDrop = frequency * (pitchDrop + Math.random() * 0.1);
+        // Add natural variations to the parameters - match createSustainedNote for consistency
+        const finalPitchDrop = frequency * (pitchDrop + Math.random() * 0.02); // Much smaller, like createSustainedNote
         const finalDecayTime = decayTime * (0.8 + Math.random() * 0.4);
         const finalNoiseAmount = noiseAmount * (0.8 + Math.random() * 0.4);
         
-        // Main oscillator with faster pitch drop
+        // Main oscillator with subtle pitch drop on attack (matching createSustainedNote)
         const osc = this.audioContext.createOscillator();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(frequency + finalPitchDrop, now);
-        osc.frequency.exponentialRampToValueAtTime(frequency, now + 0.05);
+        osc.frequency.exponentialRampToValueAtTime(frequency, now + 0.08); // Slower, smoother like createSustainedNote
 
-        // Amplitude envelope
+        // Amplitude envelope - reduced to match quietest live mode volume with smooth attack
+        // Live mode quietest: 0.35 * 0.158 = 0.0553, scaled for playNote envelope
         const gain = this.audioContext.createGain();
-        gain.gain.setValueCurveAtTime(
-            new Float32Array([0, 0.5, 0.4, 0.3, 0]),
-            now,
-            finalDecayTime
-        );
+        const volumeScale = 0.158; // Match quietest live mode volume multiplier
+        gain.gain.setValueAtTime(0, now);
+        
+        // Smooth attack like createSustainedNote (0.02s attack time)
+        const attackTime = 0.02;
+        gain.gain.linearRampToValueAtTime(0.4 * volumeScale, now + attackTime);
+        gain.gain.linearRampToValueAtTime(0.5 * volumeScale, now + attackTime + 0.01);
+        
+        // Decay to sustain then fade out
+        const sustainLevel = 0.3 * volumeScale;
+        gain.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15);
+        // Fade out over remaining duration
+        gain.gain.exponentialRampToValueAtTime(0.001, now + finalDecayTime);
 
         // Noise component
         const noise = this.audioContext.createBufferSource();
