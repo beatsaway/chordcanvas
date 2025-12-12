@@ -529,6 +529,7 @@
 
         .black-key.key-highlighted {
             background: #90EE90 !important;
+            border: 1px solid #000 !important;
         }
 
         /* Live mode palette - green notes that can be clicked */
@@ -536,6 +537,11 @@
             background: #90EE90 !important;
             cursor: pointer;
             position: relative;
+        }
+
+        .black-key.key-palette {
+            border: 1px solid #000 !important;
+            position: absolute !important; /* Maintain absolute positioning for black keys */
         }
 
         .key-palette::after {
@@ -1195,17 +1201,12 @@
             const chord = window.currentLiveChord;
             const oscillators = [];
             
-            // Clear previous highlights before adding new ones (same as playChord does)
-            clearKeyHighlights();
-            
-            // Play all notes in the palette
+            // Play all notes in the palette (no highlighting - user interactions don't affect CSS)
             chord.noteIndices.forEach(noteIndex => {
                 if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
                     const note = pianoNotes[noteIndex];
                     const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
                     if (keyElement) {
-                        // Add green highlight to key (same as playChord does)
-                        keyElement.classList.add('key-highlighted');
                         const osc = playNoteContinuous(note.freq, keyElement, volumeMultiplier);
                         oscillators.push(osc);
                     } else {
@@ -1272,127 +1273,8 @@
         window.playCurrentChord = playCurrentChord;
         window.stopOscillators = stopOscillators;
 
-        // Play a chord
-        function playChord(rootNote, chordType, durationSec = 1.5, clearPalettesFirst = true) {
-            if (!rootNote || !chordType) return;
-
-            // In live mode, show palettes instead of playing sounds
-            const isLiveMode = window.liveMode !== undefined ? window.liveMode : false;
-            if (isLiveMode) {
-                // Clear previous palettes only if this is a main chord (not a passing chord)
-                if (clearPalettesFirst) {
-                    clearPalettes();
-                }
-                
-                // Check for slash chord (e.g., C/E)
-                let bassNoteName = null;
-                const slashMatch = rootNote.match(/\/([A-G][#b]?)/);
-                if (slashMatch) {
-                    bassNoteName = slashMatch[1];
-                }
-
-                const rootNoteName = rootNote.replace(/\/.*/, '').trim();
-                const rootIndex = noteToIndex[rootNoteName];
-                if (rootIndex === undefined) {
-                    console.warn('Root note not found:', rootNoteName);
-                    return;
-                }
-
-                const intervals = chordIntervals[chordType];
-                if (!intervals) {
-                    console.warn('Chord intervals not found for:', chordType);
-                    return;
-                }
-
-                // Store chord info for live mode interaction
-                const chordNoteIndices = [];
-                let lowestNoteIndex = null;
-
-                // Add bass note palette if it's a slash chord
-                if (bassNoteName) {
-                    const bassIndex = noteToIndex[bassNoteName];
-                    if (bassIndex !== undefined) {
-                        const bassNoteInLowerOctave = 0 + bassIndex;
-                        if (bassNoteInLowerOctave < pianoNotes.length) {
-                            addPalette(bassNoteInLowerOctave);
-                            chordNoteIndices.push(bassNoteInLowerOctave);
-                            if (lowestNoteIndex === null || bassNoteInLowerOctave < lowestNoteIndex) {
-                                lowestNoteIndex = bassNoteInLowerOctave;
-                            }
-                        }
-                    }
-                }
-
-                // Add upper chord palettes
-                const rootNoteInMiddleOctave = 12 + rootIndex;
-                const e5Index = 28;
-
-                intervals.forEach((interval) => {
-                    let noteIndex = rootNoteInMiddleOctave + interval;
-                    
-                    // Keep moving down octaves until note is at or below E5
-                    while (noteIndex > e5Index && noteIndex >= 0) {
-                        noteIndex = noteIndex - 12;
-                    }
-                    
-                    if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
-                        addPalette(noteIndex);
-                        chordNoteIndices.push(noteIndex);
-                        if (lowestNoteIndex === null || noteIndex < lowestNoteIndex) {
-                            lowestNoteIndex = noteIndex;
-                        }
-                    }
-                });
-                
-                // Categorize notes into A (lowest), B (lower part of remaining), C (higher part of remaining)
-                let noteA = null;
-                let notesB = [];
-                let notesC = [];
-                
-                if (chordNoteIndices.length > 0) {
-                    // Sort notes by index (pitch)
-                    const sortedNotes = [...chordNoteIndices].sort((a, b) => a - b);
-                    
-                    // A: lowest note
-                    noteA = sortedNotes[0];
-                    
-                    // Remaining notes (excluding lowest)
-                    const remainingNotes = sortedNotes.slice(1);
-                    
-                    if (remainingNotes.length > 0) {
-                        // Split remaining into B (lower) and C (higher)
-                        const midPoint = Math.ceil(remainingNotes.length / 2);
-                        notesB = remainingNotes.slice(0, midPoint);
-                        notesC = remainingNotes.slice(midPoint);
-                    }
-                }
-                
-                // Store current chord info for live mode
-                currentLiveChord = {
-                    rootNote: rootNote,
-                    chordType: chordType,
-                    noteIndices: chordNoteIndices, // Keep for compatibility
-                    lowestNoteIndex: lowestNoteIndex, // Keep for compatibility
-                    noteA: noteA,
-                    notesB: notesB,
-                    notesC: notesC
-                };
-                window.currentLiveChord = currentLiveChord;
-                
-                return; // Don't play sounds in live mode
-            }
-
-            // Normal mode: play sounds
-            if (!waterSynth) {
-                initAudio();
-            }
-            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
-                waterSynth.audioContext.resume();
-            }
-
-            // Clear previous highlights
-            clearKeyHighlights();
-
+        // Helper function to highlight chord keys (used by both play mode and live mode)
+        function highlightChordKeys(rootNote, chordType) {
             // Check for slash chord (e.g., C/E)
             let bassNoteName = null;
             const slashMatch = rootNote.match(/\/([A-G][#b]?)/);
@@ -1404,67 +1286,118 @@
             const rootIndex = noteToIndex[rootNoteName];
             if (rootIndex === undefined) {
                 console.warn('Root note not found:', rootNoteName);
-                return;
+                return [];
             }
 
             const intervals = chordIntervals[chordType];
             if (!intervals) {
                 console.warn('Chord intervals not found for:', chordType);
-                return;
+                return [];
             }
 
-            // Play bass note in lower octave if it's a slash chord
+            const chordNoteIndices = [];
+
+            // Highlight bass note if it's a slash chord
             if (bassNoteName) {
                 const bassIndex = noteToIndex[bassNoteName];
                 if (bassIndex !== undefined) {
-                    const bassNoteInLowerOctave = 0 + bassIndex; // Lower octave (C3-B3)
+                    const bassNoteInLowerOctave = 0 + bassIndex;
                     if (bassNoteInLowerOctave < pianoNotes.length) {
-                        const bassFreq = pianoNotes[bassNoteInLowerOctave].freq;
                         const bassKeyElement = document.querySelector(`[data-note-id="${bassNoteInLowerOctave}"]`);
-                        
                         if (bassKeyElement) {
-                            // Don't add visual highlight in live mode
-                            if (!window.liveMode) {
-                                bassKeyElement.classList.add('key-highlighted');
-                            }
-                            playNote(bassFreq, bassKeyElement, false, durationSec);
-                        } else {
-                            playNote(bassFreq, null, false, durationSec);
+                            bassKeyElement.classList.add('key-highlighted');
                         }
+                        chordNoteIndices.push(bassNoteInLowerOctave);
                     }
                 }
             }
 
-            // Play upper chord in middle octave
+            // Highlight upper chord notes
             const rootNoteInMiddleOctave = 12 + rootIndex;
-            const rootFreq = pianoNotes[rootNoteInMiddleOctave].freq;
-
-            // E5 is at index 28 (E in upper octave: 24 + 4)
-            // Move any notes higher than E5 (F5, F#5, G5, etc.) down until they're at or below E5
-            const e5Index = 28; // E5 in upper octave
+            const e5Index = 28;
 
             intervals.forEach((interval) => {
                 let noteIndex = rootNoteInMiddleOctave + interval;
-                
-                // Keep moving down octaves until note is at or below E5
-                // Allow notes to go into lower octave (indices 0-11) if needed
                 while (noteIndex > e5Index && noteIndex >= 0) {
-                    noteIndex = noteIndex - 12; // Move down one octave
+                    noteIndex = noteIndex - 12;
                 }
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        keyElement.classList.add('key-highlighted');
+                    }
+                    chordNoteIndices.push(noteIndex);
+                }
+            });
+
+            return chordNoteIndices;
+        }
+
+        // Play a chord
+        function playChord(rootNote, chordType, durationSec = 1.5, clearPalettesFirst = true) {
+            if (!rootNote || !chordType) return;
+
+            const isLiveMode = window.liveMode !== undefined ? window.liveMode : false;
+            
+            // Clear previous palettes/highlights if needed
+            if (clearPalettesFirst) {
+                if (isLiveMode) {
+                    clearPalettes();
+                }
+                clearKeyHighlights();
+            }
+
+            // Use same highlighting function for both modes
+            const chordNoteIndices = highlightChordKeys(rootNote, chordType);
+            if (chordNoteIndices.length === 0) return;
+
+            // Live mode: add palettes and store chord info, skip audio
+            if (isLiveMode) {
+                // Add palettes for all chord notes
+                chordNoteIndices.forEach(noteIndex => {
+                    addPalette(noteIndex);
+                });
                 
+                // Calculate lowest note index and categorize notes for live mode storage
+                const sortedNotes = [...chordNoteIndices].sort((a, b) => a - b);
+                const lowestNoteIndex = sortedNotes[0];
+                const noteA = sortedNotes[0];
+                const remainingNotes = sortedNotes.slice(1);
+                const midPoint = Math.ceil(remainingNotes.length / 2);
+                const notesB = remainingNotes.slice(0, midPoint);
+                const notesC = remainingNotes.slice(midPoint);
+                
+                // Store current chord info for live mode
+                currentLiveChord = {
+                    rootNote: rootNote,
+                    chordType: chordType,
+                    noteIndices: chordNoteIndices,
+                    lowestNoteIndex: lowestNoteIndex,
+                    noteA: noteA,
+                    notesB: notesB,
+                    notesC: notesC
+                };
+                window.currentLiveChord = currentLiveChord;
+                
+                return; // Don't play sounds in live mode
+            }
+
+            // Play mode: play sounds
+            if (!waterSynth) {
+                initAudio();
+            }
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+
+            // Play sounds for highlighted keys
+            chordNoteIndices.forEach(noteIndex => {
                 if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
                     const noteFreq = pianoNotes[noteIndex].freq;
                     const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
-                    
                     if (keyElement) {
-                        // Don't add visual highlight in live mode
-                        if (!window.liveMode) {
-                            keyElement.classList.add('key-highlighted');
-                        }
-                        // Play the note
                         playNote(noteFreq, keyElement, false, durationSec);
                     } else {
-                        // If key element doesn't exist, play note without visual feedback
                         playNote(noteFreq, null, false, durationSec);
                     }
                 }
@@ -2314,16 +2247,10 @@
                     return;
                 }
                 
-                // In live mode, loop continuously
+                // Loop continuously when reaching the end
                 if (currentPlayIndex >= playSequence.length) {
-                    if (liveMode) {
-                        // Loop back to beginning
-                        currentPlayIndex = 0;
-                    } else {
-                        // Normal mode: stop at end
-                        stopPlayback();
-                        return;
-                    }
+                    // Loop back to beginning
+                    currentPlayIndex = 0;
                 }
 
                 const chordIndex = playSequence[currentPlayIndex];
@@ -2397,9 +2324,10 @@
                         if (cell) {
                             cell.classList.remove('cell-playing');
                         }
-                        // Clear palettes when moving to next chord (in live mode)
+                        // Clear palettes and highlights when moving to next chord (in live mode)
                         if (liveMode) {
                             clearPalettes();
+                            clearKeyHighlights();
                         }
                         playNextChord();
                     }, barIntervalMs);
@@ -2431,7 +2359,16 @@
                     playButton.disabled = false; // Keep enabled while playing so user can stop
                     
                     // Determine starting point
-                    if (selectedCells.size > 0) {
+                    // In live mode, always play from start regardless of selection
+                    if (liveMode) {
+                        // Play from first cell with value (all cells, ignoring selection)
+                        playSequence = [];
+                        for (let i = 0; i < cellValues.length; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    } else if (selectedCells.size > 0) {
                         // Play all cells from first selected to last selected (inclusive range)
                         const selectedArray = Array.from(selectedCells).sort((a, b) => a - b);
                         const firstSelected = selectedArray[0];
@@ -2775,20 +2712,6 @@
             });
         }
         
-        // Helper function to clear highlights when all interactions have ended
-        function clearHighlightsIfNoActiveInteractions() {
-            // Only clear if there are no active touches and mouse is not active
-            if (activeTouches.size === 0 && !mouseActive) {
-                // Use a small delay to allow for fade-out, but clear highlights
-                setTimeout(() => {
-                    // Double-check that no new interactions started
-                    if (activeTouches.size === 0 && !mouseActive) {
-                        clearKeyHighlights();
-                    }
-                }, 150); // Slightly longer than max release time (100ms)
-            }
-        }
-        
         // Simple: tap anywhere on piano to trigger full chord palette
         container.addEventListener('mousedown', (e) => {
             if (!window.liveMode || !window.currentLiveChord) {
@@ -2848,8 +2771,6 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
-                // Clear highlights if no other interactions are active
-                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2860,8 +2781,6 @@
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
-                // Clear highlights if no other interactions are active
-                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2940,8 +2859,6 @@
                         activeTouches.delete(touchId);
                     }
                 });
-                // Clear highlights if no other interactions are active
-                clearHighlightsIfNoActiveInteractions();
             }
         });
         
@@ -2960,8 +2877,6 @@
                         activeTouches.delete(touchId);
                     }
                 });
-                // Clear highlights if no other interactions are active
-                clearHighlightsIfNoActiveInteractions();
             }
         });
 
