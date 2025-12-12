@@ -209,9 +209,12 @@ class WaterSynth {
         
         // Attack and sustain envelope - clearer attack
         const attackTime = 0.02; // Faster attack
+        const sustainLevel = 0.35; // Sustain level
         gain.gain.linearRampToValueAtTime(0.4, now + attackTime); // Higher peak
         gain.gain.linearRampToValueAtTime(0.5, now + attackTime + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.35, now + 0.15); // Higher sustain level
+        gain.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15); // Higher sustain level
+        // Explicitly maintain sustain level indefinitely (until manually stopped)
+        gain.gain.setValueAtTime(sustainLevel, now + 0.15 + 0.001);
         
         // Noise component - much quieter
         const noise = this.audioContext.createBufferSource();
