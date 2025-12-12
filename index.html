@@ -531,6 +531,13 @@
             background: #90EE90 !important;
         }
 
+        /* Zone shrink effect for live mode */
+        .white-key.zone-shrink,
+        .black-key.zone-shrink {
+            transform: scale(0.95);
+            transition: transform 0.15s ease-out;
+        }
+
         /* Live mode palette - green notes that can be clicked */
         .key-palette {
             background: #90EE90 !important;
@@ -1029,7 +1036,7 @@
 
             const now = audioContext.currentTime;
             gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01);
             gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
 
             oscillator.start(now);
@@ -1103,44 +1110,153 @@
             }
         }
 
-        // Play current chord (all notes in the chord)
-        function playCurrentChord(includeLowestOctave = false) {
-            if (!window.currentLiveChord || !window.currentLiveChord.noteIndices) {
-                return;
+        // Play a note continuously (until stopped)
+        function playNoteContinuous(frequency, keyElement) {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            stopNote(keyElement);
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = 'sine';
+
+            const now = audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01);
+
+            oscillator.start(now);
+
+            const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
+            if (!activeOscillators[keyId]) {
+                activeOscillators[keyId] = [];
+            }
+            if (Array.isArray(activeOscillators[keyId])) {
+                activeOscillators[keyId].push({ oscillator, gainNode });
+            } else {
+                activeOscillators[keyId] = [{ oscillator, gainNode }];
+            }
+            
+            return { oscillator, gainNode };
+        }
+
+        // Play palette parts: A (lowest), B (lower part of remaining), C (higher part of remaining)
+        // Returns array of oscillators that can be stopped later
+        function playCurrentChord(zone) {
+            if (!window.currentLiveChord) {
+                return [];
             }
             
             const chord = window.currentLiveChord;
+            const oscillators = [];
             
-            // Play all chord notes
-            chord.noteIndices.forEach(noteIndex => {
-                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
-                    const note = pianoNotes[noteIndex];
-                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
-                    if (keyElement) {
-                        playNote(note.freq, keyElement, true, 0.5);
-                    } else {
-                        playNote(note.freq, null, true, 0.5);
+            if (zone === 'left') {
+                // Left zone: Play A (lowest note + octave lower version)
+                if (chord.noteA !== null && chord.noteA !== undefined) {
+                    const noteIndex = chord.noteA;
+                    // Play the lowest note
+                    if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                        const note = pianoNotes[noteIndex];
+                        const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                        if (keyElement) {
+                            const osc = playNoteContinuous(note.freq, keyElement);
+                            oscillators.push(osc);
+                        } else {
+                            const osc = playNoteContinuous(note.freq, null);
+                            oscillators.push(osc);
+                        }
+                    }
+                    // Play octave lower version
+                    const octaveLowerIndex = noteIndex - 12;
+                    if (octaveLowerIndex >= 0 && octaveLowerIndex < pianoNotes.length) {
+                        const lowerNote = pianoNotes[octaveLowerIndex];
+                        const lowerKeyElement = document.querySelector(`[data-note-id="${octaveLowerIndex}"]`);
+                        if (lowerKeyElement) {
+                            const osc = playNoteContinuous(lowerNote.freq, lowerKeyElement);
+                            oscillators.push(osc);
+                        } else {
+                            const osc = playNoteContinuous(lowerNote.freq, null);
+                            oscillators.push(osc);
+                        }
                     }
                 }
-            });
-            
-            // If left zone, also play lowest note an octave lower
-            if (includeLowestOctave && chord.lowestNoteIndex !== null) {
-                const lowestOctaveLower = chord.lowestNoteIndex - 12;
-                if (lowestOctaveLower >= 0 && lowestOctaveLower < pianoNotes.length) {
-                    const note = pianoNotes[lowestOctaveLower];
-                    const keyElement = document.querySelector(`[data-note-id="${lowestOctaveLower}"]`);
-                    if (keyElement) {
-                        playNote(note.freq, keyElement, true, 0.5);
-                    } else {
-                        playNote(note.freq, null, true, 0.5);
-                    }
+            } else if (zone === 'mid') {
+                // Mid zone: Play B (lower part of remaining notes)
+                if (chord.notesB && chord.notesB.length > 0) {
+                    chord.notesB.forEach(noteIndex => {
+                        if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                            const note = pianoNotes[noteIndex];
+                            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                            if (keyElement) {
+                                const osc = playNoteContinuous(note.freq, keyElement);
+                                oscillators.push(osc);
+                            } else {
+                                const osc = playNoteContinuous(note.freq, null);
+                                oscillators.push(osc);
+                            }
+                        }
+                    });
                 }
+            } else if (zone === 'right') {
+                // Right zone: Play C (higher part of remaining notes)
+                if (chord.notesC && chord.notesC.length > 0) {
+                    chord.notesC.forEach(noteIndex => {
+                        if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                            const note = pianoNotes[noteIndex];
+                            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                            if (keyElement) {
+                                const osc = playNoteContinuous(note.freq, keyElement);
+                                oscillators.push(osc);
+                            } else {
+                                const osc = playNoteContinuous(note.freq, null);
+                                oscillators.push(osc);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            return oscillators;
+        }
+        
+        // Stop oscillators with 0.1s release tail
+        function stopOscillators(oscillators) {
+            if (oscillators && Array.isArray(oscillators) && audioContext) {
+                const now = audioContext.currentTime;
+                const releaseTime = 0.1; // 0.1 second release tail
+                
+                oscillators.forEach(osc => {
+                    if (osc.oscillator && osc.gainNode) {
+                        try {
+                            // Fade out over 0.1s
+                            const currentGain = osc.gainNode.gain.value;
+                            osc.gainNode.gain.cancelScheduledValues(now);
+                            osc.gainNode.gain.setValueAtTime(currentGain, now);
+                            osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+                            
+                            // Stop oscillator after fade
+                            osc.oscillator.stop(now + releaseTime);
+                        } catch (e) {
+                            // Oscillator might already be stopped
+                        }
+                    }
+                });
             }
         }
         
         // Expose globally for piano key handlers
         window.playCurrentChord = playCurrentChord;
+        window.stopOscillators = stopOscillators;
 
         // Play a chord
         function playChord(rootNote, chordType, durationSec = 1.5, clearPalettesFirst = true) {
@@ -1214,12 +1330,38 @@
                     }
                 });
                 
+                // Categorize notes into A (lowest), B (lower part of remaining), C (higher part of remaining)
+                let noteA = null;
+                let notesB = [];
+                let notesC = [];
+                
+                if (chordNoteIndices.length > 0) {
+                    // Sort notes by index (pitch)
+                    const sortedNotes = [...chordNoteIndices].sort((a, b) => a - b);
+                    
+                    // A: lowest note
+                    noteA = sortedNotes[0];
+                    
+                    // Remaining notes (excluding lowest)
+                    const remainingNotes = sortedNotes.slice(1);
+                    
+                    if (remainingNotes.length > 0) {
+                        // Split remaining into B (lower) and C (higher)
+                        const midPoint = Math.ceil(remainingNotes.length / 2);
+                        notesB = remainingNotes.slice(0, midPoint);
+                        notesC = remainingNotes.slice(midPoint);
+                    }
+                }
+                
                 // Store current chord info for live mode
                 currentLiveChord = {
                     rootNote: rootNote,
                     chordType: chordType,
-                    noteIndices: chordNoteIndices,
-                    lowestNoteIndex: lowestNoteIndex
+                    noteIndices: chordNoteIndices, // Keep for compatibility
+                    lowestNoteIndex: lowestNoteIndex, // Keep for compatibility
+                    noteA: noteA,
+                    notesB: notesB,
+                    notesC: notesC
                 };
                 window.currentLiveChord = currentLiveChord;
                 
@@ -2423,15 +2565,20 @@
 
         const container = document.querySelector('.piano-container');
         
-        // Function to determine if click is in left or right zone
+        // Three zones: left (A), mid (B), right (C)
         function getClickZone(e) {
             const rect = container.getBoundingClientRect();
             const clickX = (e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - rect.left;
-            const containerWidth = rect.width;
-            return clickX < containerWidth / 2 ? 'left' : 'right';
+            const third = rect.width / 3;
+            if (clickX < third) {
+                return 'left'; // A (lowest note)
+            } else if (clickX < third * 2) {
+                return 'mid'; // B (lower part of remaining)
+            } else {
+                return 'right'; // C (higher part of remaining)
+            }
         }
         
-        // Expose globally for piano key handlers
         window.getClickZone = getClickZone;
         
         // Remove existing white keys
@@ -2447,7 +2594,14 @@
                 key.dataset.frequency = note.freq;
                 key.dataset.noteName = note.name;
                 
-                // Individual key handlers removed - using container-level handlers for live mode
+                // Mark zone for visual feedback (21 white keys: 0-6=left, 7-13=mid, 14-20=right)
+                if (whiteKeyIndex < 7) {
+                    key.dataset.zone = 'left';
+                } else if (whiteKeyIndex < 14) {
+                    key.dataset.zone = 'mid';
+                } else {
+                    key.dataset.zone = 'right';
+                }
                 
                 container.appendChild(key);
                 whiteKeyIndex++;
@@ -2465,67 +2619,133 @@
                 key.dataset.noteName = note.name;
                 key.setAttribute('data-position', blackKeyPositions[positionIndex].toString());
                 
-                // Individual key handlers removed - using container-level handlers for live mode
+                // Mark zone for visual feedback (black keys are between white keys)
+                // Positions 0.5-6.5 are in left zone, 7.5-13.5 in mid, 14.5+ in right
+                const position = blackKeyPositions[positionIndex];
+                if (position <= 6.5) {
+                    key.dataset.zone = 'left';
+                } else if (position <= 13.5) {
+                    key.dataset.zone = 'mid';
+                } else {
+                    key.dataset.zone = 'right';
+                }
                 
                 container.appendChild(key);
                 positionIndex++;
             }
         });
 
-        // Add click handlers to piano container for live mode (anywhere on piano)
+        // Function to shrink keys in a zone
+        function shrinkZoneKeys(zone) {
+            // Remove shrink from all keys first
+            document.querySelectorAll('.white-key, .black-key').forEach(key => {
+                key.classList.remove('zone-shrink');
+            });
+            
+            // Add shrink to keys in the clicked zone (stays until released)
+            if (zone) {
+                document.querySelectorAll(`[data-zone="${zone}"]`).forEach(key => {
+                    key.classList.add('zone-shrink');
+                });
+            }
+        }
+        
+        // Function to remove shrink from all keys
+        function removeZoneShrink() {
+            document.querySelectorAll('.white-key, .black-key').forEach(key => {
+                key.classList.remove('zone-shrink');
+            });
+        }
+        
+        // Track active oscillators for current touch/click
+        let currentZoneOscillators = [];
+        
+        // Three zones: left (A), mid (B), right (C)
         container.addEventListener('mousedown', (e) => {
-            if (window.liveMode && window.currentLiveChord && window.currentLiveChord.noteIndices) {
-                e.preventDefault();
-                if (window.ensureAudioReady) {
-                    window.ensureAudioReady();
-                } else if (!audioContext) {
-                    initAudio();
-                }
-                if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-                
-                // Determine zone and play accordingly
-                const zone = window.getClickZone ? window.getClickZone(e) : 'right';
-                if (zone === 'left') {
-                    // Left zone: play chord + lowest note an octave lower
-                    if (window.playCurrentChord) {
-                        window.playCurrentChord(true);
-                    }
-                } else {
-                    // Right zone: just play the chord
-                    if (window.playCurrentChord) {
-                        window.playCurrentChord(false);
-                    }
-                }
+            if (!window.liveMode || !window.currentLiveChord) {
+                return;
+            }
+            
+            if (window.ensureAudioReady) {
+                window.ensureAudioReady();
+            } else if (!audioContext) {
+                initAudio();
+            }
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            // Three zones: left (A), mid (B), right (C)
+            const zone = getClickZone(e);
+            
+            // Visual feedback: shrink keys in the clicked zone
+            shrinkZoneKeys(zone);
+            
+            // Stop any previous oscillators
+            stopOscillators(currentZoneOscillators);
+            
+            // Start playing and store oscillators
+            if (window.playCurrentChord) {
+                currentZoneOscillators = window.playCurrentChord(zone);
+            }
+        });
+        
+        container.addEventListener('mouseup', (e) => {
+            if (window.liveMode) {
+                // Stop all oscillators when mouse is released (with 0.1s tail)
+                stopOscillators(currentZoneOscillators);
+                currentZoneOscillators = [];
+                // Remove shrink visual
+                removeZoneShrink();
             }
         });
         
         container.addEventListener('touchstart', (e) => {
-            if (window.liveMode && window.currentLiveChord && window.currentLiveChord.noteIndices) {
-                e.preventDefault();
-                if (window.ensureAudioReady) {
-                    window.ensureAudioReady();
-                } else if (!audioContext) {
-                    initAudio();
-                }
-                if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-                
-                // Determine zone and play accordingly
-                const zone = window.getClickZone ? window.getClickZone(e) : 'right';
-                if (zone === 'left') {
-                    // Left zone: play chord + lowest note an octave lower
-                    if (window.playCurrentChord) {
-                        window.playCurrentChord(true);
-                    }
-                } else {
-                    // Right zone: just play the chord
-                    if (window.playCurrentChord) {
-                        window.playCurrentChord(false);
-                    }
-                }
+            if (!window.liveMode || !window.currentLiveChord) {
+                return;
+            }
+            
+            if (window.ensureAudioReady) {
+                window.ensureAudioReady();
+            } else if (!audioContext) {
+                initAudio();
+            }
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            // Three zones: left (A), mid (B), right (C)
+            const zone = getClickZone(e);
+            
+            // Visual feedback: shrink keys in the clicked zone
+            shrinkZoneKeys(zone);
+            
+            // Stop any previous oscillators
+            stopOscillators(currentZoneOscillators);
+            
+            // Start playing and store oscillators
+            if (window.playCurrentChord) {
+                currentZoneOscillators = window.playCurrentChord(zone);
+            }
+        });
+        
+        container.addEventListener('touchend', (e) => {
+            if (window.liveMode) {
+                // Stop all oscillators when touch is released (with 0.1s tail)
+                stopOscillators(currentZoneOscillators);
+                currentZoneOscillators = [];
+                // Remove shrink visual
+                removeZoneShrink();
+            }
+        });
+        
+        container.addEventListener('touchcancel', (e) => {
+            if (window.liveMode) {
+                // Stop all oscillators if touch is cancelled (with 0.1s tail)
+                stopOscillators(currentZoneOscillators);
+                currentZoneOscillators = [];
+                // Remove shrink visual
+                removeZoneShrink();
             }
         });
 
