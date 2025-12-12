@@ -1002,10 +1002,32 @@
             });
         }
 
+        // Audio nodes for preventing clipping
+        let masterGain = null;
+        let compressor = null;
+        
         // Initialize Web Audio API
         function initAudio() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create master gain and compressor to prevent clipping with multitouch
+                masterGain = audioContext.createGain();
+                compressor = audioContext.createDynamicsCompressor();
+                
+                // Configure compressor to prevent clipping
+                compressor.threshold.value = -12; // Start compressing at -12dB
+                compressor.knee.value = 6; // Smooth compression curve
+                compressor.ratio.value = 12; // High ratio for limiting effect
+                compressor.attack.value = 0.003; // Fast attack
+                compressor.release.value = 0.1; // Quick release
+                
+                // Connect: masterGain -> compressor -> destination
+                masterGain.connect(compressor);
+                compressor.connect(audioContext.destination);
+                
+                // Set master gain level
+                masterGain.gain.value = 1.0;
             } catch (e) {
                 console.error('Web Audio API not supported');
             }
@@ -1029,7 +1051,12 @@
             const gainNode = audioContext.createGain();
 
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // Route through master gain and compressor to prevent clipping
+            if (masterGain) {
+                gainNode.connect(masterGain);
+            } else {
+                gainNode.connect(audioContext.destination);
+            }
 
             oscillator.frequency.value = frequency;
             oscillator.type = 'sine';
@@ -1127,7 +1154,12 @@
             const gainNode = audioContext.createGain();
 
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // Route through master gain and compressor to prevent clipping
+            if (masterGain) {
+                gainNode.connect(masterGain);
+            } else {
+                gainNode.connect(audioContext.destination);
+            }
 
             oscillator.frequency.value = frequency;
             oscillator.type = 'sine';
@@ -2120,10 +2152,9 @@
                     document.body.classList.remove('live-mode');
                     menuToggle.textContent = '☰';
                     clearPalettes();
-                    // If playing, restart to play sounds
+                    // Stop playback when exiting live mode
                     if (isPlaying) {
                         stopPlayback();
-                        playButton.click();
                     }
                 }
             });
@@ -2283,9 +2314,21 @@
             }
 
             function playNextChord() {
-                if (!isPlaying || currentPlayIndex >= playSequence.length) {
+                if (!isPlaying) {
                     stopPlayback();
                     return;
+                }
+                
+                // In live mode, loop continuously
+                if (currentPlayIndex >= playSequence.length) {
+                    if (liveMode) {
+                        // Loop back to beginning
+                        currentPlayIndex = 0;
+                    } else {
+                        // Normal mode: stop at end
+                        stopPlayback();
+                        return;
+                    }
                 }
 
                 const chordIndex = playSequence[currentPlayIndex];
