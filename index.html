@@ -1053,10 +1053,26 @@
                             osc.gainNode.gain.cancelScheduledValues(now);
                             osc.gainNode.gain.setValueAtTime(osc.gainNode.gain.value, now);
                             osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                            
+                            // Cleanup function to disconnect all nodes
+                            const cleanup = () => {
+                                try {
+                                    if (osc.oscillator) osc.oscillator.disconnect();
+                                    if (osc.gainNode) osc.gainNode.disconnect();
+                                    if (osc.panNode) osc.panNode.disconnect();
+                                    if (osc.noise) osc.noise.disconnect();
+                                    if (osc.noiseGain) osc.noiseGain.disconnect();
+                                } catch (e) {
+                                    // Nodes might already be disconnected
+                                }
+                            };
+                            
                             if (osc.oscillator) {
+                                osc.oscillator.onended = cleanup;
                                 osc.oscillator.stop(now + 0.1);
                             }
                             if (osc.noise) {
+                                osc.noise.onended = cleanup;
                                 osc.noise.stop(now + 0.1);
                             }
                         } catch (e) {
@@ -1173,11 +1189,26 @@
                             osc.gainNode.gain.setValueAtTime(currentGain, now);
                             osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
                             
-                            // Stop oscillator after fade
+                            // Cleanup function to disconnect all nodes
+                            const cleanup = () => {
+                                try {
+                                    if (osc.oscillator) osc.oscillator.disconnect();
+                                    if (osc.gainNode) osc.gainNode.disconnect();
+                                    if (osc.panNode) osc.panNode.disconnect();
+                                    if (osc.noise) osc.noise.disconnect();
+                                    if (osc.noiseGain) osc.noiseGain.disconnect();
+                                } catch (e) {
+                                    // Nodes might already be disconnected
+                                }
+                            };
+                            
+                            // Stop oscillator after fade and cleanup
                             if (osc.oscillator) {
+                                osc.oscillator.onended = cleanup;
                                 osc.oscillator.stop(now + releaseTime);
                             }
                             if (osc.noise) {
+                                osc.noise.onended = cleanup;
                                 osc.noise.stop(now + releaseTime);
                             }
                         } catch (e) {
