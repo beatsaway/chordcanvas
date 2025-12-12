@@ -11,12 +11,13 @@ class WaterSynth {
         this.dryGain = this.audioContext.createGain();
         
         // Add compressor/limiter to prevent clipping
+        // Aggressive settings to prevent clipping on all devices
         this.compressor = this.audioContext.createDynamicsCompressor();
-        this.compressor.threshold.value = -12; // Start compressing at -12dB
-        this.compressor.knee.value = 6; // Smooth compression curve
-        this.compressor.ratio.value = 12; // High ratio for limiting effect
-        this.compressor.attack.value = 0.003; // Fast attack
-        this.compressor.release.value = 0.1; // Quick release
+        this.compressor.threshold.value = -18; // Lower threshold to catch peaks earlier
+        this.compressor.knee.value = 3; // Tighter knee for more abrupt compression
+        this.compressor.ratio.value = 20; // High ratio for strong limiting effect
+        this.compressor.attack.value = 0.001; // Very fast attack to catch transients
+        this.compressor.release.value = 0.05; // Quick release
         
         // Configure EQ for natural high-end rolloff
         this.globalEQ.type = 'lowpass';
@@ -33,12 +34,13 @@ class WaterSynth {
         this.globalEQ.connect(this.reverb);
         this.reverb.connect(this.reverbGain);
         this.reverbGain.connect(this.compressor);
-        this.reverbGain.gain.value = 1.0; // Very loud reverb
+        
+        // Reduced gain levels to prevent clipping
+        this.reverbGain.gain.value = 0.85; // Slightly lower reverb to prevent peaks
+        this.masterGain.gain.value = 0.9; // Slightly lower master gain for headroom
         
         // Compressor connects to destination (prevents clipping)
         this.compressor.connect(this.audioContext.destination);
-        
-        this.masterGain.gain.value = 1.0;
 
         // Initialize reverb with shorter, lighter response
         this.reverbLength = 1.0; // Default 1 second
