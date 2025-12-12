@@ -1120,7 +1120,8 @@
                 audioContext.resume();
             }
 
-            stopNote(keyElement);
+            // Don't stop existing oscillators - allow them to layer and fade out naturally
+            // stopNote(keyElement);
 
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
