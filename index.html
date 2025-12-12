@@ -1144,6 +1144,9 @@
                 note.originalGainPeak = 0.5;
                 note.originalGainSustain = 0.35;
                 
+                // Store start time for dynamic release calculation
+                note.startTime = waterSynth.audioContext.currentTime;
+                
                 // Apply volume multiplier to gain node
                 if (note.gainNode && volumeMultiplier !== 1.0) {
                     const now = waterSynth.audioContext.currentTime;
@@ -1200,16 +1203,21 @@
             return oscillators;
         }
         
-        // Stop oscillators with 0.1s release tail
+        // Stop oscillators with dynamic release tail based on hold duration
         function stopOscillators(oscillators) {
             if (oscillators && Array.isArray(oscillators) && waterSynth && waterSynth.audioContext) {
                 const now = waterSynth.audioContext.currentTime;
-                const releaseTime = 0.1; // 0.1 second release tail
                 
                 oscillators.forEach(osc => {
                     if (osc && osc.gainNode) {
                         try {
-                            // Fade out over 0.1s
+                            // Calculate hold duration
+                            const holdDuration = osc.startTime ? (now - osc.startTime) : 0;
+                            // Dynamic release: shorter hold = shorter release, longer hold = longer release
+                            // Minimum 0.01s for very short taps, maximum 0.1s for longer holds
+                            const releaseTime = Math.min(0.1, Math.max(0.01, holdDuration * 0.3));
+                            
+                            // Fade out with dynamic release time
                             const currentGain = osc.gainNode.gain.value;
                             osc.gainNode.gain.cancelScheduledValues(now);
                             osc.gainNode.gain.setValueAtTime(currentGain, now);
@@ -2790,7 +2798,16 @@
         
         container.addEventListener('mouseup', (e) => {
             if (window.liveMode) {
-                // Stop mouse oscillators when mouse is released (with 0.1s tail)
+                // Stop mouse oscillators when mouse is released (with dynamic tail)
+                stopOscillators(mouseOscillators);
+                mouseOscillators = [];
+                mouseActive = false;
+            }
+        });
+        
+        container.addEventListener('mouseleave', (e) => {
+            if (window.liveMode && mouseActive) {
+                // Stop mouse oscillators when mouse leaves container (with dynamic tail)
                 stopOscillators(mouseOscillators);
                 mouseOscillators = [];
                 mouseActive = false;
@@ -2841,7 +2858,8 @@
             e.preventDefault(); // Prevent scrolling
             
             // Update volume and pitch for each active touch
-            Array.from(e.changedTouches).forEach(touch => {
+            // Use e.touches to get ALL active touches, not just changed ones
+            Array.from(e.touches).forEach(touch => {
                 const touchId = touch.identifier;
                 const touchData = activeTouches.get(touchId);
                 
