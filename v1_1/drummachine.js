@@ -160,10 +160,50 @@ class DrumMachine {
     }
   }
 
+  // Helper to disconnect a node after it finishes
+  _disconnectAfter(node, duration) {
+    const disconnectTime = this.ctx.currentTime + duration + 0.1; // Small buffer
+    setTimeout(() => {
+      try {
+        if (node && typeof node.disconnect === 'function') {
+          node.disconnect();
+        }
+      } catch (e) {
+        // Ignore errors if node already disconnected
+      }
+    }, disconnectTime * 1000);
+  }
+
+  // Helper to cleanup oscillator after it stops
+  _cleanupOscillator(osc, stopTime) {
+    osc.onended = () => {
+      try {
+        osc.disconnect();
+      } catch (e) {
+        // Ignore errors
+      }
+    };
+  }
+
+  // Helper to cleanup buffer source after it stops
+  _cleanupBufferSource(src, stopTime) {
+    src.onended = () => {
+      try {
+        src.disconnect();
+      } catch (e) {
+        // Ignore errors
+      }
+    };
+  }
+
   // === DRUM SYNTHESIS METHODS ===
 
   playKick(velocity = 1, options = {}) {
     this.resume();
+    // Ensure audio context is running
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
     const { pan = 0, timeOffset = 0, velScale = 1 } = options;
     const t = this.ctx.currentTime + timeOffset;
     const startTime = Math.max(t, this.ctx.currentTime);
@@ -312,6 +352,14 @@ class DrumMachine {
     eqCut.connect(bleedDelay);
     bleedDelay.connect(bleedFilter).connect(bleedGain).connect(bleedMix);
     this._routeToMics(bleedMix, pan, 0.0005, { close: 1.1, overhead: 1.25, room: 1.15 });
+    
+    // Cleanup handlers
+    this._cleanupOscillator(osc1, startTime + 0.52);
+    this._cleanupOscillator(punchOsc, startTime + 0.5);
+    this._cleanupOscillator(osc2, startTime + 0.48);
+    this._cleanupOscillator(punchToneOsc, startTime + 0.025);
+    this._cleanupBufferSource(clickSrc, startTime + 0.02);
+    this._cleanupBufferSource(punchToneSrc, startTime + 0.03);
     
     osc1.start(startTime);
     osc1.stop(startTime + 0.52);
@@ -467,6 +515,15 @@ class DrumMachine {
     eqPunch.connect(punchReverb);
     this._routeToMics(punchReverb, pan, 0.001, { close: 0.8, overhead: 1.0, room: 1.8 });
     
+    // Cleanup handlers
+    this._cleanupBufferSource(src, startTime + 0.3);
+    this._cleanupBufferSource(crackSrc, startTime + 0.01);
+    this._cleanupBufferSource(parallelSrc, startTime + 0.15);
+    this._cleanupOscillator(tone, startTime + 0.25);
+    this._cleanupOscillator(ring, startTime + 0.22);
+    this._cleanupOscillator(bright, startTime + 0.18);
+    this._cleanupOscillator(tonal3rd, startTime + 0.15);
+    
     src.start(startTime);
     src.stop(startTime + 0.3);
     tone.start(startTime);
@@ -546,6 +603,10 @@ class DrumMachine {
     snapGain.connect(mix);
     
     this._routeToMics(mix, pan, 0.0008, { close: 1.2, overhead: 1.2, room: 1.2 });
+    
+    // Cleanup handlers
+    this._cleanupBufferSource(src, startTime + 0.3);
+    this._cleanupBufferSource(snapSrc, startTime + 0.005);
     
     src.start(startTime);
     src.stop(startTime + 0.3);
@@ -629,6 +690,12 @@ class DrumMachine {
     tomPunchMix.connect(gain);
     gain.connect(eqDip).connect(eqAttack);
     this._routeToMics(eqAttack, pan, 0.0006, { close: 1.0, overhead: 1.0, room: 1.05 });
+    
+    // Cleanup handlers
+    this._cleanupOscillator(osc, startTime + 0.55);
+    this._cleanupOscillator(harmonic, startTime + 0.5);
+    this._cleanupOscillator(tomPunchTone, startTime + 0.03);
+    this._cleanupBufferSource(tomPunchSrc, startTime + 0.035);
     
     osc.start(startTime);
     osc.stop(startTime + 0.55);
@@ -840,6 +907,15 @@ class DrumMachine {
     toneReverbHigh.gain.value = 2.5;
     toneMix.connect(toneReverbEQ).connect(toneReverbHigh).connect(reverbToneSend);
     this._routeToMics(reverbToneSend, pan, 0.0003, { close: 0, overhead: 0.5, room: open ? 1.4 : 1.1 });
+    
+    // Cleanup handlers
+    this._cleanupBufferSource(punchClickSrc, startTime + 0.01);
+    this._cleanupBufferSource(src, startTime + dur + 0.05);
+    this._cleanupBufferSource(heatTailSrc, startTime + heatTailDur + 0.1);
+    this._cleanupOscillator(tone, startTime + (open ? 0.5 : 0.2));
+    this._cleanupOscillator(slowDrift, startTime + dur + 0.2);
+    this._cleanupOscillator(vibrato, startTime + dur + 0.1);
+    this._cleanupOscillator(microMod, startTime + dur + 0.1);
     
     punchClickSrc.start(startTime);
     punchClickSrc.stop(startTime + 0.01);
