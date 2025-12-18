@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2vh 5vw;
+        }
+
+        .container {
+            text-align: center;
+            max-width: min(90vw, 800px);
+            width: 100%;
+        }
+
+        .title {
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-weight: 500;
+            margin-bottom: clamp(3vh, 5vh, 48px);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .title-link {
+            font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-weight: 400;
+            color: #000000;
+            text-decoration: none;
+            margin-right: clamp(4px, 1vw, 8px);
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+            display: inline-block;
+        }
+
+        .title-link:hover {
+            opacity: 0.7;
+        }
+
+        .title-by {
+            font-size: clamp(1.2rem, 4vw, 2rem);
+            font-weight: 500;
+            color: #000000;
+        }
+
+        .title-by .by-link {
+            color: #000000;
+            text-decoration: none;
+            border-bottom: 1px solid #d9d4cc;
+            padding-bottom: 1px;
+            cursor: pointer;
+            transition: border-bottom-color 0.2s ease;
+        }
+
+        .title-by .by-link:hover {
+            border-bottom-color: #000000;
+        }
+
+        .tagline {
+            font-size: clamp(1.1rem, 3vw, 1.5rem);
+            font-weight: 500;
+            margin-bottom: clamp(3vh, 5vh, 48px);
+            letter-spacing: -0.01em;
+            line-height: 1.4;
+        }
+
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 30;
+        }
+
+        .info-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: clamp(4px, 1vh, 8px);
+            padding: clamp(12px, 2vh, 16px);
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+            font-size: clamp(0.85rem, 2vw, 0.9rem);
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .info-modal a {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #c8c2b8;
+        }
+
+        .info-modal a:hover {
+            border-bottom-color: #111;
+        }
+
+        .links {
+            display: flex;
+            gap: clamp(12px, 2vw, 16px);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .link {
+            font-size: clamp(2rem, 6vw, 3rem);
+            font-weight: 500;
+            padding: clamp(8px, 1.5vh, 12px) clamp(16px, 3vw, 24px);
+            border: none;
+            background: transparent;
+            color: #000000;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            display: inline-block;
+        }
+
+        .link:hover {
+            opacity: 0.7;
+        }
+
+        .link.old {
+            color: #999;
+        }
+
+        .link.old:hover {
+            opacity: 0.5;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .link.pulse {
+            animation: pulse 2s ease-in-out infinite;
+            color: #2d7a2d;
+        }
+
+        @media (max-width: 767px) {
+            body {
+                padding: 3vh 4vw;
+            }
+
+            .links {
+                flex-direction: column;
+                gap: clamp(8px, 2vh, 12px);
+            }
+
+            .link {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="settingsOverlay" class="settings-overlay"></div>
+    <div id="infoModal" class="info-modal" role="dialog" aria-modal="true" aria-label="About">
+        Developed by <a href="https://youtube.com/beatsaway" target="_blank">BeatsAway</a> <br>
+        <a href="https://buymeacoffee.com/beatsaway" target="_blank">Support this developer</a>
+    </div>
+    <div class="container">
+        <div class="title">
+            <a class="title-link" href="#" id="titleLink">Chord Canvas</a>
+            <span class="title-by"> by <a class="by-link" href="#" id="byLink">Beats Away</a></span>
+        </div>
+        <div class="tagline">💅finger drum any chords for any songs!</div>
+        <div class="links">
+            <a href="v1_3/index.html" class="link pulse">V1.3</a>
+            <a href="v1_2/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.2</a>
+            <a href="v1_1/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.1</a>
+            <a href="v1_0.html" class="link old" target="_blank" rel="noopener noreferrer">V1.0</a>  
+        </div>
+    </div>
+    <script>
+        const titleLink = document.getElementById('titleLink');
+        const byLink = document.getElementById('byLink');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const infoModal = document.getElementById('infoModal');
+
+        function closeModal() {
+            settingsOverlay.style.display = 'none';
+            infoModal.style.display = 'none';
+        }
+
+        function openModal() {
+            settingsOverlay.style.display = 'block';
+            infoModal.style.display = 'block';
+        }
+
+        if (titleLink) {
+            titleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal();
+            });
+        }
+
+        if (byLink) {
+            byLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal();
+            });
+        }
+
+        settingsOverlay.addEventListener('click', closeModal);
+    </script>
+</body>
+</html>

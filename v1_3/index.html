@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas - Minimal Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+        }
+        header {
+            width: 100%;
+            padding: 8px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #fff;
+        }
+        header h1 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+            max-width: 500px;
+            margin: 0;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .beat-dots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .beat-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: background 0.1s;
+        }
+        .beat-dot.active {
+            background: #4CAF50;
+        }
+        .textarea-wrapper {
+            width: 100%;
+            background: #fff;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 0;
+            font-size: 14px;
+            font-family: monospace;
+            resize: vertical;
+            min-height: 60px;
+            background: #fff;
+        }
+        textarea:focus { outline: none; border-color: #000; }
+        input[type="number"] {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 70px;
+        }
+        input[type="number"]:focus { outline: none; border-color: #000; }
+        button {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover { background: #333; }
+        button:disabled { background: #999; cursor: not-allowed; }
+        .chords-display {
+            margin-top: 0;
+            padding: 6px 20px;
+            background: #f5f5f5;
+            font-size: 11px;
+            color: #333;
+            font-family: monospace;
+            min-height: 20px;
+        }
+        .chords-display span {
+            cursor: pointer;
+            padding: 2px 4px;
+            margin: 0 2px;
+            border-radius: 2px;
+        }
+        .chords-display span.playing {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .chords-display span.trans-none { color: #333; }
+        .chords-display span.trans-ii-v-i { color: #1976d2; }
+        .chords-display span.trans-sec-dom { color: #388e3c; }
+        .chords-display span.trans-tritone { color: #f57c00; }
+        .chords-display span.trans-leading { color: #7b1fa2; }
+        .chords-display span.trans-passing { color: #c2185b; }
+        .transition-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 3000;
+            padding: 4px 0;
+            min-width: 150px;
+        }
+        .transition-menu-item {
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .transition-menu-item:hover {
+            background: #f5f5f5;
+        }
+        .transition-menu-item.trans-none { color: #333; }
+        .transition-menu-item.trans-ii-v-i { color: #1976d2; }
+        .transition-menu-item.trans-sec-dom { color: #388e3c; }
+        .transition-menu-item.trans-tritone { color: #f57c00; }
+        .transition-menu-item.trans-leading { color: #7b1fa2; }
+        .transition-menu-item.trans-passing { color: #c2185b; }
+        .toolbar {
+            width: 100%;
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            background: #fff;
+        }
+        .toolbar button {
+            flex: 1;
+            background: transparent;
+            color: #222;
+            border: none;
+            border-right: 1px solid #e0e0e0;
+            padding: 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toolbar button:last-child {
+            border-right: none;
+        }
+        .toolbar button:hover {
+            background: #f5f5f5;
+        }
+        .toolbar button:active {
+            background: #e0e0e0;
+        }
+        .help-button {
+            position: fixed;
+            bottom: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 0;
+            background: transparent;
+            color: #999;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        .help-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .help-content {
+            background: white;
+            padding: 24px;
+            border-radius: 4px;
+            max-width: 400px;
+            font-size: 12px;
+            color: #333;
+            line-height: 1.6;
+        }
+        .help-content strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .live-play-container {
+            width: 100%;
+            padding: 8px 0;
+            background: #fff;
+            display: block !important;
+        }
+        .live-play-row {
+            width: 100vw !important;
+            display: block !important;
+            margin-bottom: 0;
+            clear: both;
+            overflow: hidden;
+        }
+        .live-play-row .live-play-btn {
+            display: block !important;
+            width: 50vw !important;
+            float: left !important;
+            padding: 24px;
+            font-size: 12px;
+            background: transparent !important;
+            color: #222;
+            border: 1px solid #e0e0e0;
+            border-right: none;
+            cursor: pointer;
+            border-radius: 0;
+            box-sizing: border-box;
+            margin: 0 !important;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .live-play-row .live-play-btn:last-child {
+            border-right: 1px solid #e0e0e0;
+        }
+        .live-play-row .live-play-btn:active {
+            background: #f5f5f5 !important;
+        }
+        .help-close {
+            float: right;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            Chord Canvas
+            <span class="beat-dots">
+                <span class="beat-dot" id="beatDot0"></span>
+                <span class="beat-dot" id="beatDot1"></span>
+                <span class="beat-dot" id="beatDot2"></span>
+                <span class="beat-dot" id="beatDot3"></span>
+            </span>
+        </h1>
+    </header>
+    <div class="textarea-wrapper">
+        <textarea id="chordInput">C, Dm, E7, Fdim, Gaug, Am, B, C#m, Db, E7</textarea>
+        <div class="toolbar">
+            <button id="confirmButton">Confirm</button>
+            <button id="playButton">Play</button>
+            <button id="stopButton">Stop</button>
+            <button id="liveButton">Live</button>
+            <button id="clearButton">Clear</button>
+            <button id="randomButton">Random</button>
+        </div>
+        <div id="chordsDisplay" class="chords-display" style="display: none;"></div>
+        <div id="livePlayContainer" class="live-play-container" style="display: none;">
+            <div class="live-play-row">
+                <button id="livePlayButtonLower" class="live-play-btn">Hold (Lower)</button>
+                <button id="livePlayButton" class="live-play-btn">Hold (Current)</button>
+            </div>
+            <div class="live-play-row">
+                <button id="livePulseButtonLower" class="live-play-btn">Pulse (Lower)</button>
+                <button id="livePulseButton" class="live-play-btn">Pulse (Current)</button>
+            </div>
+            <div class="live-play-row">
+                <button id="livePulse8TButtonLower" class="live-play-btn">1/8T (Lower)</button>
+                <button id="livePulse8TButton" class="live-play-btn">1/8T (Current)</button>
+            </div>
+            <div class="live-play-row">
+                <button id="livePulse16ButtonLower" class="live-play-btn">1/16 (Lower)</button>
+                <button id="livePulse16Button" class="live-play-btn">1/16 (Current)</button>
+            </div>
+            <div class="live-play-row">
+                <button id="liveArpeggioButtonLower" class="live-play-btn">Arpeggio (Lower)</button>
+                <button id="liveArpeggioButton" class="live-play-btn">Arpeggio (Current)</button>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+    <div class="row">
+        <input type="number" id="bpmInput" value="120" min="60" max="200">
+        <span style="font-size: 12px; color: #666;"><span id="durationDisplay">2.0</span>s/chord</span>
+    </div>
+    </div>
+
+    <button class="help-button" id="helpButton">?</button>
+    <div class="help-overlay" id="helpOverlay">
+        <div class="help-content">
+            <span class="help-close" id="helpClose">×</span>
+            <strong>Chord Notation</strong>
+            Major: C D E F G A B<br>
+            Minor: Cm Dm Em<br>
+            Dominant: C7 D7<br>
+            Dim: Cdim<br>
+            Aug: Caug<br>
+            Sharps/Flats: C# Db
+        </div>
+    </div>
+
+    <script src="watersynth.js"></script>
+    <script>
+        // Piano note frequencies (C4 as base)
+        const notes = [
+            { name: 'C', freq: 261.63, isBlack: false },
+            { name: 'C#', freq: 277.18, isBlack: true },
+            { name: 'D', freq: 293.66, isBlack: false },
+            { name: 'D#', freq: 311.13, isBlack: true },
+            { name: 'E', freq: 329.63, isBlack: false },
+            { name: 'F', freq: 349.23, isBlack: false },
+            { name: 'F#', freq: 369.99, isBlack: true },
+            { name: 'G', freq: 392.00, isBlack: false },
+            { name: 'G#', freq: 415.30, isBlack: true },
+            { name: 'A', freq: 440.00, isBlack: false },
+            { name: 'A#', freq: 466.16, isBlack: true },
+            { name: 'B', freq: 493.88, isBlack: false },
+        ];
+
+        // Create three octaves: lower (C3), middle (C4), and upper (C5)
+        const lowerOctave = notes.map(n => ({ ...n, freq: n.freq / 2 })); // C3 to B3
+        const middleOctave = notes; // C4 to B4
+        const upperOctave = notes.map(n => ({ ...n, freq: n.freq * 2 })); // C5 to B5
+        
+        const pianoNotes = [...lowerOctave, ...middleOctave, ...upperOctave];
+
+        // Note name to index mapping (supports sharps and flats)
+        const noteToIndex = {
+            'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+            'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
+            'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+        };
+
+        // Chord intervals (in semitones from root)
+        const chordIntervals = {
+            'major-triad': [0, 7, 12, 16, 19],
+            'minor-triad': [0, 7, 12, 15, 19],
+            'dominant-7th': [0, 7, 10, 12, 16, 19],
+            'minor-7th': [0, 3, 7, 10],
+            'diminished-triad': [0, 6, 12, 15, 18],
+            'diminished-7th': [0, 3, 6, 9],
+            'augmented-triad': [0, 8, 12, 16, 20]
+        };
+
+        let waterSynth = null;
+        let isPlaying = false;
+        let parsedChords = [];
+        let liveMode = false;
+        let activeOscillators = {}; // Store active oscillators for each chord index
+        let pulseIntervals = {}; // Store pulse intervals
+        let arpeggioIntervals = {}; // Store arpeggio intervals
+        let currentPlayingIndex = -1;
+        let chordTransitions = {}; // Store transition type for each chord index
+        let currentTransitionChord = null; // Store current transition chord being played
+        let dragState = {}; // Store drag state for each button: { startY, baseVolume, key }
+        let activeButtonState = {}; // Track which button is currently pressed: { buttonId: { stopFunction, params } }
+
+        // Initialize audio
+        function initAudio() {
+            if (!waterSynth) {
+                waterSynth = new WaterSynth();
+            }
+            if (waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+        }
+
+        // Parse chord from string input
+        function parseChord(input) {
+            const trimmed = input.trim();
+            if (!trimmed) return null;
+
+            // Match pattern: [Note][# or b][quality suffix]
+            // Examples: C, Cm, C7, Cdim, Caug, C#, C#m, Db, Dbm
+            const match = trimmed.match(/^([A-Ga-g])([#b]?)(.*)$/i);
+            if (!match) return null;
+
+            const rootLetter = match[1].toUpperCase();
+            const accidental = match[2] || '';
+            const suffix = match[3].toLowerCase();
+
+            // Construct note name
+            const noteName = rootLetter + accidental;
+
+            // Check if note exists in our mapping
+            if (!noteToIndex.hasOwnProperty(noteName)) {
+                return null;
+            }
+
+            // Determine chord type based on suffix
+            let chordType = 'major-triad'; // default
+            
+            if (suffix === 'm' || suffix === 'min' || suffix === '-') {
+                chordType = 'minor-triad';
+            } else if (suffix === '7' || suffix === 'dom' || suffix === 'dom7') {
+                chordType = 'dominant-7th';
+            } else if (suffix.includes('dim') || suffix === 'o' || suffix === '°') {
+                chordType = 'diminished-triad';
+            } else if (suffix.includes('aug') || suffix === '+') {
+                chordType = 'augmented-triad';
+            }
+
+            return {
+                rootNote: noteName,
+                chordType: chordType
+            };
+        }
+
+        // Get chord note frequencies
+        function getChordFrequencies(rootNote, chordType) {
+            // Handle slash chords (e.g., C/E)
+            let actualRoot = rootNote;
+            let bassNote = null;
+            const slashMatch = rootNote.match(/\/([A-G][#b]?)$/);
+            if (slashMatch) {
+                bassNote = slashMatch[1];
+                actualRoot = rootNote.replace(/\/.*/, '').trim();
+            }
+
+            const rootIndex = noteToIndex[actualRoot];
+            if (rootIndex === undefined) return [];
+
+            const intervals = chordIntervals[chordType];
+            if (!intervals) return [];
+
+            const frequencies = [];
+            const rootNoteInMiddleOctave = 12 + rootIndex; // Use middle octave (C4)
+
+            // Add bass note if slash chord (one octave lower)
+            if (bassNote) {
+                const bassIndex = noteToIndex[bassNote];
+                if (bassIndex !== undefined) {
+                    const bassNoteInLowerOctave = 0 + bassIndex;
+                    if (bassNoteInLowerOctave >= 0 && bassNoteInLowerOctave < pianoNotes.length) {
+                        frequencies.push(pianoNotes[bassNoteInLowerOctave].freq);
+                    }
+                }
+            }
+
+            intervals.forEach((interval) => {
+                let noteIndex = rootNoteInMiddleOctave + interval;
+                // Keep notes within reasonable range
+                while (noteIndex > 28 && noteIndex >= 0) {
+                    noteIndex = noteIndex - 12;
+                }
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    frequencies.push(pianoNotes[noteIndex].freq);
+                }
+            });
+
+            return frequencies;
+        }
+
+        // Play a single chord
+        function playChord(rootNote, chordType, durationSec) {
+            const frequencies = getChordFrequencies(rootNote, chordType);
+            if (frequencies.length === 0) return;
+
+            frequencies.forEach(freq => {
+                waterSynth.playNote(freq, durationSec);
+            });
+        }
+
+        // Transition type colors
+        const transitionColors = {
+            'none': 'trans-none',
+            'ii-v-i': 'trans-ii-v-i',
+            'sec-dom': 'trans-sec-dom',
+            'tritone': 'trans-tritone',
+            'leading': 'trans-leading',
+            'passing': 'trans-passing'
+        };
+
+        // Display parsed chords compactly with clickable spans
+        function displayParsedChords(chords, highlightIndex = -1) {
+            const displayEl = document.getElementById('chordsDisplay');
+            if (chords.length === 0) {
+                displayEl.style.display = 'none';
+                return;
+            }
+            
+            displayEl.innerHTML = '';
+            chords.forEach((chord, index) => {
+                const suffix = chord.chordType === 'minor-triad' ? 'm' : 
+                              chord.chordType === 'dominant-7th' ? '7' :
+                              chord.chordType === 'diminished-triad' ? 'dim' :
+                              chord.chordType === 'augmented-triad' ? 'aug' : '';
+                const label = chord.rootNote + suffix;
+                const span = document.createElement('span');
+                span.textContent = label;
+                
+                // Build class list
+                let classes = [];
+                if (index === highlightIndex) {
+                    classes.push('playing');
+                }
+                const transition = chordTransitions[index] || 'none';
+                classes.push(transitionColors[transition]);
+                span.className = classes.join(' ');
+                
+                // Add click handler for transition selection
+                span.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showTransitionMenu(e.target, index);
+                });
+                
+                displayEl.appendChild(span);
+                
+                if (index < chords.length - 1) {
+                    displayEl.appendChild(document.createTextNode(', '));
+                }
+            });
+            
+            displayEl.style.display = 'block';
+        }
+
+        // Play current chord continuously (for live mode)
+        function playCurrentChord(octaveOffset = 0) {
+            // Stop any existing oscillators for this octave
+            stopCurrentChord(octaveOffset);
+
+            // Initialize audio
+            initAudio();
+
+            let frequencies = [];
+            
+            // If there's a transition chord active, play that; otherwise play main chord
+            if (currentTransitionChord) {
+                if (Array.isArray(currentTransitionChord)) {
+                    // For ii-V-I, play the first chord (ii) when button is pressed
+                    frequencies = getChordFrequencies(currentTransitionChord[0].rootNote, currentTransitionChord[0].chordType);
+                } else {
+                    frequencies = getChordFrequencies(currentTransitionChord.rootNote, currentTransitionChord.chordType);
+                }
+            } else if (currentPlayingIndex >= 0 && parsedChords[currentPlayingIndex]) {
+                const chord = parsedChords[currentPlayingIndex];
+                frequencies = getChordFrequencies(chord.rootNote, chord.chordType);
+            }
+            
+            if (frequencies.length === 0) return;
+
+            // Apply octave offset (multiply by 0.5 for one octave lower)
+            const octaveMultiplier = octaveOffset === -1 ? 0.5 : 1;
+            frequencies = frequencies.map(freq => freq * octaveMultiplier);
+
+            // Play all notes continuously
+            const oscillators = [];
+            frequencies.forEach(freq => {
+                const note = waterSynth.createSustainedNote(freq);
+                note.startTime = waterSynth.audioContext.currentTime;
+                oscillators.push(note);
+            });
+
+            const key = octaveOffset === -1 ? 'current-lower' : 'current';
+            activeOscillators[key] = oscillators;
+        }
+
+        // Stop current chord playback
+        function stopCurrentChord(octaveOffset = 0) {
+            const key = octaveOffset === -1 ? 'current-lower' : 'current';
+            if (activeOscillators[key]) {
+                activeOscillators[key].forEach(osc => {
+                    if (osc && osc.oscillator) {
+                        try {
+                            const now = waterSynth.audioContext.currentTime;
+                            const holdDuration = osc.startTime ? (now - osc.startTime) : 0;
+                            const releaseTime = Math.min(0.1, Math.max(0.01, holdDuration * 0.3));
+                            
+                            if (osc.gainNode) {
+                                const currentGain = osc.gainNode.gain.value;
+                                osc.gainNode.gain.cancelScheduledValues(now);
+                                osc.gainNode.gain.setValueAtTime(currentGain, now);
+                                osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+                            }
+                            
+                            setTimeout(() => {
+                                if (osc.oscillator) osc.oscillator.stop();
+                            }, releaseTime * 1000);
+                        } catch (e) {
+                            console.warn('Error stopping oscillator:', e);
+                        }
+                    }
+                });
+                delete activeOscillators[key];
+            }
+        }
+
+        // Update volume for active oscillators
+        function updateOscillatorsVolume(key, volumeMultiplier) {
+            if (activeOscillators[key]) {
+                const now = waterSynth.audioContext.currentTime;
+                activeOscillators[key].forEach(osc => {
+                    if (osc && osc.gainNode) {
+                        try {
+                            const baseGain = 0.35; // Base sustain level
+                            const newGain = baseGain * volumeMultiplier;
+                            osc.gainNode.gain.cancelScheduledValues(now);
+                            osc.gainNode.gain.setValueAtTime(newGain, now);
+                        } catch (e) {
+                            console.warn('Error updating volume:', e);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Store volume multipliers for pulse/arpeggio modes
+        let pulseVolumeMultipliers = {}; // Store volume multiplier for each pulse/arpeggio key
+
+        // Calculate volume multiplier from drag distance
+        function calculateVolumeFromDrag(startY, currentY, maxDragDistance = 100) {
+            const dragDistance = startY - currentY; // Negative when dragging down, positive when up
+            const dragRatio = Math.max(-1, Math.min(1, dragDistance / maxDragDistance)); // Clamp to -1 to 1
+            const volumeMultiplier = 1 + (dragRatio * 0.2); // ±20% range
+            return Math.max(0.8, Math.min(1.2, volumeMultiplier)); // Clamp to 0.8-1.2
+        }
+
+        // Setup drag volume control for a button
+        function setupDragVolumeControl(button, key, updateVolumeCallback) {
+            const handleStart = (e) => {
+                if (!liveMode || currentPlayingIndex < 0) return;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                dragState[key] = {
+                    startY: clientY,
+                    baseVolume: 1.0,
+                    active: true
+                };
+                updateVolumeCallback(1.0); // Start with base volume
+            };
+
+            const handleMove = (e) => {
+                if (!dragState[key] || !dragState[key].active) return;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const volumeMultiplier = calculateVolumeFromDrag(dragState[key].startY, clientY);
+                dragState[key].baseVolume = volumeMultiplier;
+                updateVolumeCallback(volumeMultiplier);
+            };
+
+            const handleEnd = () => {
+                if (dragState[key]) {
+                    dragState[key].active = false;
+                }
+            };
+
+            // Mouse events
+            button.addEventListener('mousedown', handleStart);
+            document.addEventListener('mousemove', handleMove);
+            button.addEventListener('mouseup', handleEnd);
+            button.addEventListener('mouseleave', handleEnd);
+
+            // Touch events
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handleStart(e);
+            });
+            document.addEventListener('touchmove', (e) => {
+                if (dragState[key] && dragState[key].active) {
+                    e.preventDefault();
+                    handleMove(e);
+                }
+            });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handleEnd();
+            });
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                handleEnd();
+            });
+        }
+
+        // Stop all current chords (both octaves)
+        function stopAllCurrentChords() {
+            stopCurrentChord(0);
+            stopCurrentChord(-1);
+            stopPulseChord(0);
+            stopPulseChord(-1);
+            // Stop all pulse intervals
+            Object.keys(pulseIntervals).forEach(key => {
+                clearInterval(pulseIntervals[key]);
+            });
+            pulseIntervals = {};
+            // Stop all arpeggio intervals
+            Object.keys(arpeggioIntervals).forEach(key => {
+                clearInterval(arpeggioIntervals[key]);
+            });
+            arpeggioIntervals = {};
+        }
+
+        // Play chord with pulsing (every 30/bpm seconds)
+        function playPulseChord(octaveOffset = 0) {
+            // Stop any existing pulse for this octave
+            stopPulseChord(octaveOffset);
+
+            // Define key early so it's available in closures
+            const key = octaveOffset === -1 ? 'pulse-lower' : 'pulse';
+
+            // Get current chord frequencies
+            let frequencies = [];
+            if (currentTransitionChord) {
+                if (Array.isArray(currentTransitionChord)) {
+                    frequencies = getChordFrequencies(currentTransitionChord[0].rootNote, currentTransitionChord[0].chordType);
+                } else {
+                    frequencies = getChordFrequencies(currentTransitionChord.rootNote, currentTransitionChord.chordType);
+                }
+            } else if (currentPlayingIndex >= 0 && parsedChords[currentPlayingIndex]) {
+                const chord = parsedChords[currentPlayingIndex];
+                frequencies = getChordFrequencies(chord.rootNote, chord.chordType);
+            }
+
+            if (frequencies.length === 0) return;
+
+            // Apply octave offset
+            const octaveMultiplier = octaveOffset === -1 ? 0.5 : 1;
+            frequencies = frequencies.map(freq => freq * octaveMultiplier);
+
+            // Initialize audio
+            initAudio();
+
+            // Calculate pulse interval (30/bpm seconds)
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const pulseIntervalSec = 30 / bpm;
+            const pulseDurationSec = 0.25; // Longer duration to reach full volume
+
+            // Function to get current frequencies and play pulse
+            const playPulse = () => {
+                if (!liveMode) return; // Stop if live mode is disabled
+                
+                // Get current chord frequencies (may have changed)
+                let currentFrequencies = [];
+                if (currentTransitionChord) {
+                    if (Array.isArray(currentTransitionChord)) {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord[0].rootNote, currentTransitionChord[0].chordType);
+                    } else {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord.rootNote, currentTransitionChord.chordType);
+                    }
+                } else if (currentPlayingIndex >= 0 && parsedChords[currentPlayingIndex]) {
+                    const chord = parsedChords[currentPlayingIndex];
+                    currentFrequencies = getChordFrequencies(chord.rootNote, chord.chordType);
+                }
+                
+                if (currentFrequencies.length > 0) {
+                    const octaveMultiplier = octaveOffset === -1 ? 0.5 : 1;
+                    currentFrequencies = currentFrequencies.map(freq => freq * octaveMultiplier);
+                    const volumeMultiplier = pulseVolumeMultipliers[key] || 1.0;
+                    
+                    currentFrequencies.forEach(freq => {
+                        waterSynth.playNote(freq, pulseDurationSec, 0.02, 0.2, 0.03, 0.7, volumeMultiplier);
+                    });
+                }
+            };
+
+            // Play immediately
+            playPulse();
+
+            // Set up interval to pulse
+            const intervalId = setInterval(() => {
+                if (!liveMode || currentPlayingIndex < 0) {
+                    clearInterval(intervalId);
+                    delete pulseIntervals[key];
+                    return;
+                }
+                playPulse();
+            }, pulseIntervalSec * 1000);
+
+            pulseIntervals[key] = intervalId;
+        }
+
+        // Stop pulsing chord
+        function stopPulseChord(octaveOffset = 0) {
+            const key = octaveOffset === -1 ? 'pulse-lower' : 'pulse';
+            if (pulseIntervals[key]) {
+                clearInterval(pulseIntervals[key]);
+                delete pulseIntervals[key];
+            }
+        }
+
+        // Play chord with pulsing at specific interval (for 1/8T and 1/16)
+        function playPulseChordAtInterval(octaveOffset = 0, intervalSec) {
+            // Stop any existing pulse for this octave and interval type
+            const key = octaveOffset === -1 ? `pulse-${intervalSec}-lower` : `pulse-${intervalSec}`;
+            if (pulseIntervals[key]) {
+                clearInterval(pulseIntervals[key]);
+                delete pulseIntervals[key];
+            }
+
+            // Initialize audio
+            initAudio();
+
+            // Calculate pulse duration
+            const pulseDurationSec = 0.25; // Longer duration to reach full volume
+
+            // Function to get current frequencies and play pulse
+            const playPulse = () => {
+                if (!liveMode) return; // Stop if live mode is disabled
+                
+                // Get current chord frequencies (may have changed)
+                let currentFrequencies = [];
+                if (currentTransitionChord) {
+                    if (Array.isArray(currentTransitionChord)) {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord[0].rootNote, currentTransitionChord[0].chordType);
+                    } else {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord.rootNote, currentTransitionChord.chordType);
+                    }
+                } else if (currentPlayingIndex >= 0 && parsedChords[currentPlayingIndex]) {
+                    const chord = parsedChords[currentPlayingIndex];
+                    currentFrequencies = getChordFrequencies(chord.rootNote, chord.chordType);
+                }
+                
+                if (currentFrequencies.length > 0) {
+                    const octaveMultiplier = octaveOffset === -1 ? 0.5 : 1;
+                    currentFrequencies = currentFrequencies.map(freq => freq * octaveMultiplier);
+                    const volumeMultiplier = pulseVolumeMultipliers[key] || 1.0;
+                    
+                    currentFrequencies.forEach(freq => {
+                        waterSynth.playNote(freq, pulseDurationSec, 0.02, 0.2, 0.03, 0.7, volumeMultiplier);
+                    });
+                }
+            };
+
+            // Play immediately
+            playPulse();
+
+            // Set up interval to pulse
+            const intervalId = setInterval(() => {
+                if (!liveMode || currentPlayingIndex < 0) {
+                    clearInterval(intervalId);
+                    delete pulseIntervals[key];
+                    return;
+                }
+                playPulse();
+            }, intervalSec * 1000);
+
+            pulseIntervals[key] = intervalId;
+        }
+
+        // Stop pulsing chord at specific interval
+        function stopPulseChordAtInterval(octaveOffset = 0, intervalSec) {
+            const key = octaveOffset === -1 ? `pulse-${intervalSec}-lower` : `pulse-${intervalSec}`;
+            if (pulseIntervals[key]) {
+                clearInterval(pulseIntervals[key]);
+                delete pulseIntervals[key];
+            }
+        }
+
+        // Play chord as arpeggio at specific interval (7.5/bpm for arpeggio)
+        function playArpeggioChordAtInterval(octaveOffset = 0, intervalSec) {
+            // Stop any existing arpeggio for this octave and interval type
+            const key = octaveOffset === -1 ? `arpeggio-${intervalSec}-lower` : `arpeggio-${intervalSec}`;
+            if (arpeggioIntervals[key]) {
+                clearInterval(arpeggioIntervals[key]);
+                delete arpeggioIntervals[key];
+            }
+
+            // Initialize audio
+            initAudio();
+
+            // Function to get current frequencies and play next note in arpeggio
+            const playNextArpeggioNote = () => {
+                if (!liveMode) return; // Stop if live mode is disabled
+                
+                // Get current chord frequencies (may have changed)
+                let currentFrequencies = [];
+                if (currentTransitionChord) {
+                    if (Array.isArray(currentTransitionChord)) {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord[0].rootNote, currentTransitionChord[0].chordType);
+                    } else {
+                        currentFrequencies = getChordFrequencies(currentTransitionChord.rootNote, currentTransitionChord.chordType);
+                    }
+                } else if (currentPlayingIndex >= 0 && parsedChords[currentPlayingIndex]) {
+                    const chord = parsedChords[currentPlayingIndex];
+                    currentFrequencies = getChordFrequencies(chord.rootNote, chord.chordType);
+                }
+                
+                if (currentFrequencies.length === 0) return;
+
+                // Apply octave offset
+                const octaveMultiplier = octaveOffset === -1 ? 0.5 : 1;
+                currentFrequencies = currentFrequencies.map(freq => freq * octaveMultiplier);
+
+                // Randomly select a note from current frequencies (allows repeated notes)
+                const randomIndex = Math.floor(Math.random() * currentFrequencies.length);
+                const freq = currentFrequencies[randomIndex];
+                const pulseDurationSec = 0.25; // Longer duration to reach full volume
+                const volumeMultiplier = pulseVolumeMultipliers[key] || 1.0;
+                waterSynth.playNote(freq, pulseDurationSec, 0.02, 0.2, 0.03, 0.7, volumeMultiplier);
+            };
+
+            // Play immediately
+            playNextArpeggioNote();
+
+            // Set up interval to play arpeggio notes
+            const intervalId = setInterval(() => {
+                if (!liveMode || currentPlayingIndex < 0) {
+                    clearInterval(intervalId);
+                    delete arpeggioIntervals[key];
+                    return;
+                }
+                playNextArpeggioNote();
+            }, intervalSec * 1000);
+
+            arpeggioIntervals[key] = intervalId;
+        }
+
+        // Stop arpeggio chord at specific interval
+        function stopArpeggioChordAtInterval(octaveOffset = 0, intervalSec) {
+            const key = octaveOffset === -1 ? `arpeggio-${intervalSec}-lower` : `arpeggio-${intervalSec}`;
+            if (arpeggioIntervals[key]) {
+                clearInterval(arpeggioIntervals[key]);
+                delete arpeggioIntervals[key];
+            }
+        }
+
+        // Show transition selection menu
+        function showTransitionMenu(targetElement, chordIndex) {
+            // Remove existing menu if any
+            const existingMenu = document.getElementById('transitionMenu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+
+            const menu = document.createElement('div');
+            menu.id = 'transitionMenu';
+            menu.className = 'transition-menu';
+            
+            const transitions = [
+                { value: 'none', label: 'No Transition' },
+                { value: 'ii-v-i', label: 'ii-V-I' },
+                { value: 'sec-dom', label: '2nd Dominant' },
+                { value: 'tritone', label: 'Tritone Sub' },
+                { value: 'leading', label: 'Leading Tone' },
+                { value: 'passing', label: 'Passing Dim' }
+            ];
+
+            transitions.forEach(trans => {
+                const item = document.createElement('div');
+                item.className = 'transition-menu-item';
+                item.textContent = trans.label;
+                // Apply color based on transition type
+                const colorClass = transitionColors[trans.value] || 'trans-none';
+                item.classList.add(colorClass);
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    chordTransitions[chordIndex] = trans.value;
+                    displayParsedChords(parsedChords, currentPlayingIndex);
+                    menu.remove();
+                });
+                menu.appendChild(item);
+            });
+
+            document.body.appendChild(menu);
+            
+            // Position menu near clicked element
+            const rect = targetElement.getBoundingClientRect();
+            menu.style.left = rect.left + 'px';
+            menu.style.top = (rect.bottom + 4) + 'px';
+
+            // Close menu when clicking outside
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target) && e.target !== targetElement) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu);
+            }, 0);
+        }
+
+        // Parse chords from input
+        function parseChordsFromInput() {
+            const input = document.getElementById('chordInput').value;
+            const chordStrings = input.split(',').map(s => s.trim()).filter(s => s);
+            const chords = [];
+            
+            for (const chordStr of chordStrings) {
+                const chord = parseChord(chordStr);
+                if (chord) {
+                    chords.push(chord);
+                }
+            }
+            
+            return chords;
+        }
+
+        // Generate random chords
+        function generateRandomChords() {
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const qualities = ['', 'm', '7', 'dim', 'aug'];
+            const count = 8 + Math.floor(Math.random() * 5); // 8-12 chords
+            const chords = [];
+            
+            for (let i = 0; i < count; i++) {
+                const note = notes[Math.floor(Math.random() * notes.length)];
+                const quality = qualities[Math.floor(Math.random() * qualities.length)];
+                chords.push(note + quality);
+            }
+            
+            return chords.join(', ');
+        }
+
+        // Calculate transition chord based on transition type
+        function calculateTransitionChord(transitionType, currentChord, targetChord) {
+            if (!targetChord || transitionType === 'none') return null;
+
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const currentRoot = currentChord.rootNote.replace(/\/.*/, '').trim();
+            const targetRoot = targetChord.rootNote.replace(/\/.*/, '').trim();
+            const currentRootIndex = noteToIndex[currentRoot];
+            const targetRootIndex = noteToIndex[targetRoot];
+
+            if (currentRootIndex === undefined || targetRootIndex === undefined) return null;
+
+            let transitionChord = null;
+
+            switch (transitionType) {
+                case 'ii-v-i': {
+                    // ii-V7 of target (two chords)
+                    const iiIndex = (targetRootIndex + 2) % 12;
+                    const iiNote = noteNames[iiIndex];
+                    const v7Index = (targetRootIndex + 7) % 12;
+                    const v7Note = noteNames[v7Index];
+                    transitionChord = [
+                        { rootNote: iiNote, chordType: 'minor-7th' },
+                        { rootNote: v7Note, chordType: 'dominant-7th' }
+                    ];
+                    break;
+                }
+                case 'sec-dom': {
+                    // V7 of target chord
+                    const v7Index = (targetRootIndex + 7) % 12;
+                    const v7Note = noteNames[v7Index];
+                    transitionChord = { rootNote: v7Note, chordType: 'dominant-7th' };
+                    break;
+                }
+                case 'tritone': {
+                    // Dominant 7th a semitone above target
+                    const tritoneIndex = (targetRootIndex + 1) % 12;
+                    const tritoneNote = noteNames[tritoneIndex];
+                    transitionChord = { rootNote: tritoneNote, chordType: 'dominant-7th' };
+                    break;
+                }
+                case 'leading': {
+                    // Leading tone: semitone below target root in bass (slash chord)
+                    const leadingToneIndex = (targetRootIndex - 1 + 12) % 12;
+                    const leadingToneName = noteNames[leadingToneIndex];
+                    transitionChord = { rootNote: currentRoot + '/' + leadingToneName, chordType: 'major-triad' };
+                    break;
+                }
+                case 'passing': {
+                    // Passing diminished: chord between current and target
+                    const intervalDistance = (targetRootIndex - currentRootIndex + 12) % 12;
+                    let dimIndex;
+                    if (intervalDistance > 6) {
+                        dimIndex = (currentRootIndex + Math.floor(intervalDistance / 2)) % 12;
+                    } else if (intervalDistance > 2) {
+                        dimIndex = (currentRootIndex + Math.floor(intervalDistance / 2)) % 12;
+                    } else {
+                        dimIndex = (currentRootIndex + 1) % 12;
+                    }
+                    const dimNote = noteNames[dimIndex];
+                    transitionChord = { rootNote: dimNote, chordType: 'diminished-7th' };
+                    break;
+                }
+            }
+
+            return transitionChord;
+        }
+
+        // Update beat dots
+        function updateBeatDots(beatIndex) {
+            for (let i = 0; i < 4; i++) {
+                const dot = document.getElementById(`beatDot${i}`);
+                if (dot) {
+                    dot.classList.toggle('active', i === beatIndex);
+                }
+            }
+        }
+
+        // Parse and play chords sequentially
+        async function playChordsSequentially(chords, bpm) {
+            const barDurationSec = 240 / bpm; // Full bar duration (4 beats)
+            const beatDurationSec = 60 / bpm; // Single beat duration
+
+            if (chords.length === 0) {
+                displayParsedChords([]);
+                return;
+            }
+
+            isPlaying = true;
+            updatePlayButton();
+
+            // Initialize audio
+            initAudio();
+
+            // Play chords sequentially
+            for (let i = 0; i < chords.length; i++) {
+                if (!isPlaying) break; // Allow cancellation
+
+                currentPlayingIndex = i;
+                const chord = chords[i];
+                const transitionType = chordTransitions[i] || 'none';
+                const nextChord = (i < chords.length - 1) ? chords[i + 1] : null;
+                
+                // Calculate timing: if transition exists, main chord gets 2 beats, transition gets 2 beats
+                const hasTransition = transitionType !== 'none' && nextChord;
+                const mainChordBeats = hasTransition ? 2 : 4;
+                const mainChordDurationSec = beatDurationSec * mainChordBeats;
+                
+                // Update display - highlight main chord
+                currentTransitionChord = null;
+                displayParsedChords(chords, i);
+                
+                // Play main chord (skip audio in live mode)
+                if (!liveMode) {
+                    playChord(chord.rootNote, chord.chordType, mainChordDurationSec);
+                }
+                
+                // Animate beats for main chord
+                for (let beat = 0; beat < mainChordBeats; beat++) {
+                    updateBeatDots(beat);
+                    await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                }
+                
+                // Handle transition chord if exists
+                if (hasTransition) {
+                    const transitionChord = calculateTransitionChord(transitionType, chord, nextChord);
+                    if (transitionChord) {
+                        // Update display - show transition chord is active
+                        currentTransitionChord = transitionChord;
+                        displayParsedChords(chords, i); // Keep highlighting main chord, transition is tracked separately
+                        
+                        if (!liveMode) {
+                            // Play transition chord(s) in play mode
+                            if (Array.isArray(transitionChord)) {
+                                // ii-V-I: play two chords, each for 1 beat
+                                updateBeatDots(2);
+                                playChord(transitionChord[0].rootNote, transitionChord[0].chordType, beatDurationSec);
+                                await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                                updateBeatDots(3);
+                                playChord(transitionChord[1].rootNote, transitionChord[1].chordType, beatDurationSec);
+                                await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                            } else {
+                                // Single transition chord for remaining 2 beats
+                                updateBeatDots(2);
+                                playChord(transitionChord.rootNote, transitionChord.chordType, beatDurationSec * 2);
+                                await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                                updateBeatDots(3);
+                                await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                            }
+                        } else {
+                            // In live mode, just animate beats
+                            updateBeatDots(2);
+                            await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                            updateBeatDots(3);
+                            await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                        }
+                        
+                        currentTransitionChord = null;
+                    }
+                } else {
+                    // No transition, animate remaining beats
+                    for (let beat = mainChordBeats; beat < 4; beat++) {
+                        updateBeatDots(beat);
+                        await new Promise(resolve => setTimeout(resolve, beatDurationSec * 1000));
+                    }
+                }
+                
+                // Reset beat dots
+                updateBeatDots(-1);
+            }
+            
+            // Loop if still playing
+            if (isPlaying) {
+                // Reset and loop from beginning
+                currentPlayingIndex = -1;
+                currentTransitionChord = null;
+                updateBeatDots(-1);
+                // Start again from the beginning
+                playChordsSequentially(chords, bpm);
+                return;
+            }
+            
+            // Reset display after all chords are played (only if stopped)
+            currentPlayingIndex = -1;
+            currentTransitionChord = null;
+            displayParsedChords(chords, -1);
+            updateBeatDots(-1);
+
+            isPlaying = false;
+            updatePlayButton();
+        }
+
+        function updatePlayButton() {
+            const playButton = document.getElementById('playButton');
+            const stopButton = document.getElementById('stopButton');
+            playButton.disabled = isPlaying;
+            stopButton.disabled = !isPlaying;
+        }
+
+        // Event handlers
+        document.getElementById('confirmButton').addEventListener('click', () => {
+            parsedChords = parseChordsFromInput();
+            displayParsedChords(parsedChords);
+        });
+
+        document.getElementById('playButton').addEventListener('click', () => {
+            if (isPlaying) {
+                return; // Already playing, use Stop button
+            }
+            
+            if (parsedChords.length === 0) {
+                parsedChords = parseChordsFromInput();
+            }
+            
+            if (parsedChords.length === 0) {
+                return;
+            }
+
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            playChordsSequentially(parsedChords, bpm);
+        });
+
+        document.getElementById('stopButton').addEventListener('click', () => {
+            // Stop playback
+            isPlaying = false;
+            updatePlayButton();
+            updateBeatDots(-1);
+            stopCurrentChord();
+        });
+
+        document.getElementById('clearButton').addEventListener('click', () => {
+            document.getElementById('chordInput').value = '';
+            parsedChords = [];
+            chordTransitions = {};
+            document.getElementById('chordsDisplay').style.display = 'none';
+        });
+
+        document.getElementById('randomButton').addEventListener('click', () => {
+            const randomChords = generateRandomChords();
+            document.getElementById('chordInput').value = randomChords;
+            parsedChords = parseChordsFromInput();
+            displayParsedChords(parsedChords);
+        });
+
+        function updateDurationDisplay() {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const duration = 240 / bpm;
+            document.getElementById('durationDisplay').textContent = duration.toFixed(2);
+        }
+
+        document.getElementById('bpmInput').addEventListener('input', updateDurationDisplay);
+
+        // Initialize duration display and parse default chords
+        updateDurationDisplay();
+        parsedChords = parseChordsFromInput();
+        displayParsedChords(parsedChords);
+
+        // Help button functionality
+        document.getElementById('helpButton').addEventListener('click', () => {
+            document.getElementById('helpOverlay').style.display = 'flex';
+        });
+
+        document.getElementById('helpClose').addEventListener('click', () => {
+            document.getElementById('helpOverlay').style.display = 'none';
+        });
+
+        document.getElementById('helpOverlay').addEventListener('click', (e) => {
+            if (e.target.id === 'helpOverlay') {
+                document.getElementById('helpOverlay').style.display = 'none';
+            }
+        });
+
+        // Live button handler
+        document.getElementById('liveButton').addEventListener('click', () => {
+            liveMode = !liveMode;
+            const liveBtn = document.getElementById('liveButton');
+            const livePlayContainer = document.getElementById('livePlayContainer');
+            
+            if (liveMode) {
+                liveBtn.style.background = '#4CAF50';
+                liveBtn.style.color = 'white';
+                livePlayContainer.style.display = 'flex';
+                // Stop all active oscillators
+                stopAllCurrentChords();
+                // Auto-start playback in live mode
+                if (parsedChords.length === 0) {
+                    parsedChords = parseChordsFromInput();
+                }
+                if (parsedChords.length > 0 && !isPlaying) {
+                    const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                    playChordsSequentially(parsedChords, bpm);
+                }
+            } else {
+                liveBtn.style.background = '';
+                liveBtn.style.color = '';
+                livePlayContainer.style.display = 'none';
+                // Stop all active oscillators
+                stopAllCurrentChords();
+                // Stop playback when exiting live mode
+                if (isPlaying) {
+                    isPlaying = false;
+                    updatePlayButton();
+                    updateBeatDots(-1);
+                }
+            }
+        });
+
+        // Live play button handlers - current octave
+        const livePlayBtn = document.getElementById('livePlayButton');
+        const keyHold = 'current';
+        const stopHold = () => stopCurrentChord(0);
+        livePlayBtn.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePlayButton'] = { stopFunction: stopHold };
+                playCurrentChord(0);
+            }
+        });
+        livePlayBtn.addEventListener('mouseup', () => {
+            if (activeButtonState['livePlayButton']) {
+                stopHold();
+                delete activeButtonState['livePlayButton'];
+            }
+        });
+        livePlayBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePlayButton'] = { stopFunction: stopHold };
+                playCurrentChord(0);
+            }
+        });
+        livePlayBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePlayButton']) {
+                stopHold();
+                delete activeButtonState['livePlayButton'];
+            }
+        });
+        setupDragVolumeControl(livePlayBtn, keyHold, (volumeMultiplier) => {
+            updateOscillatorsVolume(keyHold, volumeMultiplier);
+        });
+
+        // Live play button handlers - one octave lower
+        const livePlayBtnLower = document.getElementById('livePlayButtonLower');
+        const keyHoldLower = 'current-lower';
+        const stopHoldLower = () => stopCurrentChord(-1);
+        livePlayBtnLower.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePlayButtonLower'] = { stopFunction: stopHoldLower };
+                playCurrentChord(-1);
+            }
+        });
+        livePlayBtnLower.addEventListener('mouseup', () => {
+            if (activeButtonState['livePlayButtonLower']) {
+                stopHoldLower();
+                delete activeButtonState['livePlayButtonLower'];
+            }
+        });
+        livePlayBtnLower.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePlayButtonLower'] = { stopFunction: stopHoldLower };
+                playCurrentChord(-1);
+            }
+        });
+        livePlayBtnLower.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePlayButtonLower']) {
+                stopHoldLower();
+                delete activeButtonState['livePlayButtonLower'];
+            }
+        });
+        setupDragVolumeControl(livePlayBtnLower, keyHoldLower, (volumeMultiplier) => {
+            updateOscillatorsVolume(keyHoldLower, volumeMultiplier);
+        });
+
+        // Live pulse button handlers - current octave
+        const livePulseBtn = document.getElementById('livePulseButton');
+        const keyPulse = 'pulse';
+        const stopPulse = () => stopPulseChord(0);
+        livePulseBtn.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePulseButton'] = { stopFunction: stopPulse };
+                playPulseChord(0);
+            }
+        });
+        livePulseBtn.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulseButton']) {
+                stopPulse();
+                delete activeButtonState['livePulseButton'];
+            }
+        });
+        livePulseBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePulseButton'] = { stopFunction: stopPulse };
+                playPulseChord(0);
+            }
+        });
+        livePulseBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulseButton']) {
+                stopPulse();
+                delete activeButtonState['livePulseButton'];
+            }
+        });
+        setupDragVolumeControl(livePulseBtn, keyPulse, (volumeMultiplier) => {
+            pulseVolumeMultipliers[keyPulse] = volumeMultiplier;
+        });
+
+        // Live pulse button handlers - one octave lower
+        const livePulseBtnLower = document.getElementById('livePulseButtonLower');
+        const keyPulseLower = 'pulse-lower';
+        const stopPulseLower = () => stopPulseChord(-1);
+        livePulseBtnLower.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePulseButtonLower'] = { stopFunction: stopPulseLower };
+                playPulseChord(-1);
+            }
+        });
+        livePulseBtnLower.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulseButtonLower']) {
+                stopPulseLower();
+                delete activeButtonState['livePulseButtonLower'];
+            }
+        });
+        livePulseBtnLower.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                activeButtonState['livePulseButtonLower'] = { stopFunction: stopPulseLower };
+                playPulseChord(-1);
+            }
+        });
+        livePulseBtnLower.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulseButtonLower']) {
+                stopPulseLower();
+                delete activeButtonState['livePulseButtonLower'];
+            }
+        });
+        setupDragVolumeControl(livePulseBtnLower, keyPulseLower, (volumeMultiplier) => {
+            pulseVolumeMultipliers[keyPulseLower] = volumeMultiplier;
+        });
+
+        // Live pulse 1/8T button handlers - current octave
+        const livePulse8TBtn = document.getElementById('livePulse8TButton');
+        const stopPulse8T = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 20 / bpm;
+            stopPulseChordAtInterval(0, intervalSec);
+        };
+        livePulse8TBtn.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 20 / bpm;
+                activeButtonState['livePulse8TButton'] = { stopFunction: stopPulse8T };
+                playPulseChordAtInterval(0, intervalSec);
+            }
+        });
+        livePulse8TBtn.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulse8TButton']) {
+                stopPulse8T();
+                delete activeButtonState['livePulse8TButton'];
+            }
+        });
+        livePulse8TBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 20 / bpm;
+                activeButtonState['livePulse8TButton'] = { stopFunction: stopPulse8T };
+                playPulseChordAtInterval(0, intervalSec);
+            }
+        });
+        livePulse8TBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulse8TButton']) {
+                stopPulse8T();
+                delete activeButtonState['livePulse8TButton'];
+            }
+        });
+        setupDragVolumeControl(livePulse8TBtn, 'pulse8t', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 20 / bpm;
+            pulseVolumeMultipliers[`pulse-${intervalSec}`] = volumeMultiplier;
+        });
+
+        // Live pulse 1/8T button handlers - one octave lower
+        const livePulse8TBtnLower = document.getElementById('livePulse8TButtonLower');
+        const stopPulse8TLower = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 20 / bpm;
+            stopPulseChordAtInterval(-1, intervalSec);
+        };
+        livePulse8TBtnLower.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 20 / bpm;
+                activeButtonState['livePulse8TButtonLower'] = { stopFunction: stopPulse8TLower };
+                playPulseChordAtInterval(-1, intervalSec);
+            }
+        });
+        livePulse8TBtnLower.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulse8TButtonLower']) {
+                stopPulse8TLower();
+                delete activeButtonState['livePulse8TButtonLower'];
+            }
+        });
+        livePulse8TBtnLower.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 20 / bpm;
+                activeButtonState['livePulse8TButtonLower'] = { stopFunction: stopPulse8TLower };
+                playPulseChordAtInterval(-1, intervalSec);
+            }
+        });
+        livePulse8TBtnLower.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulse8TButtonLower']) {
+                stopPulse8TLower();
+                delete activeButtonState['livePulse8TButtonLower'];
+            }
+        });
+        setupDragVolumeControl(livePulse8TBtnLower, 'pulse8t-lower', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 20 / bpm;
+            pulseVolumeMultipliers[`pulse-${intervalSec}-lower`] = volumeMultiplier;
+        });
+
+        // Live pulse 1/16 button handlers - current octave
+        const livePulse16Btn = document.getElementById('livePulse16Button');
+        const stopPulse16 = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 15 / bpm;
+            stopPulseChordAtInterval(0, intervalSec);
+        };
+        livePulse16Btn.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 15 / bpm;
+                activeButtonState['livePulse16Button'] = { stopFunction: stopPulse16 };
+                playPulseChordAtInterval(0, intervalSec);
+            }
+        });
+        livePulse16Btn.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulse16Button']) {
+                stopPulse16();
+                delete activeButtonState['livePulse16Button'];
+            }
+        });
+        livePulse16Btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 15 / bpm;
+                activeButtonState['livePulse16Button'] = { stopFunction: stopPulse16 };
+                playPulseChordAtInterval(0, intervalSec);
+            }
+        });
+        livePulse16Btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulse16Button']) {
+                stopPulse16();
+                delete activeButtonState['livePulse16Button'];
+            }
+        });
+        setupDragVolumeControl(livePulse16Btn, 'pulse16', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 15 / bpm;
+            pulseVolumeMultipliers[`pulse-${intervalSec}`] = volumeMultiplier;
+        });
+
+        // Live pulse 1/16 button handlers - one octave lower
+        const livePulse16BtnLower = document.getElementById('livePulse16ButtonLower');
+        const stopPulse16Lower = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 15 / bpm;
+            stopPulseChordAtInterval(-1, intervalSec);
+        };
+        livePulse16BtnLower.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 15 / bpm;
+                activeButtonState['livePulse16ButtonLower'] = { stopFunction: stopPulse16Lower };
+                playPulseChordAtInterval(-1, intervalSec);
+            }
+        });
+        livePulse16BtnLower.addEventListener('mouseup', () => {
+            if (activeButtonState['livePulse16ButtonLower']) {
+                stopPulse16Lower();
+                delete activeButtonState['livePulse16ButtonLower'];
+            }
+        });
+        livePulse16BtnLower.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 15 / bpm;
+                activeButtonState['livePulse16ButtonLower'] = { stopFunction: stopPulse16Lower };
+                playPulseChordAtInterval(-1, intervalSec);
+            }
+        });
+        livePulse16BtnLower.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['livePulse16ButtonLower']) {
+                stopPulse16Lower();
+                delete activeButtonState['livePulse16ButtonLower'];
+            }
+        });
+        setupDragVolumeControl(livePulse16BtnLower, 'pulse16-lower', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 15 / bpm;
+            pulseVolumeMultipliers[`pulse-${intervalSec}-lower`] = volumeMultiplier;
+        });
+
+        // Live arpeggio button handlers - current octave
+        const liveArpeggioBtn = document.getElementById('liveArpeggioButton');
+        const stopArpeggio = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 7.5 / bpm;
+            stopArpeggioChordAtInterval(0, intervalSec);
+        };
+        liveArpeggioBtn.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 7.5 / bpm;
+                activeButtonState['liveArpeggioButton'] = { stopFunction: stopArpeggio };
+                playArpeggioChordAtInterval(0, intervalSec);
+            }
+        });
+        liveArpeggioBtn.addEventListener('mouseup', () => {
+            if (activeButtonState['liveArpeggioButton']) {
+                stopArpeggio();
+                delete activeButtonState['liveArpeggioButton'];
+            }
+        });
+        liveArpeggioBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 7.5 / bpm;
+                activeButtonState['liveArpeggioButton'] = { stopFunction: stopArpeggio };
+                playArpeggioChordAtInterval(0, intervalSec);
+            }
+        });
+        liveArpeggioBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['liveArpeggioButton']) {
+                stopArpeggio();
+                delete activeButtonState['liveArpeggioButton'];
+            }
+        });
+        setupDragVolumeControl(liveArpeggioBtn, 'arpeggio', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 7.5 / bpm;
+            pulseVolumeMultipliers[`arpeggio-${intervalSec}`] = volumeMultiplier;
+        });
+
+        // Live arpeggio button handlers - one octave lower
+        const liveArpeggioBtnLower = document.getElementById('liveArpeggioButtonLower');
+        const stopArpeggioLower = () => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 7.5 / bpm;
+            stopArpeggioChordAtInterval(-1, intervalSec);
+        };
+        liveArpeggioBtnLower.addEventListener('mousedown', () => {
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 7.5 / bpm;
+                activeButtonState['liveArpeggioButtonLower'] = { stopFunction: stopArpeggioLower };
+                playArpeggioChordAtInterval(-1, intervalSec);
+            }
+        });
+        liveArpeggioBtnLower.addEventListener('mouseup', () => {
+            if (activeButtonState['liveArpeggioButtonLower']) {
+                stopArpeggioLower();
+                delete activeButtonState['liveArpeggioButtonLower'];
+            }
+        });
+        liveArpeggioBtnLower.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (liveMode && currentPlayingIndex >= 0) {
+                const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+                const intervalSec = 7.5 / bpm;
+                activeButtonState['liveArpeggioButtonLower'] = { stopFunction: stopArpeggioLower };
+                playArpeggioChordAtInterval(-1, intervalSec);
+            }
+        });
+        liveArpeggioBtnLower.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (activeButtonState['liveArpeggioButtonLower']) {
+                stopArpeggioLower();
+                delete activeButtonState['liveArpeggioButtonLower'];
+            }
+        });
+        setupDragVolumeControl(liveArpeggioBtnLower, 'arpeggio-lower', (volumeMultiplier) => {
+            const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+            const intervalSec = 7.5 / bpm;
+            pulseVolumeMultipliers[`arpeggio-${intervalSec}-lower`] = volumeMultiplier;
+        });
+
+        // Document-level mouseup/touchend handlers to stop sounds when released outside buttons
+        document.addEventListener('mouseup', () => {
+            // Stop all active buttons when mouse is released anywhere
+            Object.keys(activeButtonState).forEach(buttonId => {
+                if (activeButtonState[buttonId] && activeButtonState[buttonId].stopFunction) {
+                    activeButtonState[buttonId].stopFunction();
+                }
+            });
+            activeButtonState = {};
+        });
+
+        document.addEventListener('touchend', (e) => {
+            // Stop all active buttons when touch is released anywhere
+            Object.keys(activeButtonState).forEach(buttonId => {
+                if (activeButtonState[buttonId] && activeButtonState[buttonId].stopFunction) {
+                    activeButtonState[buttonId].stopFunction();
+                }
+            });
+            activeButtonState = {};
+        });
+
+        document.addEventListener('touchcancel', (e) => {
+            // Stop all active buttons when touch is cancelled
+            Object.keys(activeButtonState).forEach(buttonId => {
+                if (activeButtonState[buttonId] && activeButtonState[buttonId].stopFunction) {
+                    activeButtonState[buttonId].stopFunction();
+                }
+            });
+            activeButtonState = {};
+        });
+    </script>
+</body>
+</html>
+
