@@ -260,6 +260,14 @@
             font-weight: bold;
             color: #666;
         }
+        
+        .grid-cell.header.row-header {
+            color: #9C27B0; /* Purple for bass (first column) */
+        }
+        
+        .grid-cell.header.col-header {
+            color: #FF5722; /* Red for high notes (first row) */
+        }
         .grid-cell.active {
             background: #4CAF50;
             color: #fff;
@@ -609,8 +617,8 @@
                         
                         <div class="header-section bpm-section">
                             <div class="bpm-control">
-                                <input type="range" id="subSaturationSlider" class="bpm-slider" min="0" max="100" value="15" step="1">
-                                <div class="bpm-display" id="subSaturationDisplay">15%</div>
+                                <input type="range" id="subSaturationSlider" class="bpm-slider" min="0" max="100" value="5" step="1">
+                                <div class="bpm-display" id="subSaturationDisplay">5%</div>
                             </div>
                             <div style="font-size: 11px; color: #666; margin-top: 4px;">Saturation</div>
                         </div>
@@ -860,7 +868,7 @@
         // Sub synth parameters
         let subAttackTime = 0.01; // in seconds (10ms default)
         let subReverbGain = 0.12; // 12% default
-        let subSaturationAmount = 0.15; // 15% default
+        let subSaturationAmount = 0.05; // 5% default
         let subVolumeGain = 0.22; // 22% default
         
         // Water synth volume
@@ -3142,7 +3150,13 @@
                     const octaveLowerNote = lowestNote - 12;
                     const octaveLowerFrequency = midiToFrequency(octaveLowerNote);
                     const validNoteDuration = octaveCycleDuration * noteDuration;
-                    synth.createSubVoice(octaveLowerFrequency, validNoteDuration);
+                    // Add 5-15ms random offset to prevent phase cancellation when both notes play together
+                    const phaseOffset = 0.005 + (Math.random() * 0.01); // 5-15ms
+                    setTimeout(() => {
+                        if (isPlaying) {
+                            synth.createSubVoice(octaveLowerFrequency, validNoteDuration);
+                        }
+                    }, phaseOffset * 1000);
                 }
             }, octaveCycleDuration * 1000);
         }
@@ -3171,10 +3185,16 @@
             const frequency = midiToFrequency(lowestNote);
             synth.createSubVoice(frequency, validBassNoteDuration);
             
-            // Play an octave lower (row tempo)
+            // Play an octave lower (row tempo) with a small delay to reduce phase interference
             const octaveLowerNote = lowestNote - 12;
             const octaveLowerFrequency = midiToFrequency(octaveLowerNote);
-            synth.createSubVoice(octaveLowerFrequency, validOctaveNoteDuration);
+            // Add 5-15ms random offset to prevent phase cancellation when both notes play together
+            const phaseOffset = 0.005 + (Math.random() * 0.01); // 5-15ms
+            setTimeout(() => {
+                if (isPlaying) {
+                    synth.createSubVoice(octaveLowerFrequency, validOctaveNoteDuration);
+                }
+            }, phaseOffset * 1000);
         }
         
         function stopPlaying() {
@@ -3345,8 +3365,10 @@
                             if (row === 0 && col === 0) {
                                 cell.textContent = '';
                             } else if (row === 0) {
+                                cell.className += ' col-header'; // First row = column headers (high notes)
                                 cell.textContent = headers[col];
                             } else {
+                                cell.className += ' row-header'; // First column = row headers (bass)
                                 cell.textContent = headers[row];
                             }
                         } else {
@@ -3373,8 +3395,10 @@
                             if (row === 0 && col === 0) {
                                 cell.textContent = '';
                             } else if (row === 0) {
+                                cell.className += ' col-header'; // First row = column headers (high notes)
                                 cell.textContent = headers[col];
                             } else {
+                                cell.className += ' row-header'; // First column = row headers (bass)
                                 cell.textContent = headers[row];
                             }
                         } else {
