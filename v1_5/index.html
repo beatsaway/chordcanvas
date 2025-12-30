@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chord Canvas - Sub Bass (Water Synth)</title>
+    <title>Chord Canvas - V1.5</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
@@ -932,6 +932,13 @@
                     Q: 0.7
                 });
                 
+                // High pass filter for reverb to reduce low-end mud
+                this.reverbHighPass = new Tone.Filter({
+                    type: 'highpass',
+                    frequency: 150,
+                    Q: 0.7
+                });
+                
                 this.masterGain = new Tone.Gain(1.0);
                 this.outputVolume = new Tone.Gain(0.5); // Output volume control before reverb (default 50%)
                 this.dryGain = new Tone.Gain(0.08);
@@ -949,9 +956,10 @@
                 this.dryGain.connect(this.eq);
                 this.eq.connect(this.compressor);
                 
-                // Reverb path: reverbGain -> reverb -> compressor
+                // Reverb path: reverbGain -> reverb -> reverbHighPass -> compressor
                 this.reverbGain.connect(this.reverb);
-                this.reverb.connect(this.compressor);
+                this.reverb.connect(this.reverbHighPass);
+                this.reverbHighPass.connect(this.compressor);
                 
                 if (this.masterVolumeNode) {
                     this.compressor.connect(this.masterVolumeNode);
@@ -1229,6 +1237,13 @@
                     Q: 0.7
                 });
                 
+                // High pass filter for reverb to reduce low-end mud
+                this.reverbHighPass = new Tone.Filter({
+                    type: 'highpass',
+                    frequency: 150,
+                    Q: 0.7
+                });
+                
                 this.masterGain = new Tone.Gain(1.0);
                 this.outputVolume = new Tone.Gain(0.5); // Output volume control before reverb (default 50%)
                 this.dryGain = new Tone.Gain(0.08);
@@ -1246,9 +1261,10 @@
                 this.dryGain.connect(this.eq);
                 this.eq.connect(this.compressor);
                 
-                // Reverb path: reverbGain -> reverb -> compressor
+                // Reverb path: reverbGain -> reverb -> reverbHighPass -> compressor
                 this.reverbGain.connect(this.reverb);
-                this.reverb.connect(this.compressor);
+                this.reverb.connect(this.reverbHighPass);
+                this.reverbHighPass.connect(this.compressor);
                 
                 if (this.masterVolumeNode) {
                     this.compressor.connect(this.masterVolumeNode);
@@ -1426,6 +1442,13 @@
                     Q: 0.7
                 });
                 
+                // High pass filter for reverb to reduce low-end mud
+                this.reverbHighPass = new Tone.Filter({
+                    type: 'highpass',
+                    frequency: 150,
+                    Q: 0.7
+                });
+                
                 // Saturation for warmth and character
                 this.saturation = new Tone.Distortion(0);
                 
@@ -1446,9 +1469,10 @@
                 this.dryGain.connect(this.eq);
                 this.eq.connect(this.compressor);
                 
-                // Reverb path: reverbGain -> reverb -> compressor
+                // Reverb path: reverbGain -> reverb -> reverbHighPass -> compressor
                 this.reverbGain.connect(this.reverb);
-                this.reverb.connect(this.compressor);
+                this.reverb.connect(this.reverbHighPass);
+                this.reverbHighPass.connect(this.compressor);
                 
                 if (this.masterVolumeNode) {
                     this.compressor.connect(this.masterVolumeNode);
