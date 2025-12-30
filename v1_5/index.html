@@ -609,8 +609,8 @@
                         
                         <div class="header-section bpm-section">
                             <div class="bpm-control">
-                                <input type="range" id="subAttackSlider" class="bpm-slider" min="1" max="100" value="10" step="1">
-                                <div class="bpm-display" id="subAttackDisplay">10ms</div>
+                                <input type="range" id="subAttackSlider" class="bpm-slider" min="1" max="100" value="80" step="1">
+                                <div class="bpm-display" id="subAttackDisplay">80ms</div>
                             </div>
                             <div style="font-size: 11px; color: #666; margin-top: 4px;">Attack</div>
                         </div>
@@ -866,7 +866,7 @@
         let pluckyReverbGain = 0.77; // 77% default
         
         // Sub synth parameters
-        let subAttackTime = 0.01; // in seconds (10ms default)
+        let subAttackTime = 0.08; // in seconds (80ms default)
         let subReverbGain = 0.12; // 12% default
         let subSaturationAmount = 0.05; // 5% default
         let subVolumeGain = 0.22; // 22% default
@@ -1520,7 +1520,7 @@
                 const startTime = now + startDelay;
                 
                 // Use sub-specific attack time
-                const currentAttack = typeof subAttackTime === 'number' ? subAttackTime : 0.01;
+                const currentAttack = typeof subAttackTime === 'number' ? subAttackTime : 0.08;
                 
                 // Sub-bass: sine wave for pure low end
                 const osc = new Tone.Oscillator({
