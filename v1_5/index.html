@@ -845,6 +845,7 @@
         let masterCycleNumber = 0;
         let pendingBPM = null;
         let masterVolume = null;
+        let masterLimiter = null;
         // Water synth parameters
         let waterAttackTime = 0.02; // in seconds (20ms default)
         let waterHarmonic2Gain = 0.3; // 30% default
@@ -1655,7 +1656,19 @@
                 if (!waterSynth || !pluckySynth || !bassSynth) {
                     Tone.start().then(() => {
                         if (!masterVolume) {
-                            masterVolume = new Tone.Volume(0).toDestination();
+                            masterVolume = new Tone.Volume(0);
+                        }
+                        if (!masterLimiter) {
+                            // Limiter to prevent clipping at final master output
+                            masterLimiter = new Tone.Limiter(-0.1); // -0.1 dB ceiling to prevent clipping
+                            // Disconnect masterVolume from destination if already connected
+                            try {
+                                masterVolume.disconnect();
+                            } catch (e) {
+                                // Already disconnected or never connected
+                            }
+                            masterVolume.connect(masterLimiter);
+                            masterLimiter.toDestination();
                         }
                         if (!waterSynth) {
                             waterSynth = new WaterSynthTone(masterVolume);
@@ -2364,8 +2377,12 @@
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 if (synthType === 'water') {
                     waterVolumeModulation = randomModulation;
+                    const select = document.getElementById('waterVolumeModulation');
+                    if (select) select.value = randomModulation;
                 } else if (synthType === 'plucky') {
                     pluckyVolumeModulation = randomModulation;
+                    const select = document.getElementById('pluckyVolumeModulation');
+                    if (select) select.value = randomModulation;
                 }
             }
             
@@ -2374,8 +2391,12 @@
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 if (synthType === 'water') {
                     waterVolumeModulation = randomModulation;
+                    const select = document.getElementById('waterVolumeModulation');
+                    if (select) select.value = randomModulation;
                 } else if (synthType === 'plucky') {
                     pluckyVolumeModulation = randomModulation;
+                    const select = document.getElementById('pluckyVolumeModulation');
+                    if (select) select.value = randomModulation;
                 }
             }
             
@@ -2384,8 +2405,12 @@
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 if (synthType === 'water') {
                     waterVolumeModulation = randomModulation;
+                    const select = document.getElementById('waterVolumeModulation');
+                    if (select) select.value = randomModulation;
                 } else if (synthType === 'plucky') {
                     pluckyVolumeModulation = randomModulation;
+                    const select = document.getElementById('pluckyVolumeModulation');
+                    if (select) select.value = randomModulation;
                 }
             }
             
@@ -2677,18 +2702,24 @@
             if (profile === 'drunk' && Math.random() < 0.3) {
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 subVolumeModulation = randomModulation;
+                const select = document.getElementById('subVolumeModulation');
+                if (select) select.value = randomModulation;
             }
             
             // Creative profile: every cycle has 30% chance to change vol modulation to a random one next cycle
             if (profile === 'creative' && Math.random() < 0.3) {
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 subVolumeModulation = randomModulation;
+                const select = document.getElementById('subVolumeModulation');
+                if (select) select.value = randomModulation;
             }
             
             // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
             if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
                 subVolumeModulation = randomModulation;
+                const select = document.getElementById('subVolumeModulation');
+                if (select) select.value = randomModulation;
             }
             
             // Creative profile: every 4 cycles, pick any random cell
