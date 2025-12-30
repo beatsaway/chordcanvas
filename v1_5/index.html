@@ -585,16 +585,16 @@
                         
                         <div class="header-section bpm-section">
                             <div class="bpm-control">
-                                <input type="range" id="subVolumeSlider" class="bpm-slider" min="0" max="100" value="50" step="1">
-                                <div class="bpm-display" id="subVolumeDisplay">50%</div>
+                                <input type="range" id="subVolumeSlider" class="bpm-slider" min="0" max="100" value="22" step="1">
+                                <div class="bpm-display" id="subVolumeDisplay">22%</div>
                             </div>
                             <div style="font-size: 11px; color: #666; margin-top: 4px;">Output Volume</div>
                         </div>
                         
                         <div class="header-section bpm-section">
                             <div class="bpm-control">
-                                <input type="range" id="subReverbSlider" class="bpm-slider" min="0" max="100" value="50" step="1">
-                                <div class="bpm-display" id="subReverbDisplay">50%</div>
+                                <input type="range" id="subReverbSlider" class="bpm-slider" min="0" max="100" value="12" step="1">
+                                <div class="bpm-display" id="subReverbDisplay">12%</div>
                             </div>
                             <div style="font-size: 11px; color: #666; margin-top: 4px;">Reverb</div>
                         </div>
@@ -858,9 +858,9 @@
         
         // Sub synth parameters
         let subAttackTime = 0.01; // in seconds (10ms default)
-        let subReverbGain = 0.5; // 50% default
+        let subReverbGain = 0.12; // 12% default
         let subSaturationAmount = 0.15; // 15% default
-        let subVolumeGain = 0.5; // 50% default
+        let subVolumeGain = 0.22; // 22% default
         
         // Water synth volume
         let waterVolumeGain = 0.5; // 50% default
@@ -897,9 +897,9 @@
         let waterReverbTransitionDuration = 0;
         
         // Transition tracking for sub reverb
-        let targetSubReverbGain = 0.5;
+        let targetSubReverbGain = 0.12;
         let subReverbTransitionStartTime = null;
-        let subReverbTransitionStartValue = 0.5;
+        let subReverbTransitionStartValue = 0.12;
         let subReverbTransitionDuration = 0;
         
         const DURATION_MULTIPLIERS = [null, 240, 120, 60, 40, 30, 20];
@@ -1453,9 +1453,9 @@
                 this.saturation = new Tone.Distortion(0);
                 
                 this.masterGain = new Tone.Gain(1.0);
-                this.outputVolume = new Tone.Gain(0.5); // Output volume control before reverb (default 50%)
+                this.outputVolume = new Tone.Gain(0.22); // Output volume control before reverb (default 22%)
                 this.dryGain = new Tone.Gain(0.1);
-                this.reverbGain = new Tone.Gain(0.5);
+                this.reverbGain = new Tone.Gain(0.12);
                 
                 // Audio chain: masterGain -> volumeModulation -> outputVolume -> saturation -> (dryGain + reverbGain) -> reverb/eq -> compressor -> masterVolume
                 // Output volume is independent control before reverb chain
@@ -2356,6 +2356,39 @@
         function handleProfileBehaviors(synthType, profile, currentBassDuration, currentHighDuration) {
             const gridId = synthType === 'water' ? 'waterGrid' : 'pluckyGrid';
             
+            // Volume modulation randomization for profiles
+            const volumeModulationOptions = ['triangle', 'ascend', 'descend'];
+            
+            // Drunk profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'drunk' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                if (synthType === 'water') {
+                    waterVolumeModulation = randomModulation;
+                } else if (synthType === 'plucky') {
+                    pluckyVolumeModulation = randomModulation;
+                }
+            }
+            
+            // Creative profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'creative' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                if (synthType === 'water') {
+                    waterVolumeModulation = randomModulation;
+                } else if (synthType === 'plucky') {
+                    pluckyVolumeModulation = randomModulation;
+                }
+            }
+            
+            // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                if (synthType === 'water') {
+                    waterVolumeModulation = randomModulation;
+                } else if (synthType === 'plucky') {
+                    pluckyVolumeModulation = randomModulation;
+                }
+            }
+            
             // Creative profile: randomize synth parameters every cycle, transition over 3 cycles
             if (profile === 'creative') {
                 if (synthType === 'water') {
@@ -2636,6 +2669,27 @@
         
         function handleSubProfileBehaviors(profile, currentBassDuration, currentOctaveDuration) {
             const gridId = 'subGrid';
+            
+            // Volume modulation randomization for profiles
+            const volumeModulationOptions = ['triangle', 'ascend', 'descend'];
+            
+            // Drunk profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'drunk' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                subVolumeModulation = randomModulation;
+            }
+            
+            // Creative profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'creative' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                subVolumeModulation = randomModulation;
+            }
+            
+            // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                subVolumeModulation = randomModulation;
+            }
             
             // Creative profile: every 4 cycles, pick any random cell
             if (profile === 'creative') {
