@@ -79,9 +79,14 @@
             margin: 0 0 16px 0;
             color: #1a1a1a;
             font-size: 20px;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-weight: 500;
+            font-family: 'Pacifico', cursive;
+            font-weight: 400;
             letter-spacing: -0.03em;
+        }
+        
+        #mainScreen h1 {
+            font-family: 'Pacifico', cursive;
+            font-weight: 400;
         }
         
         .selection-section {
@@ -132,14 +137,48 @@
             border-color: #1a1a1a;
         }
         
-        .preset-info {
-            padding: 6px;
-            background: #f8f8f8;
-            border: 1px solid #e5e5e5;
-            border-radius: 2px;
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 8px;
+        .simple-tooltip {
+            position: absolute;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            white-space: nowrap;
+            z-index: 10000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-5px);
+            transition: opacity 0.3s, transform 0.3s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .simple-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .simple-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #1a1a1a;
+        }
+        
+        .tutorial-highlight {
+            position: relative;
+            transition: box-shadow 0.3s;
+        }
+        
+        .tutorial-highlight.active {
+            box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.4);
+            z-index: 9998;
         }
         
         .chord-preview {
@@ -507,21 +546,27 @@
     </style>
 </head>
 <body>
+    
     <!-- Selection Screen -->
     <div id="selectionScreen">
         <div class="selection-container">
-            <h1><a href="../index.html">Chord Canvas</a></h1>
+            <h1 style="margin: 0 0 20px 0;"><a href="../index.html">Chord Canvas</a></h1>
             <div class="selection-section">
-                <h2>Preset</h2>
-                <select id="presetSelect"><option value="">-- Select --</option></select>
-                <div id="presetInfo" class="preset-info" style="display: none;"></div>
+                
+                <select id="presetSelect"></select>
             </div>
             <div class="selection-section">
-                <h2>Or Enter Chords</h2>
                 <textarea id="chordInput" placeholder="Am, D7, G, C"></textarea>
             </div>
             <div class="selection-section">
-                <h2>Preview</h2>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <h2 style="margin: 0;">Preview</h2>
+                    <div class="bpm-control" style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 13px; font-weight: 500; min-width: 50px;">BPM:</label>
+                        <input type="range" id="presetBpmSlider" class="bpm-slider" min="40" max="240" value="120" step="1" style="flex: 1; min-width: 150px;">
+                        <div class="bpm-display" id="presetBpmDisplay" style="min-width: 70px; font-size: 13px; font-weight: bold;">120</div>
+                    </div>
+                </div>
                 <div id="chordPreview" class="chord-preview"></div>
             </div>
             <button id="nextBtn" style="width: 100%; margin-top: 8px;">Next →</button>
@@ -534,7 +579,7 @@
             <h1 style="margin: 0;"><a href="../index.html">Chord Canvas</a></h1>
             <div class="bpm-control" style="display: flex; align-items: center; gap: 8px;">
                 <input type="range" id="bpmSlider" class="bpm-slider" min="40" max="240" value="120" step="1" style="flex: 1; min-width: 150px;">
-                <div class="bpm-display" id="bpmDisplay" style="min-width: 70px; font-size: 13px; font-weight: bold;">120BPM</div>
+                <div class="bpm-display" id="bpmDisplay" style="min-width: 70px; font-size: 13px; font-weight: bold;">120</div>
                 <div style="font-size: 11px; color: #666;" id="durationDisplay">2.00s</div>
             </div>
         </div>
@@ -2489,9 +2534,19 @@
                 slider.value = newBPM;
             }
             
-            document.getElementById('bpmDisplay').textContent = `${newBPM}BPM`;
+            document.getElementById('bpmDisplay').textContent = `${newBPM}`;
             const duration = 240 / newBPM;
             document.getElementById('durationDisplay').textContent = `${duration.toFixed(2)}s`;
+            
+            // Also update the selection screen BPM slider if it exists
+            const presetBpmSlider = document.getElementById('presetBpmSlider');
+            const presetBpmDisplay = document.getElementById('presetBpmDisplay');
+            if (presetBpmSlider) {
+                presetBpmSlider.value = newBPM;
+            }
+            if (presetBpmDisplay) {
+                presetBpmDisplay.textContent = `${newBPM}`;
+            }
             
             if (isPlaying) {
                 pendingBPM = newBPM;
@@ -3602,7 +3657,6 @@
         
         function handlePresetChange() {
             const presetSelect = document.getElementById('presetSelect');
-            const presetInfo = document.getElementById('presetInfo');
             const chordInput = document.getElementById('chordInput');
             
             if (presetSelect.value) {
@@ -3610,8 +3664,6 @@
                 const preset = presets[presetSelect.value];
                 
                 if (preset) {
-                    presetInfo.style.display = 'block';
-                    presetInfo.innerHTML = `<strong>${preset.name}</strong> - ${preset.style}<br>${preset.description}`;
                     chordInput.value = preset.chords;
                     chordSequence = parseChordSequence(preset.chords);
                     currentChordIndex = 0;
@@ -3623,8 +3675,6 @@
                         setBPM(preset.bpm);
                     }
                 }
-            } else {
-                presetInfo.style.display = 'none';
             }
         }
         
@@ -3634,7 +3684,6 @@
             
             if (chordInput.value.trim()) {
                 presetSelect.value = '';
-                document.getElementById('presetInfo').style.display = 'none';
                 chordSequence = parseChordSequence(chordInput.value);
                 currentChordIndex = 0;
                 nextChordIndex = chordSequence.length > 1 ? 1 : 0;
@@ -3696,9 +3745,226 @@
             updateChordSequenceDisplay();
         }
         
+        // ========== SIMPLE TUTORIAL SYSTEM ==========
+        let currentTutorialStep = 0;
+        let tutorialTimeout = null;
+        let globalClickHandler = null;
+        
+        const tutorialSteps = [
+            {
+                targetId: 'presetSelect',
+                message: 'Select a chord sequence to start'
+            },
+            {
+                targetId: 'chordInput',
+                message: 'Or write your own chord sequence here'
+            },
+            {
+                targetId: 'presetBpmSlider',
+                message: 'Feel free to adjust the BPM'
+            },
+            {
+                targetId: 'nextBtn',
+                message: 'Go next to play it!'
+            }
+        ];
+        
+        function showTooltip(element, message) {
+            // Remove any existing tooltip
+            const existingTooltip = document.querySelector('.simple-tooltip');
+            if (existingTooltip) {
+                existingTooltip.remove();
+            }
+            
+            // Remove previous highlights
+            document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                el.classList.remove('tutorial-highlight', 'active');
+            });
+            
+            // Highlight the target element
+            element.classList.add('tutorial-highlight', 'active');
+            
+            // Create tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'simple-tooltip';
+            tooltip.textContent = message;
+            document.body.appendChild(tooltip);
+            
+            // Position tooltip above the element
+            const rect = element.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            tooltip.style.left = `${rect.left + (rect.width / 2) - (tooltipRect.width / 2)}px`;
+            tooltip.style.top = `${rect.top - tooltipRect.height - 10}px`;
+            
+            // Keep within viewport
+            const padding = 10;
+            if (parseInt(tooltip.style.left) < padding) {
+                tooltip.style.left = `${padding}px`;
+            }
+            if (parseInt(tooltip.style.left) + tooltipRect.width > window.innerWidth - padding) {
+                tooltip.style.left = `${window.innerWidth - tooltipRect.width - padding}px`;
+            }
+            
+            // Make tooltip clickable
+            tooltip.style.cursor = 'pointer';
+            
+            // Show tooltip
+            setTimeout(() => {
+                tooltip.classList.add('show');
+            }, 10);
+            
+            return tooltip;
+        }
+        
+        function showTutorialStep(stepIndex) {
+            if (stepIndex >= tutorialSteps.length) {
+                // Tutorial complete
+                document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                    el.classList.remove('tutorial-highlight', 'active');
+                });
+                const tooltip = document.querySelector('.simple-tooltip');
+                if (tooltip) tooltip.remove();
+                return;
+            }
+            
+            const step = tutorialSteps[stepIndex];
+            const element = document.getElementById(step.targetId);
+            
+            if (!element) {
+                // Element not found, skip to next
+                showTutorialStep(stepIndex + 1);
+                return;
+            }
+            
+            const tooltip = showTooltip(element, step.message);
+            currentTutorialStep = stepIndex;
+            
+            // Function to advance to next step
+            const advanceToNext = () => {
+                // Remove all event listeners
+                element.removeEventListener('click', clickHandler);
+                element.removeEventListener('change', changeHandler);
+                element.removeEventListener('input', inputHandler);
+                tooltip.removeEventListener('click', tooltipClickHandler);
+                
+                // Remove global click listener if tutorial is complete
+                if (stepIndex + 1 >= tutorialSteps.length) {
+                    if (globalClickHandler) {
+                        document.removeEventListener('click', globalClickHandler, true);
+                        globalClickHandler = null;
+                    }
+                    tooltip.classList.remove('show');
+                    tooltip.remove();
+                    // Remove highlights
+                    document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                        el.classList.remove('tutorial-highlight', 'active');
+                    });
+                    return;
+                }
+                
+                // Hide current tooltip
+                tooltip.classList.remove('show');
+                setTimeout(() => {
+                    tooltip.remove();
+                    // Move to next step
+                    showTutorialStep(stepIndex + 1);
+                }, 300);
+            };
+            
+            // Wait for user to interact with the highlighted element or tooltip
+            const clickHandler = (e) => {
+                e.stopPropagation();
+                advanceToNext();
+            };
+            
+            const changeHandler = (e) => {
+                advanceToNext();
+            };
+            
+            const inputHandler = (e) => {
+                // For textarea/input, advance after user types something
+                if (e.target.value.trim().length > 0) {
+                    advanceToNext();
+                }
+            };
+            
+            // Allow clicking on the tooltip itself to advance
+            const tooltipClickHandler = (e) => {
+                e.stopPropagation();
+                advanceToNext();
+            };
+            
+            tooltip.addEventListener('click', tooltipClickHandler);
+            
+            // Add global click listener to advance on any tap
+            if (globalClickHandler) {
+                document.removeEventListener('click', globalClickHandler, true);
+            }
+            globalClickHandler = (e) => {
+                // Don't advance if clicking on the tooltip itself (handled separately)
+                if (e.target.closest('.simple-tooltip')) {
+                    return;
+                }
+                advanceToNext();
+            };
+            document.addEventListener('click', globalClickHandler, true);
+            
+            // Add appropriate event listeners based on element type
+            if (element.tagName === 'SELECT') {
+                element.addEventListener('change', changeHandler);
+            } else if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+                if (element.type === 'range') {
+                    // For sliders, listen to input events
+                    element.addEventListener('input', inputHandler);
+                } else {
+                    // For text inputs, listen to input events
+                    element.addEventListener('input', inputHandler);
+                }
+                // Also allow clicking to advance
+                element.addEventListener('click', clickHandler);
+            } else {
+                // For buttons and other elements, listen to clicks
+                element.addEventListener('click', clickHandler);
+            }
+        }
+        
+        function closeTutorial() {
+            if (tutorialTimeout) {
+                clearTimeout(tutorialTimeout);
+                tutorialTimeout = null;
+            }
+            
+            // Remove global click listener
+            if (globalClickHandler) {
+                document.removeEventListener('click', globalClickHandler, true);
+                globalClickHandler = null;
+            }
+            
+            document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                el.classList.remove('tutorial-highlight', 'active');
+            });
+            
+            const tooltip = document.querySelector('.simple-tooltip');
+            if (tooltip) {
+                tooltip.classList.remove('show');
+                setTimeout(() => tooltip.remove(), 300);
+            }
+            
+            currentTutorialStep = 0;
+        }
+        
+        // Make function globally accessible
+        window.closeTutorial = closeTutorial;
+        
         // ========== INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', () => {
             loadPresets();
+            
+            // Show tutorial on page load
+            setTimeout(() => {
+                showTutorialStep(0);
+            }, 800); // Small delay for better UX
             
             // Randomly pick a preset to load
             const presetSelect = document.getElementById('presetSelect');
@@ -3741,6 +4007,17 @@
             });
             
             document.getElementById('bpmSlider').addEventListener('input', updateBPM);
+            
+            // Selection screen BPM slider
+            const presetBpmSlider = document.getElementById('presetBpmSlider');
+            const presetBpmDisplay = document.getElementById('presetBpmDisplay');
+            if (presetBpmSlider && presetBpmDisplay) {
+                presetBpmSlider.addEventListener('input', (e) => {
+                    const newBPM = parseInt(e.target.value);
+                    presetBpmDisplay.textContent = `${newBPM}`;
+                    setBPM(newBPM);
+                });
+            }
             
             // Tab switching (water tab handler moved above)
             
