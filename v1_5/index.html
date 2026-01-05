@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="chord-intervals-config.js"></script>
     <script src="chord-presets.js"></script>
+    <script src="grid-manager.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -260,7 +261,7 @@
         
         .grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(8, 1fr);
             gap: 1px;
             background: #e5e5e5;
             border: 1px solid #d0d0d0;
@@ -281,7 +282,7 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.15s;
-            font-size: 11px;
+            font-size: 9px;
             line-height: 1;
             color: #1a1a1a;
         }
@@ -301,6 +302,18 @@
         .grid-cell.header.col-header {
             color: #666;
         }
+        
+        /* Header fade animation keyframes */
+        @keyframes headerFade {
+            0% { background-color: #d0d0d0; }
+            50% { background-color: #e8e8e8; }
+            100% { background-color: #fafafa; }
+        }
+        
+        .grid-cell.header.animated {
+            animation: headerFade linear infinite;
+        }
+        
         .grid-cell.active {
             background: #1a1a1a;
             color: #ffffff;
@@ -887,6 +900,8 @@
         let waterPendingHighDuration = null;
         let waterPendingCellRow = null;
         let waterPendingCellCol = null;
+        let waterActiveCellRow = null;
+        let waterActiveCellCol = null;
         let waterProfile = 'none';
         let waterCreativeCycleCounter = 0;
         
@@ -899,6 +914,8 @@
         let pluckyPendingHighDuration = null;
         let pluckyPendingCellRow = null;
         let pluckyPendingCellCol = null;
+        let pluckyActiveCellRow = null;
+        let pluckyActiveCellCol = null;
         let pluckyProfile = 'none';
         let pluckyCreativeCycleCounter = 0;
         
@@ -912,6 +929,8 @@
         let subPendingOctaveDuration = null;
         let subPendingCellRow = null;
         let subPendingCellCol = null;
+        let subActiveCellRow = null;
+        let subActiveCellCol = null;
         let subProfile = 'none';
         let subCreativeCycleCounter = 0;
         
@@ -948,7 +967,7 @@
         let waterVolumeGain = 0.5; // 50% default
         
         // Plucky synth volume
-        let pluckyVolumeGain = 0.5; // 50% default
+        let pluckyVolumeGain = 0.22; // 22% default
         
         // Legacy variables for compatibility (used by water synth)
         let attackTime = 0.02;
@@ -984,7 +1003,10 @@
         let subReverbTransitionStartValue = 0.12;
         let subReverbTransitionDuration = 0;
         
-        const DURATION_MULTIPLIERS = [null, 240, 120, 60, 40, 30, 20];
+        const DURATION_MULTIPLIERS = [null, 240, 120, 60, 40, 30, 20, 15];
+        
+        // ========== GRID MANAGER ==========
+        let gridManager;
         
         // ========== WATER SYNTH ==========
         class WaterSynthTone {
@@ -1077,11 +1099,18 @@
                 this.activeVoices = [];
             }
             
-            createWaterVoice(frequency, noteDuration, pitchDrop = 0.02, noiseAmount = 0.03, isHighNote = false) {
+            createWaterVoice(frequency, noteDuration, pitchDrop = 0.02, noiseAmount = 0.03, isHighNote = false, tempo = null) {
                 const now = Tone.now();
                 
-                // Random delay 0-20ms
-                const startDelay = Math.random() * 0.02;
+                // Tempo-based random delay: 0 to (tempo / currentBPM) * 0.02 seconds
+                let startDelay = 0;
+                if (tempo !== null && isFinite(tempo) && tempo > 0 && typeof currentBPM !== 'undefined' && isFinite(currentBPM) && currentBPM > 0) {
+                    const maxDelay = (tempo / currentBPM) * 0.02;
+                    startDelay = Math.random() * maxDelay;
+                } else {
+                    // Fallback to old behavior if tempo not provided
+                    startDelay = Math.random() * 0.02;
+                }
                 const startTime = now + startDelay;
                 
                 // Random decay reduction 0-40ms
@@ -1182,7 +1211,9 @@
                 const pan = new Tone.Panner((Math.random() - 0.5) * 0.15);
                 // Apply -12 dB reduction for high notes (linear gain ≈ 0.251)
                 const highNoteVolumeReduction = isHighNote ? 0.251 : 1.0;
-                const volumeGain = new Tone.Gain(highNoteVolumeReduction);
+                // Random volume reduction 0-6dB (linear gain: 0.5012 to 1.0)
+                const volumeVariation = 0.5012 + Math.random() * (1.0 - 0.5012);
+                const volumeGain = new Tone.Gain(highNoteVolumeReduction * volumeVariation);
                 
                 osc.connect(env);
                 env.connect(volumeGain);
@@ -1377,11 +1408,18 @@
                 this.activeVoices = [];
             }
             
-            createPluckyVoice(frequency, noteDuration, isHighNote = false) {
+            createPluckyVoice(frequency, noteDuration, isHighNote = false, tempo = null) {
                 const now = Tone.now();
                 
-                // Random delay 0-20ms
-                const startDelay = Math.random() * 0.02;
+                // Tempo-based random delay: 0 to (tempo / currentBPM) * 0.02 seconds
+                let startDelay = 0;
+                if (tempo !== null && isFinite(tempo) && tempo > 0 && typeof currentBPM !== 'undefined' && isFinite(currentBPM) && currentBPM > 0) {
+                    const maxDelay = (tempo / currentBPM) * 0.02;
+                    startDelay = Math.random() * maxDelay;
+                } else {
+                    // Fallback to old behavior if tempo not provided
+                    startDelay = Math.random() * 0.02;
+                }
                 const startTime = now + startDelay;
                 
                 // Very short attack for plucky sound
@@ -1423,7 +1461,9 @@
                 
                 // Apply -12 dB reduction for high notes
                 const highNoteVolumeReduction = isHighNote ? 0.251 : 1.0;
-                const volumeGain = new Tone.Gain(highNoteVolumeReduction);
+                // Random volume reduction 0-6dB (linear gain: 0.5012 to 1.0)
+                const volumeVariation = 0.5012 + Math.random() * (1.0 - 0.5012);
+                const volumeGain = new Tone.Gain(highNoteVolumeReduction * volumeVariation);
                 
                 const pan = new Tone.Panner((Math.random() - 0.5) * 0.15);
                 
@@ -1586,11 +1626,18 @@
                 this.activeVoices = [];
             }
             
-            createSubVoice(frequency, noteDuration) {
+            createSubVoice(frequency, noteDuration, tempo = null) {
                 const now = Tone.now();
                 
-                // Random delay 0-20ms
-                const startDelay = Math.random() * 0.02;
+                // Tempo-based random delay: 0 to (tempo / currentBPM) * 0.02 seconds
+                let startDelay = 0;
+                if (tempo !== null && isFinite(tempo) && tempo > 0 && typeof currentBPM !== 'undefined' && isFinite(currentBPM) && currentBPM > 0) {
+                    const maxDelay = (tempo / currentBPM) * 0.02;
+                    startDelay = Math.random() * maxDelay;
+                } else {
+                    // Fallback to old behavior if tempo not provided
+                    startDelay = Math.random() * 0.02;
+                }
                 const startTime = now + startDelay;
                 
                 // Use sub-specific attack time
@@ -1630,7 +1677,9 @@
                     Q: 1.0
                 });
                 
-                const volumeGain = new Tone.Gain(1.0);
+                // Random volume reduction 0-6dB (linear gain: 0.5012 to 1.0)
+                const volumeVariation = 0.5012 + Math.random() * (1.0 - 0.5012);
+                const volumeGain = new Tone.Gain(volumeVariation);
                 const pan = new Tone.Panner((Math.random() - 0.5) * 0.1); // Less panning for bass
                 
                 // Routing
@@ -1873,6 +1922,8 @@
                         document.querySelectorAll('#waterGrid .grid-cell.active').forEach(c => c.classList.remove('active'));
                         pendingCell.classList.remove('pending');
                         pendingCell.classList.add('active');
+                        waterActiveCellRow = waterPendingCellRow;
+                        waterActiveCellCol = waterPendingCellCol;
                     }
                 }
                 
@@ -1883,6 +1934,9 @@
                 waterPendingCellRow = null;
                 waterPendingCellCol = null;
                 changed = true;
+                
+                // Update header animations
+                gridManager.updateGridHeaderAnimations('waterGrid', waterCurrentBassDuration, waterCurrentHighDuration, 'water', waterActiveCellRow, waterActiveCellCol);
             }
             
             // Handle plucky synth pending changes
@@ -1896,6 +1950,8 @@
                         document.querySelectorAll('#pluckyGrid .grid-cell.active').forEach(c => c.classList.remove('active'));
                         pendingCell.classList.remove('pending');
                         pendingCell.classList.add('active');
+                        pluckyActiveCellRow = pluckyPendingCellRow;
+                        pluckyActiveCellCol = pluckyPendingCellCol;
                     }
                 }
                 
@@ -1906,6 +1962,9 @@
                 pluckyPendingCellRow = null;
                 pluckyPendingCellCol = null;
                 changed = true;
+                
+                // Update header animations
+                gridManager.updateGridHeaderAnimations('pluckyGrid', pluckyCurrentBassDuration, pluckyCurrentHighDuration, 'plucky', pluckyActiveCellRow, pluckyActiveCellCol);
             }
             
             // Handle sub synth pending changes
@@ -1919,6 +1978,8 @@
                         document.querySelectorAll('#subGrid .grid-cell.active').forEach(c => c.classList.remove('active'));
                         pendingCell.classList.remove('pending');
                         pendingCell.classList.add('active');
+                        subActiveCellRow = subPendingCellRow;
+                        subActiveCellCol = subPendingCellCol;
                     }
                 }
                 
@@ -1929,6 +1990,9 @@
                 subPendingCellRow = null;
                 subPendingCellCol = null;
                 changed = true;
+                
+                // Update header animations
+                gridManager.updateGridHeaderAnimations('subGrid', subCurrentBassDuration, subCurrentOctaveDuration, 'sub', subActiveCellRow, subActiveCellCol);
             }
             
             // Restart if needed
@@ -1985,7 +2049,7 @@
             }
         }
         
-        function playBassLayer(notes, noteDuration, cycleDuration, synth, synthType) {
+        function playBassLayer(notes, noteDuration, cycleDuration, synth, synthType, bassDurationMultiplier) {
             if (!synth || !notes || notes.length === 0) {
                 return;
             }
@@ -2006,11 +2070,11 @@
             notes.forEach((midiNote) => {
                 const frequency = midiToFrequency(midiNote);
                 if (synthType === 'water') {
-                    synth.createWaterVoice(frequency, validNoteDuration, 0.02, 0.03, false);
+                    synth.createWaterVoice(frequency, validNoteDuration, 0.02, 0.03, false, bassDurationMultiplier);
                 } else if (synthType === 'plucky') {
-                    synth.createPluckyVoice(frequency, validNoteDuration, false);
+                    synth.createPluckyVoice(frequency, validNoteDuration, false, bassDurationMultiplier);
                 } else if (synthType === 'sub') {
-                    synth.createSubVoice(frequency, validNoteDuration);
+                    synth.createSubVoice(frequency, validNoteDuration, bassDurationMultiplier);
                 }
             });
         }
@@ -2049,9 +2113,9 @@
                             if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                 const frequency = midiToFrequency(midiNote);
                                 if (synthType === 'water') {
-                                    synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
+                                    synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true, currentHighDuration);
                                 } else if (synthType === 'plucky') {
-                                    synth.createPluckyVoice(frequency, thirdNoteDuration, true);
+                                    synth.createPluckyVoice(frequency, thirdNoteDuration, true, currentHighDuration);
                                 }
                             }
                         });
@@ -2063,9 +2127,9 @@
                                     if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
-                                            synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
+                                            synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true, currentHighDuration);
                                         } else if (synthType === 'plucky') {
-                                            synth.createPluckyVoice(frequency, thirdNoteDuration, true);
+                                            synth.createPluckyVoice(frequency, thirdNoteDuration, true, currentHighDuration);
                                         }
                                     }
                                 });
@@ -2079,9 +2143,9 @@
                                     if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
-                                            synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
+                                            synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true, currentHighDuration);
                                         } else if (synthType === 'plucky') {
-                                            synth.createPluckyVoice(frequency, thirdNoteDuration, true);
+                                            synth.createPluckyVoice(frequency, thirdNoteDuration, true, currentHighDuration);
                                         }
                                     }
                                 });
@@ -2096,9 +2160,9 @@
                             if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                 const frequency = midiToFrequency(midiNote);
                                 if (synthType === 'water') {
-                                    synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true);
+                                    synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true, currentHighDuration);
                                 } else if (synthType === 'plucky') {
-                                    synth.createPluckyVoice(frequency, halfNoteDuration, true);
+                                    synth.createPluckyVoice(frequency, halfNoteDuration, true, currentHighDuration);
                                 }
                             }
                         });
@@ -2110,9 +2174,9 @@
                                     if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
-                                            synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true);
+                                            synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true, currentHighDuration);
                                         } else if (synthType === 'plucky') {
-                                            synth.createPluckyVoice(frequency, halfNoteDuration, true);
+                                            synth.createPluckyVoice(frequency, halfNoteDuration, true, currentHighDuration);
                                         }
                                     }
                                 });
@@ -2135,9 +2199,9 @@
                 // Play this note
                 const frequency = midiToFrequency(midiNote);
                 if (synthType === 'water') {
-                    synth.createWaterVoice(frequency, validNoteDuration, 0.02, 0.03, true);
+                    synth.createWaterVoice(frequency, validNoteDuration, 0.02, 0.03, true, currentHighDuration);
                 } else if (synthType === 'plucky') {
-                    synth.createPluckyVoice(frequency, validNoteDuration, true);
+                    synth.createPluckyVoice(frequency, validNoteDuration, true, currentHighDuration);
                 }
             });
         }
@@ -2451,65 +2515,6 @@
         function handleProfileBehaviors(synthType, profile, currentBassDuration, currentHighDuration) {
             const gridId = synthType === 'water' ? 'waterGrid' : 'pluckyGrid';
             
-            // Volume modulation randomization for profiles
-            const volumeModulationOptions = ['triangle', 'ascend', 'descend'];
-            
-            // Drunk profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'drunk' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                if (synthType === 'water') {
-                    waterVolumeModulation = randomModulation;
-                    const select = document.getElementById('waterVolumeModulation');
-                    if (select) select.value = randomModulation;
-                } else if (synthType === 'plucky') {
-                    pluckyVolumeModulation = randomModulation;
-                    const select = document.getElementById('pluckyVolumeModulation');
-                    if (select) select.value = randomModulation;
-                }
-            }
-            
-            // Creative profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'creative' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                if (synthType === 'water') {
-                    waterVolumeModulation = randomModulation;
-                    const select = document.getElementById('waterVolumeModulation');
-                    if (select) select.value = randomModulation;
-                } else if (synthType === 'plucky') {
-                    pluckyVolumeModulation = randomModulation;
-                    const select = document.getElementById('pluckyVolumeModulation');
-                    if (select) select.value = randomModulation;
-                }
-            }
-            
-            // Lazy profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'lazy' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                if (synthType === 'water') {
-                    waterVolumeModulation = randomModulation;
-                    const select = document.getElementById('waterVolumeModulation');
-                    if (select) select.value = randomModulation;
-                } else if (synthType === 'plucky') {
-                    pluckyVolumeModulation = randomModulation;
-                    const select = document.getElementById('pluckyVolumeModulation');
-                    if (select) select.value = randomModulation;
-                }
-            }
-            
-            // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                if (synthType === 'water') {
-                    waterVolumeModulation = randomModulation;
-                    const select = document.getElementById('waterVolumeModulation');
-                    if (select) select.value = randomModulation;
-                } else if (synthType === 'plucky') {
-                    pluckyVolumeModulation = randomModulation;
-                    const select = document.getElementById('pluckyVolumeModulation');
-                    if (select) select.value = randomModulation;
-                }
-            }
-            
             // Creative profile: randomize synth parameters every cycle, transition over 3 cycles
             if (profile === 'creative') {
                 if (synthType === 'water') {
@@ -2801,41 +2806,6 @@
         function handleSubProfileBehaviors(profile, currentBassDuration, currentOctaveDuration) {
             const gridId = 'subGrid';
             
-            // Volume modulation randomization for profiles
-            const volumeModulationOptions = ['triangle', 'ascend', 'descend'];
-            
-            // Drunk profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'drunk' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                subVolumeModulation = randomModulation;
-                const select = document.getElementById('subVolumeModulation');
-                if (select) select.value = randomModulation;
-            }
-            
-            // Creative profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'creative' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                subVolumeModulation = randomModulation;
-                const select = document.getElementById('subVolumeModulation');
-                if (select) select.value = randomModulation;
-            }
-            
-            // Lazy profile: every cycle has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'lazy' && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                subVolumeModulation = randomModulation;
-                const select = document.getElementById('subVolumeModulation');
-                if (select) select.value = randomModulation;
-            }
-            
-            // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
-            if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
-                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
-                subVolumeModulation = randomModulation;
-                const select = document.getElementById('subVolumeModulation');
-                if (select) select.value = randomModulation;
-            }
-            
             // Creative profile: every 4 cycles, pick any random cell
             if (profile === 'creative') {
                 subCreativeCycleCounter++;
@@ -3090,6 +3060,11 @@
             // Start sub synth (sub-only - two durations)
             startSubSynthLayer(subSynth, subCurrentBassDuration, subCurrentOctaveDuration, subProfile);
             
+            // Update header animations for all grids
+            gridManager.updateGridHeaderAnimations('waterGrid', waterCurrentBassDuration, waterCurrentHighDuration, 'water', waterActiveCellRow, waterActiveCellCol);
+            gridManager.updateGridHeaderAnimations('pluckyGrid', pluckyCurrentBassDuration, pluckyCurrentHighDuration, 'plucky', pluckyActiveCellRow, pluckyActiveCellCol);
+            gridManager.updateGridHeaderAnimations('subGrid', subCurrentBassDuration, subCurrentOctaveDuration, 'sub', subActiveCellRow, subActiveCellCol);
+            
             // Update debug display
             const chordNotes = getCurrentChordNotes();
             updateDebugDisplay(chordNotes.bass, chordNotes.high);
@@ -3135,7 +3110,7 @@
                         if (waterCurrentBassDuration && waterCurrentHighDuration) {
                             const waterBassCycle = waterCurrentBassDuration / currentBPM;
                             const waterHighCycle = waterCurrentHighDuration / currentBPM;
-                            playBassLayer(chordNotes.bass, waterBassCycle * noteDuration, waterBassCycle, waterSynth, 'water');
+                            playBassLayer(chordNotes.bass, waterBassCycle * noteDuration, waterBassCycle, waterSynth, 'water', waterCurrentBassDuration);
                             playHighLayer(chordNotes.high, waterHighCycle * noteDuration, waterHighCycle, waterSynth, 'water', waterProfile, waterCurrentHighDuration);
                         }
                         
@@ -3143,7 +3118,7 @@
                         if (pluckyCurrentBassDuration && pluckyCurrentHighDuration) {
                             const pluckyBassCycle = pluckyCurrentBassDuration / currentBPM;
                             const pluckyHighCycle = pluckyCurrentHighDuration / currentBPM;
-                            playBassLayer(chordNotes.bass, pluckyBassCycle * noteDuration, pluckyBassCycle, pluckySynth, 'plucky');
+                            playBassLayer(chordNotes.bass, pluckyBassCycle * noteDuration, pluckyBassCycle, pluckySynth, 'plucky', pluckyCurrentBassDuration);
                             playHighLayer(chordNotes.high, pluckyHighCycle * noteDuration, pluckyHighCycle, pluckySynth, 'plucky', pluckyProfile, pluckyCurrentHighDuration);
                         }
                         
@@ -3151,7 +3126,7 @@
                         if (subCurrentBassDuration && subCurrentOctaveDuration) {
                             const subBassCycle = subCurrentBassDuration / currentBPM;
                             const subOctaveCycle = subCurrentOctaveDuration / currentBPM;
-                            playSubLayer(chordNotes.bass, subBassCycle * noteDuration, subOctaveCycle * noteDuration, subBassCycle, subOctaveCycle, subSynth);
+                            playSubLayer(chordNotes.bass, subBassCycle * noteDuration, subOctaveCycle * noteDuration, subBassCycle, subOctaveCycle, subSynth, subCurrentBassDuration, subCurrentOctaveDuration);
                         }
                     }
                     
@@ -3199,7 +3174,7 @@
             }
             
             const chordNotes = getCurrentChordNotes();
-            playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType);
+            playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType, bassDurationMultiplier);
             playHighLayer(chordNotes.high, highCycleDuration * noteDuration, highCycleDuration, synth, synthType, profile, highDurationMultiplier);
             
             if (synthType === 'water') {
@@ -3215,7 +3190,7 @@
                 waterBassInterval = setInterval(() => {
                     if (isPlaying) {
                         const chordNotes = getCurrentChordNotes();
-                        playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType);
+                        playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType, bassDurationMultiplier);
                     }
                 }, bassCycleDuration * 1000);
                 
@@ -3238,7 +3213,7 @@
                 pluckyBassInterval = setInterval(() => {
                     if (isPlaying) {
                         const chordNotes = getCurrentChordNotes();
-                        playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType);
+                        playBassLayer(chordNotes.bass, bassCycleDuration * noteDuration, bassCycleDuration, synth, synthType, bassDurationMultiplier);
                     }
                 }, bassCycleDuration * 1000);
                 
@@ -3263,7 +3238,7 @@
             }
             
             const chordNotes = getCurrentChordNotes();
-            playSubLayer(chordNotes.bass, bassCycleDuration * noteDuration, octaveCycleDuration * noteDuration, bassCycleDuration, octaveCycleDuration, synth);
+            playSubLayer(chordNotes.bass, bassCycleDuration * noteDuration, octaveCycleDuration * noteDuration, bassCycleDuration, octaveCycleDuration, synth, bassDurationMultiplier, octaveDurationMultiplier);
             
             // Clear any existing intervals before creating new ones
             if (subBassInterval) {
@@ -3282,7 +3257,7 @@
                     const lowestNote = Math.min(...chordNotes.bass);
                     const frequency = midiToFrequency(lowestNote);
                     const validNoteDuration = bassCycleDuration * noteDuration;
-                    synth.createSubVoice(frequency, validNoteDuration);
+                    synth.createSubVoice(frequency, validNoteDuration, bassDurationMultiplier);
                 }
             }, bassCycleDuration * 1000);
             
@@ -3298,14 +3273,14 @@
                     const phaseOffset = 0.005 + (Math.random() * 0.01); // 5-15ms
                     setTimeout(() => {
                         if (isPlaying) {
-                            synth.createSubVoice(octaveLowerFrequency, validNoteDuration);
+                            synth.createSubVoice(octaveLowerFrequency, validNoteDuration, octaveDurationMultiplier);
                         }
                     }, phaseOffset * 1000);
                 }
             }, octaveCycleDuration * 1000);
         }
         
-        function playSubLayer(notes, bassNoteDuration, octaveNoteDuration, bassCycleDuration, octaveCycleDuration, synth) {
+        function playSubLayer(notes, bassNoteDuration, octaveNoteDuration, bassCycleDuration, octaveCycleDuration, synth, bassDurationMultiplier, octaveDurationMultiplier) {
             if (!synth || !notes || notes.length === 0) {
                 return;
             }
@@ -3327,7 +3302,7 @@
             // Play the lowest note (column tempo)
             const lowestNote = Math.min(...notes);
             const frequency = midiToFrequency(lowestNote);
-            synth.createSubVoice(frequency, validBassNoteDuration);
+            synth.createSubVoice(frequency, validBassNoteDuration, bassDurationMultiplier);
             
             // Play an octave lower (row tempo) with a small delay to reduce phase interference
             const octaveLowerNote = lowestNote - 12;
@@ -3336,7 +3311,7 @@
             const phaseOffset = 0.005 + (Math.random() * 0.01); // 5-15ms
             setTimeout(() => {
                 if (isPlaying) {
-                    synth.createSubVoice(octaveLowerFrequency, validOctaveNoteDuration);
+                    synth.createSubVoice(octaveLowerFrequency, validOctaveNoteDuration, octaveDurationMultiplier);
                 }
             }, phaseOffset * 1000);
         }
@@ -3373,6 +3348,11 @@
                 clearInterval(subOctaveInterval);
                 subOctaveInterval = null;
             }
+            
+            // Stop header animations
+            gridManager.updateGridHeaderAnimations('waterGrid', null, null, 'water');
+            gridManager.updateGridHeaderAnimations('pluckyGrid', null, null, 'plucky');
+            gridManager.updateGridHeaderAnimations('subGrid', null, null, 'sub');
             
             if (cycleInterval) {
                 clearInterval(cycleInterval);
@@ -3500,93 +3480,25 @@
             // Don't restart playback - just queue the next chord
         }
         
-        function createGrid(gridId, synthType) {
-            const grid = document.getElementById(gridId);
-            const headers = ['', '240/bpm', '120/bpm', '60/bpm', '40/bpm', '30/bpm', '20/bpm'];
-            
-            // Sub grid is 7x7 like others (column = lowest note tempo, row = octave lower tempo)
-            if (synthType === 'sub') {
-                for (let row = 0; row < 7; row++) {
-                    for (let col = 0; col < 7; col++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'grid-cell';
-                        cell.dataset.synthType = synthType;
-                        
-                        if (row === 0 || col === 0) {
-                            cell.className += ' header';
-                            if (row === 0 && col === 0) {
-                                cell.textContent = '';
-                            } else if (row === 0) {
-                                cell.className += ' col-header'; // First row = column headers (high notes)
-                                cell.textContent = headers[col];
-                            } else {
-                                cell.className += ' row-header'; // First column = row headers (bass)
-                                cell.textContent = headers[row];
-                            }
-                        } else {
-                            cell.dataset.row = row;
-                            cell.dataset.col = col;
-                            cell.addEventListener('click', () => {
-                                handleGridCellClick(row, col, synthType, cell);
-                            });
-                        }
-                        
-                        grid.appendChild(cell);
-                    }
+        // Grid functions are now handled by GridManager class
+        // Initialize GridManager with callbacks
+        function initializeGridManager() {
+            gridManager = new GridManager({
+                durationMultipliers: DURATION_MULTIPLIERS,
+                getIsPlaying: () => isPlaying,
+                getCurrentBPM: () => currentBPM,
+                onCellClick: (synthType, row, col, bassDurationMultiplier, highDurationMultiplier, isPlayingState, cell) => {
+                    handleGridCellClick(synthType, row, col, bassDurationMultiplier, highDurationMultiplier, isPlayingState, cell);
                 }
-            } else {
-                // Regular 7x7 grid for water and plucky
-                for (let row = 0; row < 7; row++) {
-                    for (let col = 0; col < 7; col++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'grid-cell';
-                        cell.dataset.synthType = synthType;
-                        
-                        if (row === 0 || col === 0) {
-                            cell.className += ' header';
-                            if (row === 0 && col === 0) {
-                                cell.textContent = '';
-                            } else if (row === 0) {
-                                cell.className += ' col-header'; // First row = column headers (high notes)
-                                cell.textContent = headers[col];
-                            } else {
-                                cell.className += ' row-header'; // First column = row headers (bass)
-                                cell.textContent = headers[row];
-                            }
-                        } else {
-                            cell.dataset.row = row;
-                            cell.dataset.col = col;
-                            cell.addEventListener('click', () => {
-                                handleGridCellClick(row, col, synthType, cell);
-                            });
-                        }
-                        
-                        grid.appendChild(cell);
-                    }
-                }
-            }
+            });
         }
         
-        function handleGridCellClick(row, col, synthType, cell) {
-            const bassDurationMultiplier = DURATION_MULTIPLIERS[row];
-            const highDurationMultiplier = DURATION_MULTIPLIERS[col];
-            
-            if (!bassDurationMultiplier || !isFinite(bassDurationMultiplier) || bassDurationMultiplier <= 0 ||
-                !highDurationMultiplier || !isFinite(highDurationMultiplier) || highDurationMultiplier <= 0) {
-                console.error('Invalid duration multipliers');
-                return;
-            }
-            
+        function handleGridCellClick(synthType, row, col, bassDurationMultiplier, highDurationMultiplier, isPlayingState, cell) {
             if (synthType === 'water') {
                 // Clear water grid active and pending states
-                document.querySelectorAll('#waterGrid .grid-cell.active').forEach(c => {
-                    c.classList.remove('active');
-                });
-                document.querySelectorAll('#waterGrid .grid-cell.pending').forEach(c => {
-                    c.classList.remove('pending');
-                });
+                gridManager.clearGridStates('waterGrid');
                 
-                if (isPlaying) {
+                if (isPlayingState) {
                     cell.classList.add('pending');
                     waterPendingBassDuration = bassDurationMultiplier;
                     waterPendingHighDuration = highDurationMultiplier;
@@ -3596,19 +3508,19 @@
                     cell.classList.add('active');
                     waterCurrentBassDuration = bassDurationMultiplier;
                     waterCurrentHighDuration = highDurationMultiplier;
+                    waterActiveCellRow = row;
+                    waterActiveCellCol = col;
                     waterPendingCellRow = null;
                     waterPendingCellCol = null;
                 }
+                
+                // Update header animations
+                gridManager.updateGridHeaderAnimations('waterGrid', waterCurrentBassDuration, waterCurrentHighDuration, 'water', waterActiveCellRow, waterActiveCellCol);
             } else if (synthType === 'plucky') {
                 // Clear plucky grid active and pending states
-                document.querySelectorAll('#pluckyGrid .grid-cell.active').forEach(c => {
-                    c.classList.remove('active');
-                });
-                document.querySelectorAll('#pluckyGrid .grid-cell.pending').forEach(c => {
-                    c.classList.remove('pending');
-                });
+                gridManager.clearGridStates('pluckyGrid');
                 
-                if (isPlaying) {
+                if (isPlayingState) {
                     cell.classList.add('pending');
                     pluckyPendingBassDuration = bassDurationMultiplier;
                     pluckyPendingHighDuration = highDurationMultiplier;
@@ -3618,22 +3530,22 @@
                     cell.classList.add('active');
                     pluckyCurrentBassDuration = bassDurationMultiplier;
                     pluckyCurrentHighDuration = highDurationMultiplier;
+                    pluckyActiveCellRow = row;
+                    pluckyActiveCellCol = col;
                     pluckyPendingCellRow = null;
                     pluckyPendingCellCol = null;
                 }
+                
+                // Update header animations
+                gridManager.updateGridHeaderAnimations('pluckyGrid', pluckyCurrentBassDuration, pluckyCurrentHighDuration, 'plucky', pluckyActiveCellRow, pluckyActiveCellCol);
             } else if (synthType === 'sub') {
                 // Clear sub grid active and pending states
-                document.querySelectorAll('#subGrid .grid-cell.active').forEach(c => {
-                    c.classList.remove('active');
-                });
-                document.querySelectorAll('#subGrid .grid-cell.pending').forEach(c => {
-                    c.classList.remove('pending');
-                });
+                gridManager.clearGridStates('subGrid');
                 
                 // Column = lowest note tempo, Row = octave lower tempo
                 const octaveDurationMultiplier = DURATION_MULTIPLIERS[row];
                 
-                if (isPlaying) {
+                if (isPlayingState) {
                     cell.classList.add('pending');
                     subPendingBassDuration = bassDurationMultiplier;
                     subPendingOctaveDuration = octaveDurationMultiplier;
@@ -3643,9 +3555,14 @@
                     cell.classList.add('active');
                     subCurrentBassDuration = bassDurationMultiplier;
                     subCurrentOctaveDuration = octaveDurationMultiplier;
+                    subActiveCellRow = row;
+                    subActiveCellCol = col;
                     subPendingCellRow = null;
                     subPendingCellCol = null;
                 }
+                
+                // Update header animations (for sub: col = bass, row = octave)
+                gridManager.updateGridHeaderAnimations('subGrid', subCurrentBassDuration, subCurrentOctaveDuration, 'sub', subActiveCellRow, subActiveCellCol);
             }
         }
         
@@ -3795,9 +3712,10 @@
                 }
             }
             
-            createGrid('waterGrid', 'water');
-            createGrid('pluckyGrid', 'plucky');
-            createGrid('subGrid', 'sub');
+            initializeGridManager();
+            gridManager.createGrid('waterGrid', 'water');
+            gridManager.createGrid('pluckyGrid', 'plucky');
+            gridManager.createGrid('subGrid', 'sub');
             updateBPM();
             
             document.getElementById('presetSelect').addEventListener('change', handlePresetChange);
@@ -4045,12 +3963,16 @@
                             defaultCell.classList.add('active');
                             waterCurrentBassDuration = 240;
                             waterCurrentHighDuration = 30;
+                            waterActiveCellRow = 1;
+                            waterActiveCellCol = 5;
                         }
                     } else {
                         const row = parseInt(waterActiveCell.dataset.row);
                         const col = parseInt(waterActiveCell.dataset.col);
                         waterCurrentBassDuration = DURATION_MULTIPLIERS[row];
                         waterCurrentHighDuration = DURATION_MULTIPLIERS[col];
+                        waterActiveCellRow = row;
+                        waterActiveCellCol = col;
                     }
                     
                     if (!pluckyActiveCell) {
@@ -4060,12 +3982,16 @@
                             defaultCell.classList.add('active');
                             pluckyCurrentBassDuration = 240;
                             pluckyCurrentHighDuration = 30;
+                            pluckyActiveCellRow = 1;
+                            pluckyActiveCellCol = 5;
                         }
                     } else {
                         const row = parseInt(pluckyActiveCell.dataset.row);
                         const col = parseInt(pluckyActiveCell.dataset.col);
                         pluckyCurrentBassDuration = DURATION_MULTIPLIERS[row];
                         pluckyCurrentHighDuration = DURATION_MULTIPLIERS[col];
+                        pluckyActiveCellRow = row;
+                        pluckyActiveCellCol = col;
                     }
                     
                     if (!subActiveCell) {
@@ -4075,12 +4001,16 @@
                             defaultCell.classList.add('active');
                             subCurrentBassDuration = 240;
                             subCurrentOctaveDuration = 30;
+                            subActiveCellRow = 1;
+                            subActiveCellCol = 5;
                         }
                     } else {
                         const row = parseInt(subActiveCell.dataset.row);
                         const col = parseInt(subActiveCell.dataset.col);
                         subCurrentBassDuration = DURATION_MULTIPLIERS[col];
                         subCurrentOctaveDuration = DURATION_MULTIPLIERS[row];
+                        subActiveCellRow = row;
+                        subActiveCellCol = col;
                     }
                     
                     // Clear any pending cells
