@@ -910,7 +910,7 @@
                 this.masterVolumeNode = masterVolumeNode;
                 this.activeVoices = [];
                 
-                // Volume modulation node (applied before reverb)
+                // Volume modulation node (applied only to dry path, not reverb)
                 this.volumeModulation = new Tone.Volume(0);
                 
                 this.reverb = new Tone.Reverb({
@@ -944,12 +944,12 @@
                 this.dryGain = new Tone.Gain(0.08);
                 this.reverbGain = new Tone.Gain(0.77);
                 
-                // Audio chain: masterGain -> volumeModulation -> outputVolume -> (dryGain + reverbGain) -> reverb/eq -> compressor -> masterVolume
-                // Volume modulation affects both dry and reverb paths BEFORE reverb
+                // Audio chain: masterGain -> outputVolume -> (volumeModulation -> dryGain) + (reverbGain) -> reverb/eq -> compressor -> masterVolume
+                // Volume modulation ONLY affects dry path, NOT reverb tails (prevents next cycle from affecting previous cycle's reverb)
                 // Output volume is independent control before reverb chain
-                this.masterGain.connect(this.volumeModulation);
-                this.volumeModulation.connect(this.outputVolume);
-                this.outputVolume.connect(this.dryGain);
+                this.masterGain.connect(this.outputVolume);
+                this.outputVolume.connect(this.volumeModulation);
+                this.volumeModulation.connect(this.dryGain);
                 this.outputVolume.connect(this.reverbGain);
                 
                 // Dry path: dryGain -> eq -> compressor
@@ -1215,7 +1215,7 @@
                 this.masterVolumeNode = masterVolumeNode;
                 this.activeVoices = [];
                 
-                // Volume modulation node (applied before reverb)
+                // Volume modulation node (applied only to dry path, not reverb)
                 this.volumeModulation = new Tone.Volume(0);
                 
                 this.reverb = new Tone.Reverb({
@@ -1249,12 +1249,12 @@
                 this.dryGain = new Tone.Gain(0.08);
                 this.reverbGain = new Tone.Gain(0.77);
                 
-                // Audio chain: masterGain -> volumeModulation -> outputVolume -> (dryGain + reverbGain) -> reverb/eq -> compressor -> masterVolume
-                // Volume modulation affects both dry and reverb paths BEFORE reverb
+                // Audio chain: masterGain -> outputVolume -> (volumeModulation -> dryGain) + (reverbGain) -> reverb/eq -> compressor -> masterVolume
+                // Volume modulation ONLY affects dry path, NOT reverb tails (prevents next cycle from affecting previous cycle's reverb)
                 // Output volume is independent control before reverb chain
-                this.masterGain.connect(this.volumeModulation);
-                this.volumeModulation.connect(this.outputVolume);
-                this.outputVolume.connect(this.dryGain);
+                this.masterGain.connect(this.outputVolume);
+                this.outputVolume.connect(this.volumeModulation);
+                this.volumeModulation.connect(this.dryGain);
                 this.outputVolume.connect(this.reverbGain);
                 
                 // Dry path: dryGain -> eq -> compressor
@@ -1419,7 +1419,7 @@
                 this.masterVolumeNode = masterVolumeNode;
                 this.activeVoices = [];
                 
-                // Volume modulation node (applied before reverb)
+                // Volume modulation node (applied only to dry path, not reverb)
                 this.volumeModulation = new Tone.Volume(0);
                 
                 this.reverb = new Tone.Reverb({
@@ -1457,12 +1457,13 @@
                 this.dryGain = new Tone.Gain(0.1);
                 this.reverbGain = new Tone.Gain(0.12);
                 
-                // Audio chain: masterGain -> volumeModulation -> outputVolume -> saturation -> (dryGain + reverbGain) -> reverb/eq -> compressor -> masterVolume
+                // Audio chain: masterGain -> outputVolume -> saturation -> (volumeModulation -> dryGain) + (reverbGain) -> reverb/eq -> compressor -> masterVolume
+                // Volume modulation ONLY affects dry path, NOT reverb tails (prevents next cycle from affecting previous cycle's reverb)
                 // Output volume is independent control before reverb chain
-                this.masterGain.connect(this.volumeModulation);
-                this.volumeModulation.connect(this.outputVolume);
+                this.masterGain.connect(this.outputVolume);
                 this.outputVolume.connect(this.saturation);
-                this.saturation.connect(this.dryGain);
+                this.saturation.connect(this.volumeModulation);
+                this.volumeModulation.connect(this.dryGain);
                 this.saturation.connect(this.reverbGain);
                 
                 // Dry path: dryGain -> eq -> compressor
