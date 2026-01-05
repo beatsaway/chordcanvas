@@ -396,16 +396,6 @@
             transition: all 0.2s;
         }
         
-        .synth-tab.active {
-            background: #4CAF50 !important;
-            color: white !important;
-        }
-        
-        .synth-tab:not(.active) {
-            background: #e0e0e0 !important;
-            color: #666 !important;
-        }
-        
         .synth-controls-panel {
             padding: 8px 0;
         }
@@ -657,7 +647,7 @@
                 <div class="grid" id="pluckyGrid"></div>
             </div>
             <div style="flex: 1; min-width: 300px;">
-                <h2 style="color: #9C27B0; font-size: 14px; margin: 0 0 8px 0; font-weight: 500; letter-spacing: -0.01em;">Sub Synth Grid</h2>
+                <h2 style="color: #006994; font-size: 14px; margin: 0 0 8px 0; font-weight: 500; letter-spacing: -0.01em;">Sub Synth Grid</h2>
                 <div class="grid" id="subGrid"></div>
             </div>
         </div>
@@ -3783,6 +3773,13 @@
                 document.getElementById('pluckyControlsTab').classList.add('active');
                 document.getElementById('waterControlsTab').classList.remove('active');
                 document.getElementById('subControlsTab').classList.remove('active');
+                // Update tab colors
+                document.getElementById('pluckyControlsTab').style.background = '#FF9800';
+                document.getElementById('pluckyControlsTab').style.color = 'white';
+                document.getElementById('waterControlsTab').style.background = '#e0e0e0';
+                document.getElementById('waterControlsTab').style.color = '#666';
+                document.getElementById('subControlsTab').style.background = '#e0e0e0';
+                document.getElementById('subControlsTab').style.color = '#666';
                 document.getElementById('pluckyControlsPanel').style.display = 'block';
                 document.getElementById('waterControlsPanel').style.display = 'none';
                 document.getElementById('subControlsPanel').style.display = 'none';
@@ -3792,6 +3789,13 @@
                 document.getElementById('subControlsTab').classList.add('active');
                 document.getElementById('waterControlsTab').classList.remove('active');
                 document.getElementById('pluckyControlsTab').classList.remove('active');
+                // Update tab colors
+                document.getElementById('subControlsTab').style.background = '#006994';
+                document.getElementById('subControlsTab').style.color = 'white';
+                document.getElementById('waterControlsTab').style.background = '#e0e0e0';
+                document.getElementById('waterControlsTab').style.color = '#666';
+                document.getElementById('pluckyControlsTab').style.background = '#e0e0e0';
+                document.getElementById('pluckyControlsTab').style.color = '#666';
                 document.getElementById('subControlsPanel').style.display = 'block';
                 document.getElementById('waterControlsPanel').style.display = 'none';
                 document.getElementById('pluckyControlsPanel').style.display = 'none';
@@ -3801,6 +3805,13 @@
                 document.getElementById('waterControlsTab').classList.add('active');
                 document.getElementById('pluckyControlsTab').classList.remove('active');
                 document.getElementById('subControlsTab').classList.remove('active');
+                // Update tab colors
+                document.getElementById('waterControlsTab').style.background = '#4CAF50';
+                document.getElementById('waterControlsTab').style.color = 'white';
+                document.getElementById('pluckyControlsTab').style.background = '#e0e0e0';
+                document.getElementById('pluckyControlsTab').style.color = '#666';
+                document.getElementById('subControlsTab').style.background = '#e0e0e0';
+                document.getElementById('subControlsTab').style.color = '#666';
                 document.getElementById('waterControlsPanel').style.display = 'block';
                 document.getElementById('pluckyControlsPanel').style.display = 'none';
                 document.getElementById('subControlsPanel').style.display = 'none';
