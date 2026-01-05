@@ -157,7 +157,7 @@
             pointer-events: none;
             opacity: 0;
             transform: translateY(-5px);
-            transition: opacity 0.3s, transform 0.3s;
+            transition: opacity 5s, transform 5s;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
         
@@ -4026,7 +4026,7 @@
                     tooltip.remove();
                     // Move to next step
                     showTutorialStep(stepIndex + 1);
-                }, 300);
+                }, 5000);
             };
             
             // Wait for user to interact with the highlighted element or tooltip
@@ -4105,7 +4105,7 @@
             const tooltip = document.querySelector('.simple-tooltip');
             if (tooltip) {
                 tooltip.classList.remove('show');
-                setTimeout(() => tooltip.remove(), 300);
+                setTimeout(() => tooltip.remove(), 5000);
             }
             
             currentTutorialStep = 0;
@@ -4294,7 +4294,7 @@
             const tooltip = document.querySelector('.simple-tooltip');
             if (tooltip) {
                 tooltip.classList.remove('show');
-                setTimeout(() => tooltip.remove(), 300);
+                setTimeout(() => tooltip.remove(), 5000);
             }
             
             currentMainTutorialStep = 0;
