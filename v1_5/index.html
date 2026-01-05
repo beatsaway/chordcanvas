@@ -282,16 +282,6 @@
             background: rgba(33, 150, 243, 0.3);
         }
         
-        .info {
-            margin-top: 8px;
-            padding: 6px;
-            background: #f5f5f5;
-            border: 1px solid #e0e0e0;
-            border-radius: 3px;
-            font-size: 11px;
-            color: #000;
-        }
-        
         .volume-modulation-display {
             margin-top: 8px;
             padding: 8px;
@@ -474,6 +464,7 @@
                                 <option value="none">none</option>
                                 <option value="drunk">drunk</option>
                                 <option value="creative">creative</option>
+                                <option value="lazy">lazy</option>
                                 <option value="threat">threat</option>
                             </select>
                         </div>
@@ -530,6 +521,7 @@
                                 <option value="none">none</option>
                                 <option value="drunk">drunk</option>
                                 <option value="creative">creative</option>
+                                <option value="lazy">lazy</option>
                                 <option value="threat">threat</option>
                             </select>
                         </div>
@@ -561,8 +553,8 @@
                         
                         <div class="header-section bpm-section">
                             <div class="bpm-control">
-                                <input type="range" id="pluckyAttackSlider" class="bpm-slider" min="1" max="100" value="20" step="1">
-                                <div class="bpm-display" id="pluckyAttackDisplay">20ms</div>
+                                <input type="range" id="pluckyAttackSlider" class="bpm-slider" min="1" max="100" value="66" step="1">
+                                <div class="bpm-display" id="pluckyAttackDisplay">66ms</div>
                             </div>
                             <div style="font-size: 11px; color: #666; margin-top: 4px;">Attack</div>
                         </div>
@@ -578,6 +570,7 @@
                                 <option value="none">none</option>
                                 <option value="drunk">drunk</option>
                                 <option value="creative">creative</option>
+                                <option value="lazy">lazy</option>
                                 <option value="threat">threat</option>
                             </select>
                         </div>
@@ -668,8 +661,6 @@
                 <div class="grid" id="subGrid"></div>
             </div>
         </div>
-        
-        <div class="info" id="info"></div>
     </div>
     
     <script>
@@ -862,7 +853,7 @@
         let waterReverbGain = 0.77; // 77% default
         
         // Plucky synth parameters (attack only, no harmonics)
-        let pluckyAttackTime = 0.02; // in seconds (20ms default)
+        let pluckyAttackTime = 0.066; // in seconds (66ms default)
         let pluckyReverbGain = 0.77; // 77% default
         
         // Sub synth parameters
@@ -1661,7 +1652,7 @@
         // ========== AUDIO FUNCTIONS ==========
         function initAudio() {
             return new Promise((resolve, reject) => {
-                if (!waterSynth || !pluckySynth || !bassSynth) {
+                if (!waterSynth || !pluckySynth || !subSynth) {
                     Tone.start().then(() => {
                         if (!masterVolume) {
                             masterVolume = new Tone.Volume(0);
@@ -1959,8 +1950,8 @@
                 synth.activeVoices = synth.activeVoices.slice(synth.activeVoices.length - 30);
             }
             
-            // Drunk/Creative/Threat profile: Check for special variations first (120/bpm or 60/bpm)
-            if ((profile === 'drunk' || profile === 'creative' || profile === 'threat') && (currentHighDuration === 120 || currentHighDuration === 60) && Math.random() < 0.34) {
+            // Drunk/Creative/Lazy/Threat profile: Check for special variations first (120/bpm or 60/bpm)
+            if ((profile === 'drunk' || profile === 'creative' || profile === 'lazy' || profile === 'threat') && (currentHighDuration === 120 || currentHighDuration === 60) && Math.random() < 0.34) {
                 // Another 34% chance to play special variations
                 if (Math.random() < 0.34) {
                     const currentBassNotes = getCurrentChordNotes().bass;
@@ -1972,7 +1963,7 @@
                         
                         // Play first third (each note individually decides to skip)
                         notes.forEach((midiNote) => {
-                            if (profile !== 'drunk' && profile !== 'creative' && profile !== 'threat' || Math.random() >= 0.34) {
+                            if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                 const frequency = midiToFrequency(midiNote);
                                 if (synthType === 'water') {
                                     synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
@@ -1986,7 +1977,7 @@
                         setTimeout(() => {
                             if (isPlaying) {
                                 notes.forEach((midiNote) => {
-                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'threat' || Math.random() >= 0.34) {
+                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
                                             synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
@@ -2002,7 +1993,7 @@
                         setTimeout(() => {
                             if (isPlaying) {
                                 notes.forEach((midiNote) => {
-                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'threat' || Math.random() >= 0.34) {
+                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
                                             synth.createWaterVoice(frequency, thirdNoteDuration, 0.02, 0.03, true);
@@ -2019,7 +2010,7 @@
                         
                         // Play first half (each note individually decides to skip)
                         notes.forEach((midiNote) => {
-                            if (profile !== 'drunk' && profile !== 'creative' && profile !== 'threat' || Math.random() >= 0.34) {
+                            if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                 const frequency = midiToFrequency(midiNote);
                                 if (synthType === 'water') {
                                     synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true);
@@ -2033,7 +2024,7 @@
                         setTimeout(() => {
                             if (isPlaying) {
                                 notes.forEach((midiNote) => {
-                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'threat' || Math.random() >= 0.34) {
+                                    if (profile !== 'drunk' && profile !== 'creative' && profile !== 'lazy' && profile !== 'threat' || Math.random() >= 0.34) {
                                         const frequency = midiToFrequency(midiNote);
                                         if (synthType === 'water') {
                                             synth.createWaterVoice(frequency, halfNoteDuration, 0.02, 0.03, true);
@@ -2052,8 +2043,8 @@
             
             // Normal playback: each note individually decides whether to skip (34% chance)
             notes.forEach((midiNote) => {
-                // Each note individually decides: 34% chance to skip in drunk/creative/threat profile
-                if ((profile === 'drunk' || profile === 'creative' || profile === 'threat') && Math.random() < 0.34) {
+                // Each note individually decides: 34% chance to skip in drunk/creative/lazy/threat profile
+                if ((profile === 'drunk' || profile === 'creative' || profile === 'lazy' || profile === 'threat') && Math.random() < 0.34) {
                     // Skip this note
                     return;
                 }
@@ -2408,6 +2399,20 @@
                 }
             }
             
+            // Lazy profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'lazy' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                if (synthType === 'water') {
+                    waterVolumeModulation = randomModulation;
+                    const select = document.getElementById('waterVolumeModulation');
+                    if (select) select.value = randomModulation;
+                } else if (synthType === 'plucky') {
+                    pluckyVolumeModulation = randomModulation;
+                    const select = document.getElementById('pluckyVolumeModulation');
+                    if (select) select.value = randomModulation;
+                }
+            }
+            
             // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
             if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
@@ -2424,6 +2429,16 @@
             
             // Creative profile: randomize synth parameters every cycle, transition over 3 cycles
             if (profile === 'creative') {
+                if (synthType === 'water') {
+                    randomizeSynthParameters(3);
+                    randomizeWaterReverb(3);
+                } else if (synthType === 'plucky') {
+                    randomizePluckyReverb(3);
+                }
+            }
+            
+            // Lazy profile: randomize synth parameters every cycle, transition over 3 cycles (same as creative, but NO cell selection)
+            if (profile === 'lazy') {
                 if (synthType === 'water') {
                     randomizeSynthParameters(3);
                     randomizeWaterReverb(3);
@@ -2722,6 +2737,14 @@
                 if (select) select.value = randomModulation;
             }
             
+            // Lazy profile: every cycle has 30% chance to change vol modulation to a random one next cycle
+            if (profile === 'lazy' && Math.random() < 0.3) {
+                const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
+                subVolumeModulation = randomModulation;
+                const select = document.getElementById('subVolumeModulation');
+                if (select) select.value = randomModulation;
+            }
+            
             // Threat profile: every 3 cycles has 30% chance to change vol modulation to a random one next cycle
             if (profile === 'threat' && masterCycleNumber % 3 === 0 && Math.random() < 0.3) {
                 const randomModulation = volumeModulationOptions[Math.floor(Math.random() * volumeModulationOptions.length)];
@@ -2988,6 +3011,16 @@
             const chordNotes = getCurrentChordNotes();
             updateDebugDisplay(chordNotes.bass, chordNotes.high);
             
+            // Clear any existing intervals before creating new ones
+            if (cycleInterval) {
+                clearInterval(cycleInterval);
+                cycleInterval = null;
+            }
+            if (transitionUpdateInterval) {
+                clearInterval(transitionUpdateInterval);
+                transitionUpdateInterval = null;
+            }
+            
             // Master cycle interval for chord changes and profile behaviors
             cycleInterval = setInterval(() => {
                 if (isPlaying) {
@@ -3087,6 +3120,15 @@
             playHighLayer(chordNotes.high, highCycleDuration * noteDuration, highCycleDuration, synth, synthType, profile, highDurationMultiplier);
             
             if (synthType === 'water') {
+                // Clear any existing intervals before creating new ones
+                if (waterBassInterval) {
+                    clearInterval(waterBassInterval);
+                    waterBassInterval = null;
+                }
+                if (waterHighInterval) {
+                    clearInterval(waterHighInterval);
+                    waterHighInterval = null;
+                }
                 waterBassInterval = setInterval(() => {
                     if (isPlaying) {
                         const chordNotes = getCurrentChordNotes();
@@ -3101,6 +3143,15 @@
                     }
                 }, highCycleDuration * 1000);
             } else if (synthType === 'plucky') {
+                // Clear any existing intervals before creating new ones
+                if (pluckyBassInterval) {
+                    clearInterval(pluckyBassInterval);
+                    pluckyBassInterval = null;
+                }
+                if (pluckyHighInterval) {
+                    clearInterval(pluckyHighInterval);
+                    pluckyHighInterval = null;
+                }
                 pluckyBassInterval = setInterval(() => {
                     if (isPlaying) {
                         const chordNotes = getCurrentChordNotes();
@@ -3130,6 +3181,16 @@
             
             const chordNotes = getCurrentChordNotes();
             playSubLayer(chordNotes.bass, bassCycleDuration * noteDuration, octaveCycleDuration * noteDuration, bassCycleDuration, octaveCycleDuration, synth);
+            
+            // Clear any existing intervals before creating new ones
+            if (subBassInterval) {
+                clearInterval(subBassInterval);
+                subBassInterval = null;
+            }
+            if (subOctaveInterval) {
+                clearInterval(subOctaveInterval);
+                subOctaveInterval = null;
+            }
             
             // Interval for lowest note (column tempo)
             subBassInterval = setInterval(() => {
@@ -3594,7 +3655,7 @@
                 }
                 
                 // Randomly pick Water Profile (except 'none')
-                const waterProfileOptions = ['drunk', 'creative', 'threat'];
+                const waterProfileOptions = ['drunk', 'creative', 'lazy', 'threat'];
                 const randomWaterProfile = waterProfileOptions[Math.floor(Math.random() * waterProfileOptions.length)];
                 waterProfile = randomWaterProfile;
                 const waterProfileSelect = document.getElementById('waterProfileSelect');
@@ -3603,7 +3664,7 @@
                 }
                 
                 // Randomly pick Plucky Profile (except 'none')
-                const pluckyProfileOptions = ['drunk', 'creative', 'threat'];
+                const pluckyProfileOptions = ['drunk', 'creative', 'lazy', 'threat'];
                 const randomPluckyProfile = pluckyProfileOptions[Math.floor(Math.random() * pluckyProfileOptions.length)];
                 pluckyProfile = randomPluckyProfile;
                 const pluckyProfileSelect = document.getElementById('pluckyProfileSelect');
@@ -3612,7 +3673,7 @@
                 }
                 
                 // Randomly pick Sub Profile (except 'none')
-                const subProfileOptions = ['drunk', 'creative', 'threat'];
+                const subProfileOptions = ['drunk', 'creative', 'lazy', 'threat'];
                 const randomSubProfile = subProfileOptions[Math.floor(Math.random() * subProfileOptions.length)];
                 subProfile = randomSubProfile;
                 const subProfileSelect = document.getElementById('subProfileSelect');
