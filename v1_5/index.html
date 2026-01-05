@@ -73,6 +73,14 @@
             background: #ffffff;
             border: 1px solid #e5e5e5;
             border-radius: 2px;
+            position: relative;
+        }
+        
+        /* Tutorial button for selection screen - inside container top right */
+        .selection-container .tutorial-help-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
         }
         
         .selection-container h1 {
@@ -179,6 +187,125 @@
         .tutorial-highlight.active {
             box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.4);
             z-index: 9998;
+        }
+        
+        /* Tutorial Prompt Modal */
+        .tutorial-prompt-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .tutorial-prompt-modal.show {
+            display: flex;
+        }
+        
+        .tutorial-prompt-content {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 4px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tutorial-prompt-content h3 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+        
+        .tutorial-prompt-content p {
+            margin: 0 0 20px 0;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .tutorial-prompt-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .tutorial-prompt-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .tutorial-prompt-checkbox label {
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .tutorial-prompt-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .tutorial-prompt-buttons button {
+            padding: 8px 16px;
+            font-size: 13px;
+            border-radius: 2px;
+            cursor: pointer;
+            border: 1px solid #d0d0d0;
+            background: #ffffff;
+            color: #1a1a1a;
+            transition: all 0.2s;
+        }
+        
+        .tutorial-prompt-buttons button:hover {
+            background: #f8f8f8;
+        }
+        
+        .tutorial-prompt-buttons button.primary {
+            background: #1a1a1a;
+            color: #ffffff;
+            border-color: #1a1a1a;
+        }
+        
+        .tutorial-prompt-buttons button.primary:hover {
+            background: #333;
+            border-color: #333;
+        }
+        
+        /* Tutorial button - fixed top right */
+        .tutorial-help-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #f8f8f8;
+            color: #666;
+            border: 1px solid #d0d0d0;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 1000;
+        }
+        
+        .tutorial-help-btn:hover {
+            background: #e8e8e8;
+            border-color: #1a1a1a;
+            color: #1a1a1a;
+        }
+        
+        /* Hide tutorial buttons when screens are hidden */
+        #mainScreen:not(.visible) #showMainTutorialBtn {
+            display: none;
         }
         
         .chord-preview {
@@ -547,9 +674,26 @@
 </head>
 <body>
     
+    <!-- Tutorial Prompt Modal -->
+    <div id="tutorialPromptModal" class="tutorial-prompt-modal">
+        <div class="tutorial-prompt-content">
+            <h3>Welcome to Chord Canvas!</h3>
+            <p>Would you like to see tutorial tips to help you get started?</p>
+            <div class="tutorial-prompt-checkbox">
+                <input type="checkbox" id="neverShowTutorial">
+                <label for="neverShowTutorial">Never show this again</label>
+            </div>
+            <div class="tutorial-prompt-buttons">
+                <button id="tutorialPromptNo">No, thanks</button>
+                <button id="tutorialPromptYes" class="primary">Yes, show me</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Selection Screen -->
     <div id="selectionScreen">
         <div class="selection-container">
+            <button id="showTutorialBtn" class="tutorial-help-btn" title="Show tutorial tips">?</button>
             <h1 style="margin: 0 0 20px 0;"><a href="../index.html">Chord Canvas</a></h1>
             <div class="selection-section">
                 
@@ -575,6 +719,7 @@
     
     <!-- Main Screen -->
     <div id="mainScreen">
+        <button id="showMainTutorialBtn" class="tutorial-help-btn" title="Show tutorial tips">?</button>
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px; flex-wrap: wrap;">
             <h1 style="margin: 0;"><a href="../index.html">Chord Canvas</a></h1>
             <div class="bpm-control" style="display: flex; align-items: center; gap: 8px;">
@@ -3743,6 +3888,18 @@
             document.getElementById('mainScreen').classList.add('visible');
             updateChordDisplay();
             updateChordSequenceDisplay();
+            
+            // Show main screen tutorial after a short delay (wait for elements to render)
+            // Only show if user hasn't disabled tutorials
+            if (!mainTutorialShown && checkTutorialPreference()) {
+                setTimeout(() => {
+                    // Double check that main screen is visible before showing tutorial
+                    const mainScreen = document.getElementById('mainScreen');
+                    if (mainScreen && mainScreen.classList.contains('visible')) {
+                        showMainTutorialStep(0);
+                    }
+                }, 1000);
+            }
         }
         
         // ========== SIMPLE TUTORIAL SYSTEM ==========
@@ -3753,11 +3910,11 @@
         const tutorialSteps = [
             {
                 targetId: 'presetSelect',
-                message: 'Select a chord sequence to start'
+                message: 'Select any chord sequence to start'
             },
             {
                 targetId: 'chordInput',
-                message: 'Or write your own chord sequence here'
+                message: 'Or write your own chords'
             },
             {
                 targetId: 'presetBpmSlider',
@@ -3765,7 +3922,7 @@
             },
             {
                 targetId: 'nextBtn',
-                message: 'Go next to play it!'
+                message: 'Go next to play the chords!'
             }
         ];
         
@@ -3957,14 +4114,281 @@
         // Make function globally accessible
         window.closeTutorial = closeTutorial;
         
+        // ========== MAIN SCREEN TUTORIAL SYSTEM ==========
+        let currentMainTutorialStep = 0;
+        let mainTutorialTimeout = null;
+        let mainTutorialGlobalClickHandler = null;
+        let mainTutorialShown = false;
+        
+        const mainTutorialSteps = [
+            {
+                targetId: 'toggleBtn',
+                message: 'Press start to play your chords'
+            },
+            {
+                targetId: 'editBtn',
+                message: 'Press edit to go back and modify'
+            },
+            {
+                targetId: 'nextChordBtn',
+                message: 'Press ← → to skip to next chord or go back to previous chord'
+            },
+            {
+                targetSelector: '.chord-sequence-item',
+                message: 'Or just tap on the chord item directly to go there next'
+            },
+            {
+                targetSelector: '#waterGrid .grid-cell.row-header',
+                message: 'Row is tempo of bass notes of that sound'
+            },
+            {
+                targetSelector: '#waterGrid .grid-cell.col-header',
+                message: 'Column is tempo of high notes of that sound'
+            },
+            {
+                targetId: 'waterControlsTab',
+                message: 'At navbar we have 3 sounds playing - each has parameters to control'
+            }
+        ];
+        
+        function showMainTutorialStep(stepIndex) {
+            if (stepIndex >= mainTutorialSteps.length) {
+                // Tutorial complete
+                document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                    el.classList.remove('tutorial-highlight', 'active');
+                });
+                const tooltip = document.querySelector('.simple-tooltip');
+                if (tooltip) tooltip.remove();
+                mainTutorialShown = true;
+                return;
+            }
+            
+            const step = mainTutorialSteps[stepIndex];
+            let element = null;
+            
+            // Handle both ID and selector-based targeting
+            if (step.targetId) {
+                element = document.getElementById(step.targetId);
+            } else if (step.targetSelector) {
+                // For selectors, get the first matching element
+                element = document.querySelector(step.targetSelector);
+            }
+            
+            if (!element) {
+                // Element not found, skip to next
+                showMainTutorialStep(stepIndex + 1);
+                return;
+            }
+            
+            const tooltip = showTooltip(element, step.message);
+            currentMainTutorialStep = stepIndex;
+            
+            // Function to advance to next step
+            const advanceToNext = () => {
+                // Remove all event listeners
+                if (element) {
+                    element.removeEventListener('click', clickHandler);
+                    element.removeEventListener('change', changeHandler);
+                    element.removeEventListener('input', inputHandler);
+                }
+                tooltip.removeEventListener('click', tooltipClickHandler);
+                
+                // Remove global click listener if tutorial is complete
+                if (stepIndex + 1 >= mainTutorialSteps.length) {
+                    if (mainTutorialGlobalClickHandler) {
+                        document.removeEventListener('click', mainTutorialGlobalClickHandler, true);
+                        mainTutorialGlobalClickHandler = null;
+                    }
+                    tooltip.classList.remove('show');
+                    tooltip.remove();
+                    // Remove highlights
+                    document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                        el.classList.remove('tutorial-highlight', 'active');
+                    });
+                    mainTutorialShown = true;
+                    return;
+                }
+                
+                // Hide current tooltip
+                tooltip.classList.remove('show');
+                setTimeout(() => {
+                    tooltip.remove();
+                    // Move to next step
+                    showMainTutorialStep(stepIndex + 1);
+                }, 300);
+            };
+            
+            // Wait for user to interact with the highlighted element or tooltip
+            const clickHandler = (e) => {
+                e.stopPropagation();
+                advanceToNext();
+            };
+            
+            const changeHandler = (e) => {
+                advanceToNext();
+            };
+            
+            const inputHandler = (e) => {
+                // For textarea/input, advance after user types something
+                if (e.target.value.trim().length > 0) {
+                    advanceToNext();
+                }
+            };
+            
+            // Allow clicking on the tooltip itself to advance
+            const tooltipClickHandler = (e) => {
+                e.stopPropagation();
+                advanceToNext();
+            };
+            
+            tooltip.addEventListener('click', tooltipClickHandler);
+            
+            // Add global click listener to advance on any tap
+            if (mainTutorialGlobalClickHandler) {
+                document.removeEventListener('click', mainTutorialGlobalClickHandler, true);
+            }
+            mainTutorialGlobalClickHandler = (e) => {
+                // Don't advance if clicking on the tooltip itself (handled separately)
+                if (e.target.closest('.simple-tooltip')) {
+                    return;
+                }
+                advanceToNext();
+            };
+            document.addEventListener('click', mainTutorialGlobalClickHandler, true);
+            
+            // Add appropriate event listeners based on element type
+            if (element.tagName === 'SELECT') {
+                element.addEventListener('change', changeHandler);
+            } else if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+                if (element.type === 'range') {
+                    // For sliders, listen to input events
+                    element.addEventListener('input', inputHandler);
+                } else {
+                    // For text inputs, listen to input events
+                    element.addEventListener('input', inputHandler);
+                }
+                // Also allow clicking to advance
+                element.addEventListener('click', clickHandler);
+            } else {
+                // For buttons and other elements, listen to clicks
+                element.addEventListener('click', clickHandler);
+            }
+        }
+        
+        function closeMainTutorial() {
+            if (mainTutorialTimeout) {
+                clearTimeout(mainTutorialTimeout);
+                mainTutorialTimeout = null;
+            }
+            
+            // Remove global click listener
+            if (mainTutorialGlobalClickHandler) {
+                document.removeEventListener('click', mainTutorialGlobalClickHandler, true);
+                mainTutorialGlobalClickHandler = null;
+            }
+            
+            document.querySelectorAll('.tutorial-highlight').forEach(el => {
+                el.classList.remove('tutorial-highlight', 'active');
+            });
+            
+            const tooltip = document.querySelector('.simple-tooltip');
+            if (tooltip) {
+                tooltip.classList.remove('show');
+                setTimeout(() => tooltip.remove(), 300);
+            }
+            
+            currentMainTutorialStep = 0;
+            mainTutorialShown = true;
+        }
+        
+        // Make function globally accessible
+        window.closeMainTutorial = closeMainTutorial;
+        
+        // ========== TUTORIAL PROMPT MODAL ==========
+        function showTutorialPrompt() {
+            const modal = document.getElementById('tutorialPromptModal');
+            if (modal) {
+                modal.classList.add('show');
+            }
+        }
+        
+        function hideTutorialPrompt() {
+            const modal = document.getElementById('tutorialPromptModal');
+            if (modal) {
+                modal.classList.remove('show');
+            }
+        }
+        
+        function checkTutorialPreference() {
+            const neverShow = localStorage.getItem('chordCanvasNeverShowTutorial');
+            return neverShow !== 'true';
+        }
+        
+        function setTutorialPreference(neverShow) {
+            if (neverShow) {
+                localStorage.setItem('chordCanvasNeverShowTutorial', 'true');
+            } else {
+                localStorage.removeItem('chordCanvasNeverShowTutorial');
+            }
+        }
+        
+        // Function to manually start tutorial (bypasses preference check)
+        function startTutorialManually() {
+            // Close any existing tutorials first
+            closeTutorial();
+            closeMainTutorial();
+            
+            // Start the initial tutorial
+            setTimeout(() => {
+                showTutorialStep(0);
+            }, 300);
+        }
+        
+        // Function to manually start main screen tutorial (bypasses preference check)
+        function startMainTutorialManually() {
+            // Close any existing tutorials first
+            closeTutorial();
+            closeMainTutorial();
+            
+            // Reset the flag so tutorial can show
+            mainTutorialShown = false;
+            
+            // Start the main screen tutorial
+            setTimeout(() => {
+                showMainTutorialStep(0);
+            }, 300);
+        }
+        
         // ========== INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', () => {
             loadPresets();
             
-            // Show tutorial on page load
-            setTimeout(() => {
-                showTutorialStep(0);
-            }, 800); // Small delay for better UX
+            // Check if user wants to see tutorials
+            const showTutorials = checkTutorialPreference();
+            
+            if (showTutorials) {
+                // Show tutorial prompt modal
+                setTimeout(() => {
+                    showTutorialPrompt();
+                }, 500);
+                
+                // Handle tutorial prompt buttons
+                document.getElementById('tutorialPromptYes').addEventListener('click', () => {
+                    const neverShow = document.getElementById('neverShowTutorial').checked;
+                    setTutorialPreference(neverShow);
+                    hideTutorialPrompt();
+                    // Show tutorial after modal closes
+                    setTimeout(() => {
+                        showTutorialStep(0);
+                    }, 300);
+                });
+                
+                document.getElementById('tutorialPromptNo').addEventListener('click', () => {
+                    const neverShow = document.getElementById('neverShowTutorial').checked;
+                    setTutorialPreference(neverShow);
+                    hideTutorialPrompt();
+                });
+            }
             
             // Randomly pick a preset to load
             const presetSelect = document.getElementById('presetSelect');
@@ -3987,6 +4411,11 @@
             document.getElementById('presetSelect').addEventListener('change', handlePresetChange);
             document.getElementById('chordInput').addEventListener('input', handleChordInput);
             document.getElementById('nextBtn').addEventListener('click', goToMainScreen);
+            
+            // Tutorial button - allows users to see tutorial even if they said "never show again"
+            document.getElementById('showTutorialBtn').addEventListener('click', () => {
+                startTutorialManually();
+            });
             
             document.getElementById('prevBtn').addEventListener('click', prevChord);
             document.getElementById('nextChordBtn').addEventListener('click', nextChord);
@@ -4216,6 +4645,13 @@
                 }
                 document.getElementById('mainScreen').classList.remove('visible');
                 document.getElementById('selectionScreen').classList.remove('hidden');
+                // Reset main tutorial so it can be shown again if user comes back
+                mainTutorialShown = false;
+            });
+            
+            // Main screen tutorial button - allows users to see tutorial even if they said "never show again"
+            document.getElementById('showMainTutorialBtn').addEventListener('click', () => {
+                startMainTutorialManually();
             });
             
             document.getElementById('toggleBtn').addEventListener('click', async () => {
