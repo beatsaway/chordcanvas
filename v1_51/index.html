@@ -125,18 +125,18 @@
             min-height: 60px;
             padding: 8px;
             font-size: 13px;
-            border: 1px solid #d0d0d0;
+            border: none;
             border-radius: 2px;
             background: #ffffff;
             color: #1a1a1a;
-            resize: vertical;
+            resize: none;
             font-family: monospace;
-            transition: border-color 0.2s;
+            transition: none;
+            overflow: hidden;
         }
         
         #chordInput:focus {
             outline: none;
-            border-color: #1a1a1a;
         }
         
         #presetSelect {
@@ -145,15 +145,14 @@
             font-size: 13px;
             background: #ffffff;
             color: #1a1a1a;
-            border: 1px solid #d0d0d0;
+            border: none;
             border-radius: 2px;
             margin-bottom: 6px;
-            transition: border-color 0.2s;
+            transition: none;
         }
         
         #presetSelect:focus {
             outline: none;
-            border-color: #1a1a1a;
         }
         
         .simple-tooltip {
@@ -732,7 +731,7 @@
         <!-- Page Header -->
         <div class="page-header">
             <div class="header-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between;">
-                <h1 style="margin: 0; padding: 0; font-size: 18px; line-height: 1.2; font-family: 'Pacifico', cursive; font-weight: 400;"><a href="../index.html" style="text-decoration: none; color: inherit;">Chord Canvas</a></h1>
+                <h1 style="margin: 0; padding: 0; font-size: 24px; line-height: 1.2; font-family: 'Pacifico', cursive; font-weight: 400;"><a href="../index.html" style="text-decoration: none; color: inherit;">Chord Canvas</a></h1>
                 <button id="showTutorialBtn" class="tutorial-help-btn" title="Show tutorial tips" style="position: static;">Tutorial</button>
             </div>
             
@@ -754,7 +753,7 @@
         <div class="page-header">
             <div class="header-section" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; line-height: 1.2;">
-                    <h1 id="mainScreenTitle" style="margin: 0; padding: 0; font-size: 18px; line-height: 1.2;">Chord Canvas</h1>
+                    <h1 id="mainScreenTitle" style="margin: 0; padding: 0; font-size: 24px; line-height: 1.2;">Chord Canvas</h1>
                 </div>
                 <div class="bpm-control" style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
                     <input type="range" id="bpmSlider" class="bpm-slider" min="40" max="240" value="120" step="1" style="flex: 1; min-width: 150px;">
@@ -4222,6 +4221,8 @@ chordType = 'minor-7th';
                 
                 if (preset) {
                     chordInput.value = preset.chords;
+                    // Auto-resize textarea after setting preset value
+                    autoResizeTextarea(chordInput);
                     chordSequence = parseChordSequence(preset.chords);
                     currentChordIndex = 0;
                     nextChordIndex = chordSequence.length > 1 ? 1 : 0;
@@ -4235,6 +4236,15 @@ chordType = 'minor-7th';
             }
         }
         
+        function autoResizeTextarea(textarea) {
+            if (!textarea) return;
+            // Reset height to auto to get the correct scrollHeight
+            textarea.style.height = 'auto';
+            // Set height to scrollHeight to fit content, but respect min-height
+            const minHeight = 60; // Match the CSS min-height
+            textarea.style.height = Math.max(textarea.scrollHeight, minHeight) + 'px';
+        }
+        
         function handleChordInput() {
             // Don't allow chord input changes when main sequence is playing
             // But allow input during piano preview playback (PianoSound.getIsPlaying)
@@ -4244,6 +4254,9 @@ chordType = 'minor-7th';
             
             const chordInput = document.getElementById('chordInput');
             const presetSelect = document.getElementById('presetSelect');
+            
+            // Auto-resize textarea
+            autoResizeTextarea(chordInput);
             
             if (chordInput.value.trim()) {
                 presetSelect.value = '';
@@ -4956,7 +4969,14 @@ chordType = 'minor-7th';
             
             
             document.getElementById('presetSelect').addEventListener('change', handlePresetChange);
-            document.getElementById('chordInput').addEventListener('input', handleChordInput);
+            const chordInput = document.getElementById('chordInput');
+            chordInput.addEventListener('input', handleChordInput);
+            // Also resize on paste
+            chordInput.addEventListener('paste', () => {
+                setTimeout(() => autoResizeTextarea(chordInput), 0);
+            });
+            // Initialize textarea height on page load
+            autoResizeTextarea(chordInput);
             // nextBtn is now dynamically created in updateChordPreview, so event listener is attached there
             // This line is kept for backward compatibility but button may not exist at init time
             const nextBtn = document.getElementById('nextBtn');
