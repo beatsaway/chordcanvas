@@ -17,35 +17,43 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
             background: #ffffff;
-            color: #000000;
+            color: #1a1a1a;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2vh 5vw;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            line-height: 1.4;
         }
 
         .container {
             text-align: center;
             max-width: min(90vw, 800px);
             width: 100%;
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            border-radius: 2px;
+            padding: 20px;
         }
 
         .title {
-            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-size: clamp(1.5rem, 6vw, 2.5rem);
             font-weight: 500;
-            margin-bottom: clamp(3vh, 5vh, 48px);
+            margin-bottom: 20px;
             letter-spacing: -0.02em;
             line-height: 1.2;
         }
 
         .title-link {
             font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-size: clamp(1.5rem, 6vw, 2.5rem);
             font-weight: 400;
-            color: #000000;
+            color: #1a1a1a;
             text-decoration: none;
-            margin-right: clamp(4px, 1vw, 8px);
+            margin-right: 8px;
             cursor: pointer;
             transition: opacity 0.2s ease;
             display: inline-block;
@@ -56,36 +64,37 @@
         }
 
         .title-by {
-            font-size: clamp(1.2rem, 4vw, 2rem);
+            font-size: clamp(1rem, 3vw, 1.5rem);
             font-weight: 500;
-            color: #000000;
+            color: #1a1a1a;
         }
 
         .title-by .by-link {
-            color: #000000;
+            color: #1a1a1a;
             text-decoration: none;
-            border-bottom: 1px solid #d9d4cc;
+            border-bottom: 1px solid #d0d0d0;
             padding-bottom: 1px;
             cursor: pointer;
             transition: border-bottom-color 0.2s ease;
         }
 
         .title-by .by-link:hover {
-            border-bottom-color: #000000;
+            border-bottom-color: #1a1a1a;
         }
 
         .tagline {
-            font-size: clamp(1.1rem, 3vw, 1.5rem);
+            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
             font-weight: 500;
-            margin-bottom: clamp(3vh, 5vh, 48px);
+            margin-bottom: 20px;
             letter-spacing: -0.01em;
             line-height: 1.4;
+            color: #666;
         }
 
         .settings-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.08);
+            background: rgba(0, 0, 0, 0.5);
             display: none;
             z-index: 30;
         }
@@ -96,57 +105,61 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: #fff;
-            border: 1px solid #e2ddd5;
-            border-radius: clamp(4px, 1vh, 8px);
-            padding: clamp(12px, 2vh, 16px);
+            border: 1px solid #e5e5e5;
+            border-radius: 2px;
+            padding: 16px;
             width: min(320px, 90vw);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             display: none;
             z-index: 31;
-            font-size: clamp(0.85rem, 2vw, 0.9rem);
+            font-size: 13px;
             line-height: 1.5;
             text-align: center;
         }
 
         .info-modal a {
-            color: #111;
+            color: #1a1a1a;
             text-decoration: none;
-            border-bottom: 1px solid #c8c2b8;
+            border-bottom: 1px solid #d0d0d0;
         }
 
         .info-modal a:hover {
-            border-bottom-color: #111;
+            border-bottom-color: #1a1a1a;
         }
 
         .links {
             display: flex;
-            gap: clamp(12px, 2vw, 16px);
+            gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
         }
 
         .link {
-            font-size: clamp(2rem, 6vw, 3rem);
+            font-size: 16px;
             font-weight: 500;
-            padding: clamp(8px, 1.5vh, 12px) clamp(16px, 3vw, 24px);
-            border: none;
-            background: transparent;
-            color: #000000;
+            padding: 8px 16px;
+            border: 1px solid #e5e5e5;
+            border-radius: 2px;
+            background: #ffffff;
+            color: #1a1a1a;
             text-decoration: none;
             transition: all 0.2s ease;
             display: inline-block;
         }
 
         .link:hover {
-            opacity: 0.7;
+            border-color: #1a1a1a;
+            background: #f8f8f8;
         }
 
         .link.old {
             color: #999;
+            border-color: #e5e5e5;
         }
 
         .link.old:hover {
-            opacity: 0.5;
+            opacity: 0.7;
+            border-color: #999;
         }
 
         @keyframes pulse {
@@ -160,17 +173,22 @@
 
         .link.pulse {
             animation: pulse 2s ease-in-out infinite;
-            color: #2d7a2d;
+            color: rgb(33, 150, 243);
+            border-color: rgb(33, 150, 243);
         }
 
         @media (max-width: 767px) {
             body {
-                padding: 3vh 4vw;
+                padding: 12px 16px;
+            }
+
+            .container {
+                padding: 16px;
             }
 
             .links {
                 flex-direction: column;
-                gap: clamp(8px, 2vh, 12px);
+                gap: 8px;
             }
 
             .link {
@@ -190,9 +208,10 @@
             <a class="title-link" href="#" id="titleLink">Chord Canvas</a>
             <span class="title-by"> by <a class="by-link" href="#" id="byLink">Beats Away</a></span>
         </div>
-        <div class="tagline">💅finger drum any chords for any songs!</div>
+        <div class="tagline">Write chords. Music plays instantly.</div>
         <div class="links">
-            <a href="v1_5/index.html" class="link pulse">V1.5</a>
+            <a href="v1_51/index.html" class="link pulse">V1.51</a>
+            <a href="v1_5/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.5</a>
             <a href="v1_4/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.4</a>
             <a href="v1_3/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.3</a>
             <a href="v1_2/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.2</a>
