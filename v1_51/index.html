@@ -11,53 +11,74 @@
     <!-- Web Audio API Engine (for piano-sound.js - mobile compatible) -->
     <script src="audio/web-audio-engine/additive-synth.js"></script>
     <script src="audio/web-audio-engine/poly-synth-wrapper.js"></script>
-    <!-- Tone.js (still needed for waterSynth, pluckySynth, subSynth - will be replaced in future) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Tone.js will be loaded lazily on first user interaction -->
     <script>
-        // Suppress expected AudioContext warnings from Tone.js initialization
-        // These warnings occur because Tone.js initializes on page load, before user interaction
-        // They are harmless and don't affect functionality once user interacts with the page
-        // Note: Tone.js is still needed for waterSynth, pluckySynth, and subSynth (not piano)
-        (function() {
-            const originalWarn = console.warn;
-            let toneJsWarningShown = false;
-            let pageLoadTime = Date.now();
-            const PAGE_LOAD_WINDOW = 3000; // Suppress warnings within 3 seconds of page load
+        // Lazy loading for Tone.js - only load when user interacts with the page
+        let toneJsLoadingPromise = null;
+        let toneJsLoaded = false;
+        
+        function loadToneJs() {
+            // Return existing promise if already loading
+            if (toneJsLoadingPromise) {
+                return toneJsLoadingPromise;
+            }
             
-            console.warn = function(...args) {
-                const message = args.join(' ');
-                const timeSinceLoad = Date.now() - pageLoadTime;
+            // Return resolved promise if already loaded
+            if (toneJsLoaded && window.Tone) {
+                return Promise.resolve();
+            }
+            
+            // Create new loading promise
+            toneJsLoadingPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js';
+                script.async = true;
                 
-                // Suppress AudioContext warnings that occur during page load (almost certainly from Tone.js)
-                if (message.includes('AudioContext was not allowed to start')) {
-                    // Get stack trace to check if it's from Tone.js
-                    const stack = new Error().stack || '';
-                    const isFromToneJs = stack.includes('Tone') || 
-                                        stack.includes('Context.ts') || 
-                                        stack.includes('ToneConstantSource') ||
-                                        stack.includes('Transport.ts') ||
-                                        stack.includes('ContextInitialization') ||
-                                        stack.includes('Signal.ts') ||
-                                        stack.includes('TickSignal') ||
-                                        stack.includes('Clock.ts') ||
-                                        // Also check message for file names (browser console shows them)
-                                        message.includes('Context.ts') ||
-                                        message.includes('ToneConstantSource');
-                    
-                    // Suppress if from Tone.js OR if it's during page load (safe assumption)
-                    if (isFromToneJs || timeSinceLoad < PAGE_LOAD_WINDOW) {
-                        // Only show one informative message
-                        if (!toneJsWarningShown) {
-                            toneJsWarningShown = true;
-                            console.info('ℹ️ Tone.js AudioContext warnings suppressed (expected on page load). Audio will work after user interaction. Note: Tone.js is still used for waterSynth, pluckySynth, and subSynth.');
-                        }
-                        return; // Suppress the warning
-                    }
-                }
-                // Allow all other warnings through
-                originalWarn.apply(console, args);
+                script.onload = () => {
+                    toneJsLoaded = true;
+                    console.log('✓ Tone.js loaded successfully');
+                    resolve();
+                };
+                
+                script.onerror = () => {
+                    console.error('✗ Failed to load Tone.js');
+                    toneJsLoadingPromise = null; // Allow retry
+                    reject(new Error('Failed to load Tone.js'));
+                };
+                
+                document.head.appendChild(script);
+            });
+            
+            return toneJsLoadingPromise;
+        }
+        
+        // Load Tone.js on first user interaction (click, touch, or keydown)
+        let interactionHandlersAttached = false;
+        function attachToneJsLoadListeners() {
+            if (interactionHandlersAttached) return;
+            interactionHandlersAttached = true;
+            
+            const loadOnInteraction = () => {
+                loadToneJs().catch(err => {
+                    console.error('Error loading Tone.js:', err);
+                });
+                // Remove listeners after first interaction
+                document.removeEventListener('click', loadOnInteraction);
+                document.removeEventListener('touchstart', loadOnInteraction);
+                document.removeEventListener('keydown', loadOnInteraction);
             };
-        })();
+            
+            document.addEventListener('click', loadOnInteraction, { once: true, passive: true });
+            document.addEventListener('touchstart', loadOnInteraction, { once: true, passive: true });
+            document.addEventListener('keydown', loadOnInteraction, { once: true, passive: true });
+        }
+        
+        // Attach listeners when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', attachToneJsLoadListeners);
+        } else {
+            attachToneJsLoadListeners();
+        }
     </script>
     <script src="chord-intervals-config.js"></script>
     <script src="chord-presets.js"></script>
@@ -1524,8 +1545,10 @@ chordType = 'minor-7th';
         function initAudio() {
             return new Promise((resolve, reject) => {
                 if (!waterSynth || !pluckySynth || !subSynth) {
-                    if (window.Tone && window.Tone.start) {
-                        window.Tone.start().then(() => {
+                    // Ensure Tone.js is loaded before initializing audio
+                    loadToneJs().then(() => {
+                        if (window.Tone && window.Tone.start) {
+                            window.Tone.start().then(() => {
                         if (!masterVolume) {
                             // Check if slider exists and use its value, otherwise default to 50%
                             const masterVolumeSlider = document.getElementById('masterVolumeSlider');
@@ -1588,6 +1611,7 @@ chordType = 'minor-7th';
                     } else {
                         resolve();
                     }
+                    }).catch(reject); // Catch error from loadToneJs
                 } else {
                     resolve();
                 }
@@ -1596,6 +1620,7 @@ chordType = 'minor-7th';
         
         function setupVolumeModulation(synth, cycleStartTime, cycleDuration, modulation) {
             if (!synth || !synth.volumeModulation || !isFinite(cycleDuration) || cycleDuration <= 0) return;
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             
             const minVolume = -20;
             const maxVolume = 0;
@@ -1962,6 +1987,7 @@ chordType = 'minor-7th';
         }
         
         function updateParameterTransitions() {
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             const now = Tone.now();
             
             // Update water attack transition
@@ -2165,6 +2191,7 @@ chordType = 'minor-7th';
         }
         
         function randomizeSynthParameters(transitionCycles = 1) {
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             const now = Tone.now();
             const masterCycleDuration240 = 240 / currentBPM;
             const transitionDuration = masterCycleDuration240 * transitionCycles;
@@ -2189,6 +2216,7 @@ chordType = 'minor-7th';
         }
         
         function randomizePluckyReverb(transitionCycles = 1) {
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             const now = Tone.now();
             const masterCycleDuration240 = 240 / currentBPM;
             const transitionDuration = masterCycleDuration240 * transitionCycles;
@@ -2204,6 +2232,7 @@ chordType = 'minor-7th';
         }
         
         function randomizeWaterReverb(transitionCycles = 1) {
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             const now = Tone.now();
             const masterCycleDuration240 = 240 / currentBPM;
             const transitionDuration = masterCycleDuration240 * transitionCycles;
@@ -2219,6 +2248,7 @@ chordType = 'minor-7th';
         }
         
         function randomizeSubReverb(transitionCycles = 1) {
+            if (!window.Tone || !window.Tone.now) return; // Ensure Tone.js is loaded
             const now = Tone.now();
             const masterCycleDuration240 = 240 / currentBPM;
             const transitionDuration = masterCycleDuration240 * transitionCycles;
@@ -2797,6 +2827,11 @@ chordType = 'minor-7th';
             
             if (!masterVolume) {
                 console.error('Master volume not initialized');
+                return;
+            }
+            
+            if (!window.Tone || !window.Tone.now) {
+                console.error('Tone.js not loaded');
                 return;
             }
             
