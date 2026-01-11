@@ -1,0 +1,3946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <!-- Suppress favicon request to prevent 404 error -->
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+            font-family: 'Lexend', sans-serif;
+            background: radial-gradient(circle at center, rgba(0, 20, 10, 0.8) 0%, rgba(0, 10, 5, 1) 100%);
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block;
+            z-index: 1;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 0;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .header-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            padding: 8px 20px;
+            pointer-events: auto;
+            z-index: 1001;
+            background: rgba(0, 10, 5, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .header-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .header-title-row #tutorial-icon {
+            margin-left: 4px;
+        }
+        .header-toggle-btn {
+            cursor: pointer;
+            display: inline-block;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            transition: all 0.2s;
+            padding: 2px 6px;
+            border-radius: 2px;
+            user-select: none;
+        }
+        .header-toggle-btn:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            padding: 0;
+            margin: 0;
+            pointer-events: none;
+        }
+        .header-controls.visible {
+            max-height: 100px;
+            opacity: 1;
+            padding: 8px 0;
+            margin: 0;
+            pointer-events: auto;
+        }
+        .overlay h1 {
+            margin: 0;
+            font-family: "Pacifico", cursive;
+            font-weight: 400;
+            font-style: normal;
+            font-size: 28px;
+            color: #ffffff;
+            letter-spacing: 1px;
+            cursor: pointer;
+            line-height: 1;
+            transition: opacity 0.2s ease;
+            user-select: none;
+            pointer-events: auto;
+            white-space: nowrap;
+        }
+        .overlay h1:hover {
+            opacity: 0.8;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .header-controls #bpm-input {
+            width: 70px;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+            color: #fff;
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            height: 32px;
+        }
+        .header-controls #bpm-input:focus {
+            outline: none;
+            border-color: #1a5a3a;
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        .header-controls .bpm-label {
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .header-controls label {
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .header-controls #keyboard-visual-icon,
+        .header-controls #settings-icon,
+        .header-controls #chord-settings-icon,
+        .header-controls #camera-icon,
+        .header-controls #tutorial-icon {
+            margin: 0;
+        }
+        .overlay .subtitle {
+            display: none;
+        }
+        .credits-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 4001;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        .credits-modal.active {
+            display: flex;
+        }
+        .credits-panel {
+            background: rgba(8, 12, 16, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+        .credits-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .credits-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .credits-content {
+            font-family: 'Lexend', sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.8;
+            text-align: center;
+        }
+        .credits-content h2 {
+            margin: 0 0 16px 0;
+            font-family: "Pacifico", cursive;
+            font-weight: 400;
+            font-size: 32px;
+            color: #ffffff;
+            letter-spacing: 1px;
+        }
+        .credits-content p {
+            margin: 0 0 16px 0;
+        }
+        .credits-content .coffee-line {
+            margin-top: 16px;
+            font-style: italic;
+            display: block;
+        }
+        .credits-content a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.2s ease;
+            font-weight: 400;
+        }
+        .credits-content a:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        #preset-select {
+            padding: 6px 10px;
+            padding-right: 32px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+            color: #fff;
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 12px;
+            min-width: 140px;
+            height: 32px;
+        }
+        #preset-select:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        #preset-select:focus {
+            outline: none;
+            border-color: #1a5a3a;
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        #preset-select option {
+            background: rgba(40, 40, 55, 0.98);
+            color: #fff;
+            padding: 8px 12px;
+        }
+        .chord-input-section {
+            margin-top: 100px;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 8px;
+            pointer-events: auto;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-bottom: 100px;
+        }
+        .chord-input-section > *:not(.chord-preview):not(.rhythm-grid) {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+        #chord-input {
+            padding: 8px 12px;
+            background: rgba(30, 40, 50, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+            color: #fff;
+            font-family: 'Lexend', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 400px;
+            width: 100%;
+            height: 36px;
+            transition: all 0.2s;
+        }
+        #chord-input:focus {
+            outline: none;
+            border-color: #1a5a3a;
+            background-color: rgba(40, 50, 60, 0.95);
+        }
+        #chord-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        #cell-sequence-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        #cell-sequence-input:focus {
+            outline: none;
+            border-color: #1a5a3a;
+            background-color: rgba(40, 50, 60, 0.95);
+        }
+        #play-chord-btn {
+            padding: 8px 20px;
+            background: rgba(26, 90, 58, 0.3);
+            border: 1px solid rgba(26, 90, 58, 0.5);
+            border-radius: 1px;
+            color: #2a7a5a;
+            font-family: 'Lexend', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            height: 36px;
+        }
+        #play-chord-btn:hover {
+            background: rgba(26, 90, 58, 0.4);
+            color: #3a9a7a;
+            border-color: rgba(26, 90, 58, 0.6);
+        }
+        #play-chord-btn:active {
+            transform: scale(0.95);
+        }
+        .chord-preview {
+            margin-top: 0;
+            padding: 0;
+            background: none;
+            border: none;
+            min-height: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+            justify-content: flex-start;
+            width: 100%;
+            max-width: 700px;
+        }
+        .chord-preview-item {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 500;
+        }
+        .chord-preview-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(26, 90, 58, 0.5);
+            color: #2a7a5a;
+        }
+        .chord-preview-item.playing {
+            background: transparent;
+            border: 1px solid transparent;
+            color: rgba(42, 122, 90, 0.9);
+        }
+        .chord-preview-item.current-playing {
+            background: transparent;
+            border: 1px solid transparent;
+            color: rgba(42, 122, 90, 1);
+            font-weight: 600;
+        }
+        #play-chord-btn.playing {
+            background: rgba(255, 100, 100, 0.3);
+            border-color: rgba(255, 100, 100, 0.5);
+            color: rgba(255, 150, 150, 0.9);
+        }
+        #play-chord-btn.playing:hover {
+            background: rgba(255, 100, 100, 0.4);
+            border-color: rgba(255, 100, 100, 0.6);
+        }
+        #settings-icon {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 20px;
+            line-height: 1;
+        }
+        #settings-icon:hover {
+            transform: scale(1.1);
+        }
+        #keyboard-visual-icon {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 20px;
+            line-height: 1;
+        }
+        #keyboard-visual-icon:hover {
+            transform: scale(1.1);
+        }
+        #camera-icon {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 20px;
+            line-height: 1;
+        }
+        #camera-icon:hover {
+            transform: scale(1.1);
+        }
+        #chord-settings-icon {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 20px;
+            line-height: 1;
+        }
+        #chord-settings-icon:hover {
+            transform: scale(1.1);
+        }
+        #tutorial-icon {
+            cursor: pointer;
+            display: inline-block;
+            transition: all 0.2s;
+            font-size: 16px;
+            line-height: 1;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #tutorial-icon:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+        .tutorial-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 3000;
+            pointer-events: auto;
+            align-items: center;
+            justify-content: center;
+        }
+        .tutorial-overlay.active {
+            display: flex;
+        }
+        .tutorial-highlight {
+            position: relative;
+            z-index: 3001;
+            pointer-events: auto;
+            animation: tutorialPulse 1.5s ease-in-out infinite;
+        }
+        .tutorial-highlight::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 1px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+        }
+        @keyframes tutorialPulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(255, 255, 255, 0.8), 0 0 60px rgba(255, 255, 255, 0.6);
+            }
+        }
+        .tutorial-box {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 12, 16, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            font-family: 'Lexend', sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            z-index: 3002;
+            pointer-events: auto;
+        }
+        .tutorial-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1px;
+            transition: all 0.2s;
+        }
+        .tutorial-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .tutorial-next {
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: rgba(26, 90, 58, 0.2);
+            border: 1px solid rgba(26, 90, 58, 0.3);
+            border-radius: 1px;
+            color: #2a7a5a;
+            font-family: 'Lexend', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tutorial-next:hover {
+            background: rgba(26, 90, 58, 0.3);
+            color: #3a9a7a;
+        }
+        .tutorial-prompt-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 4000;
+            align-items: center;
+            justify-content: center;
+        }
+        .tutorial-prompt-modal.active {
+            display: flex;
+        }
+        .tutorial-prompt-panel {
+            background: rgba(8, 12, 16, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            padding: 32px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+        .tutorial-prompt-panel h3 {
+            margin: 0 0 16px 0;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.95);
+        }
+        .tutorial-prompt-panel p {
+            margin: 0 0 24px 0;
+            font-family: 'Lexend', sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
+        }
+        .tutorial-prompt-checkbox {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .tutorial-prompt-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #1a5a3a;
+        }
+        .tutorial-prompt-checkbox label {
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+        }
+        .tutorial-prompt-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .tutorial-prompt-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 1px;
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tutorial-prompt-btn-primary {
+            background: rgba(26, 90, 58, 0.3);
+            border: 1px solid rgba(26, 90, 58, 0.5);
+            color: #2a7a5a;
+        }
+        .tutorial-prompt-btn-primary:hover {
+            background: rgba(26, 90, 58, 0.4);
+            color: #3a9a7a;
+        }
+        .tutorial-prompt-btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .tutorial-prompt-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.95);
+        }
+        .keyboard-visual-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            z-index: 2001;
+            align-items: center;
+            justify-content: center;
+        }
+        .keyboard-visual-modal.active {
+            display: flex;
+        }
+        .keyboard-visual-panel {
+            background: rgba(8, 12, 16, 0.85);
+            border: none;
+            border-radius: 1px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            position: relative;
+            backdrop-filter: blur(20px);
+        }
+        .keyboard-visual-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .keyboard-visual-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .keyboard-visual-panel h2 {
+            margin: 0 0 24px 0;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: -0.3px;
+        }
+        .keyboard-visual-setting-item {
+            margin-bottom: 8px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .keyboard-visual-setting-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+        .keyboard-visual-setting-item label {
+            display: flex;
+            align-items: flex-start;
+            cursor: pointer;
+            font-family: 'Lexend', sans-serif;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .keyboard-visual-setting-item input[type="checkbox"] {
+            margin-right: 12px;
+            margin-top: 1px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #1a5a3a;
+        }
+        .keyboard-visual-settings-btn {
+            background: rgba(26, 90, 58, 0.15);
+            border: none;
+            color: #2a7a5a;
+            font-family: 'Lexend', sans-serif;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            margin-left: 8px;
+            font-weight: 500;
+        }
+        .keyboard-visual-settings-btn:hover {
+            background: rgba(26, 90, 58, 0.25);
+            color: #3a9a7a;
+        }
+        .keyboard-visual-setting-item .setting-description {
+            margin-top: 6px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: 'Lexend', sans-serif;
+            line-height: 1.5;
+        }
+        .chord-settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            z-index: 2001;
+            align-items: center;
+            justify-content: center;
+        }
+        .chord-settings-modal.active {
+            display: flex;
+        }
+        .chord-settings-panel {
+            background: rgba(8, 12, 16, 0.85);
+            border: none;
+            border-radius: 1px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            position: relative;
+            backdrop-filter: blur(20px);
+        }
+        .chord-settings-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .chord-settings-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .chord-settings-panel h2 {
+            margin: 0 0 24px 0;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: -0.3px;
+        }
+        .chord-settings-item {
+            margin-bottom: 8px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .chord-settings-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+        .chord-settings-item label {
+            display: flex;
+            align-items: flex-start;
+            cursor: pointer;
+            font-family: 'Lexend', sans-serif;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .chord-settings-item input[type="checkbox"] {
+            margin-right: 12px;
+            margin-top: 1px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #1a5a3a;
+        }
+        .chord-settings-item .setting-description {
+            margin-top: 6px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: 'Lexend', sans-serif;
+            line-height: 1.5;
+        }
+        #settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        #settings-modal.active {
+            display: flex;
+        }
+        #settings-panel {
+            background: rgba(8, 12, 16, 0.85);
+            border: none;
+            border-radius: 1px;
+            padding: 32px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(20px);
+        }
+        @media (max-width: 768px) {
+            #settings-panel {
+                max-width: 95%;
+                padding: 24px;
+            }
+        }
+        .settings-category {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .settings-category.active {
+            display: flex;
+        }
+        #settings-panel h2 {
+            margin: 0 0 24px 0;
+            font-family: 'Lexend', sans-serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: -0.3px;
+        }
+        .settings-header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 16px;
+        }
+        .settings-header-sticky {
+            position: sticky;
+            top: 0;
+            backdrop-filter: blur(20px);
+            background: rgba(8, 12, 16, 0.7);
+            z-index: 11;
+            padding-top: 0;
+            margin-top: 0;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            border-radius: 1px;
+        }
+        .settings-preset-dropdown {
+            position: relative;
+        }
+        .settings-preset-select {
+            padding: 6px 12px;
+            padding-right: 32px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            color: #fff;
+            font-family: 'Lexend', sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 12px;
+            min-width: 180px;
+        }
+        .settings-preset-select:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .settings-preset-select:focus {
+            outline: none;
+            border-color: rgba(26, 90, 58, 0.6);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        .settings-preset-select option {
+            background: rgba(40, 40, 55, 0.98);
+            color: #fff;
+            padding: 8px 14px;
+        }
+        .settings-navbar {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 0;
+        }
+        .settings-navbar::-webkit-scrollbar {
+            height: 3px;
+        }
+        .settings-navbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+        }
+        .nav-tab {
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-bottom: -1px;
+            border-radius: 4px 4px 0 0;
+        }
+        .nav-tab:hover {
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .nav-tab.active {
+            color: rgba(255, 255, 255, 0.95);
+            border-bottom-color: rgba(26, 90, 58, 0.7);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .settings-category {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .settings-category.active {
+            display: flex;
+        }
+        .setting-item {
+            margin-bottom: 0;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .setting-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+        .setting-item label {
+            display: flex;
+            align-items: flex-start;
+            cursor: pointer;
+            font-family: 'Lexend', sans-serif;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .setting-item input[type="checkbox"] {
+            margin-right: 12px;
+            margin-top: 1px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #1a5a3a;
+        }
+        .setting-description {
+            margin-top: 6px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: 'Lexend', sans-serif;
+            line-height: 1.5;
+        }
+        .setting-cpu-warning {
+            margin-top: 6px;
+            font-size: 10px;
+            color: rgba(255, 170, 68, 0.8);
+            font-family: 'Lexend', sans-serif;
+        }
+        .binaural-reverb-button {
+            background: rgba(26, 90, 58, 0.15);
+            border: none;
+            color: #2a7a5a;
+            font-family: 'Lexend', sans-serif;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            margin-left: 8px;
+            font-weight: 500;
+        }
+        .binaural-reverb-button:hover {
+            background: rgba(26, 90, 58, 0.25);
+            color: #3a9a7a;
+        }
+        #settings-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 1px;
+            transition: all 0.2s;
+            z-index: 100;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        #settings-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .light-badge {
+            display: inline-block;
+            background: rgba(26, 90, 58, 0.2);
+            color: #1a5a3a;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 1px;
+            margin-left: 8px;
+            font-weight: 500;
+        }
+        .rhythm-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 1px;
+            background: rgba(20, 30, 40, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+            overflow: hidden;
+            padding: 0;
+            width: 100%;
+            max-width: 700px;
+            margin-top: 12px;
+        }
+        .grid-cell {
+            padding: 1px;
+            margin: 0;
+            background: rgba(30, 40, 50, 0.9);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 13px;
+            line-height: 1;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Lexend', sans-serif;
+        }
+        .grid-cell:hover:not(.header) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .grid-cell.header {
+            background: rgba(40, 50, 60, 0.95);
+            cursor: default;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .grid-cell.header.tutorial-highlight.active {
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        .grid-cell.header.row-header {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .grid-cell.header.col-header {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        @keyframes headerFade {
+            0% { background-color: rgba(255, 255, 255, 0.15); }
+            50% { background-color: rgba(255, 255, 255, 0.2); }
+            100% { background-color: rgba(255, 255, 255, 0.08); }
+        }
+        .grid-cell.header.animated {
+            animation: headerFade linear infinite;
+        }
+        .grid-cell.active {
+            background: rgba(26, 90, 58, 0.4);
+            color: #fff;
+            font-weight: 600;
+        }
+        .grid-cell.pending {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(26, 90, 58, 0.5);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .grid-cell:not(.header) {
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        .grid-cell:not(.header):hover {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .grid-cell:not(.header).active {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .grid-cell:not(.header).pending {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .grid-cell.pending:hover:not(.header) {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        #settings-diff-panel {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 320px;
+            max-height: 100vh;
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 999;
+            overflow-y: auto;
+            padding: 16px;
+            font-family: 'Lexend', sans-serif;
+            font-size: 12px;
+            color: #fff;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+            display: none; /* Hidden by default */
+        }
+        #settings-diff-panel.visible {
+            display: block;
+        }
+        #settings-diff-panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a5a3a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #settings-diff-panel .refresh-btn {
+            background: rgba(26, 90, 58, 0.2);
+            border: 1px solid rgba(26, 90, 58, 0.3);
+            color: #1a5a3a;
+            padding: 4px 8px;
+            border-radius: 1px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        #settings-diff-panel .refresh-btn:hover {
+            background: rgba(26, 90, 58, 0.3);
+        }
+        #settings-diff-panel .diff-category {
+            margin-bottom: 16px;
+        }
+        #settings-diff-panel .diff-category-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: #fff;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #settings-diff-panel .diff-item {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 1px;
+            font-size: 11px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        #settings-diff-panel .diff-item strong {
+            color: #1a5a3a;
+        }
+        #settings-diff-panel .no-diffs {
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+            padding: 12px;
+            text-align: center;
+        }
+        #settings-diff-panel .diff-content {
+            min-height: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <div class="header-bar">
+            <div class="header-title-row">
+                <h1>Chord Canvas</h1>
+                <span class="header-toggle-btn" id="header-toggle-btn">...</span>
+                <span id="tutorial-icon">?</span>
+            </div>
+            <div class="header-controls" id="header-controls">
+                <select id="preset-select">
+                    <option value="primal" selected>Primal</option>
+                    <option value="cosmos">Cosmos</option>
+                    <option value="livid">Livid</option>
+                    <option value="bluish">Bluish</option>
+                </select>
+                <span class="bpm-label">BPM:</span>
+                <input type="number" id="bpm-input" min="40" max="240" value="120">
+                <span id="keyboard-visual-icon">🎹</span>
+                <span id="chord-settings-icon">🎼</span>
+                <span id="settings-icon">🔊</span>
+                <span id="camera-icon">📷</span>
+            </div>
+        </div>
+        <div class="chord-input-section">
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%; max-width: 700px;">
+                <input type="text" id="chord-input" placeholder="Write your chords here (e.g., Am, D7, G, C)" style="flex: 1;">
+                <button id="play-chord-btn">▶ Play</button>
+            </div>
+            <div id="chord-preview" class="chord-preview"></div>
+            <div class="grid-section" id="rhythm-section">
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px; margin-bottom: 0;">
+                    <div class="grid-section-title" id="rhythm-title" style="cursor: pointer; user-select: none; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9); white-space: nowrap;">▶ Rhythm</div>
+                    <input type="text" id="cell-sequence-input" placeholder="Enter cell sequence (e.g., A1 B2 C3 D4)" style="flex: 1; padding: 8px 12px; background: rgba(30, 40, 50, 0.95); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px; color: #fff; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 500; height: 36px; transition: all 0.2s; min-width: 400px;">
+                </div>
+                <div class="rhythm-grid" id="rhythmGrid" style="display: none; margin-top: 0;"></div>
+            </div>
+            <div class="grid-section" id="arpeggio-section">
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px; margin-bottom: 0;">
+                    <div class="grid-section-title" id="arpeggio-title" style="cursor: pointer; user-select: none; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9); white-space: nowrap;">▶ Arpeggio</div>
+                    <input type="text" id="arpeggio-sequence-input" placeholder="Enter arpeggio sequence (e.g., A1 B2 C3 D4)" style="flex: 1; padding: 8px 12px; background: rgba(30, 40, 50, 0.95); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px; color: #fff; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 500; height: 36px; transition: all 0.2s; min-width: 400px;">
+                </div>
+                <div class="rhythm-grid" id="arpeggioGrid" style="display: none; margin-top: 0;"></div>
+            </div>
+            <div class="grid-section" id="volumemod-section">
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px; margin-bottom: 0;">
+                    <div class="grid-section-title" id="volumemod-title" style="cursor: pointer; user-select: none; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9); white-space: nowrap;">▶ VolumeMod</div>
+                    <input type="text" id="volumemod-sequence-input" placeholder="Enter volume mod sequence (e.g., A1 B2 C3 D4)" style="flex: 1; padding: 8px 12px; background: rgba(30, 40, 50, 0.95); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px; color: #fff; font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 500; height: 36px; transition: all 0.2s; min-width: 400px;">
+                </div>
+                <div class="rhythm-grid" id="volumemodGrid" style="display: none; margin-top: 0;"></div>
+            </div>
+        </div>
+    </div>
+    <div id="credits-modal" class="credits-modal">
+        <div class="credits-panel">
+            <button class="credits-close">×</button>
+            <div class="credits-content">
+                <h2>Chord Canvas</h2>
+                <p>developed by <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a> in 2026</p>
+                <span class="coffee-line">If you enjoy using this premium midi synth for free, <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">buy me a coffee ☕</a></span>
+            </div>
+        </div>
+    </div>
+    <div id="chord-settings-modal" class="chord-settings-modal">
+        <div class="chord-settings-panel">
+            <button class="chord-settings-close" id="chord-settings-close">×</button>
+            <h2>🎼 Chord Settings</h2>
+            
+            <div class="chord-settings-item">
+                <label>
+                    <input type="checkbox" id="enable-humanisation" checked>
+                    <div>
+                        <strong>Humanisation</strong>
+                        <button class="keyboard-visual-settings-btn" id="humanisation-settings-btn">[...]</button>
+                        <div class="setting-description">
+                            Adds subtle timing variations to make chord playback feel more natural and human-like. Each note has a 78.6% chance of receiving a random delay between 1% and a customizable max percentage of its duration.
+                            <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Note duration × 0.01-0.04 (random delay, max adjustable)</span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+            
+            <div class="chord-settings-item">
+                <label>
+                    <input type="checkbox" id="enable-volumemod" checked disabled>
+                    <div>
+                        <strong>VolumeMod</strong>
+                        <button class="keyboard-visual-settings-btn" id="volumemod-settings-btn">[...]</button>
+                        <div class="setting-description">
+                            Dynamically adjusts note velocity based on selected pattern (uphill, downhill, valley, hill, etc.) within each 240/bpm cycle. Always enabled. Adjust min and max velocity to control the intensity of the effect.
+                            <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 240/bpm cycle (full note duration)</span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div id="settings-diff-panel">
+        <h3>
+            <span>Settings Differences</span>
+            <button class="refresh-btn" id="refresh-settings-diff">Refresh</button>
+        </h3>
+        <div class="diff-content" id="settings-diff-content">
+            <div class="no-diffs">Click "Refresh" to check differences</div>
+        </div>
+    </div>
+    <div id="settings-modal">
+        <div id="settings-panel">
+            <button id="settings-close">×</button>
+            <div class="settings-header-sticky">
+                <div class="settings-header-controls">
+                    <h2>Sound Settings</h2>
+                </div>
+                
+                <!-- Navigation Tabs - Simplified for Light Version -->
+                <div class="settings-navbar">
+                    <button class="nav-tab active" data-category="envelope">🎹 Amplitude Envelope</button>
+                    <button class="nav-tab" data-category="timbre">🎵 Timbre</button>
+                    <button class="nav-tab" data-category="frequency">🎚️ Frequency & Pitch</button>
+                    <button class="nav-tab" data-category="delay">🔊 Delay & Resonance</button>
+                    <button class="nav-tab" data-category="master">🔊 Master Volume</button>
+                </div>
+            </div>
+            
+            <!-- Amplitude Envelope Category -->
+            <div class="settings-category active" id="category-envelope">
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-velocity-attack" checked>
+                        <div>
+                            <strong>Velocity-Dependent Attack Time</strong>
+                            <div class="setting-description">
+                                Higher velocities produce faster attack times. Louder notes respond more quickly, matching real piano behavior.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 1-5ms (attack phase)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-two-stage-decay" checked>
+                        <div>
+                            <strong>Two-Stage Decay</strong>
+                            <div class="setting-description">
+                                Realistic piano decay: fast initial decay followed by slower long decay. Velocity affects decay rates.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 50ms (fast) → seconds (slow decay)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" checked disabled>
+                        <div>
+                            <strong>Primary Envelope Settings</strong>
+                            <button class="binaural-reverb-button" id="envelope-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                Core amplitude envelope parameters: attack, decay, sustain, and release times. These control the fundamental shape of each note's amplitude over time.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 1-2000ms (envelope phases)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: No impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-piano-envelope-model" checked>
+                        <div>
+                            <strong>Realistic Piano Envelope Model</strong>
+                            <button class="binaural-reverb-button" id="piano-envelope-model-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                State-based decay times: different decay rates for key down+pedal, pedal only, key only, and no pedal/key states. Lower notes have longer decay (exponential). Matches real piano physics.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 0.1-15s (decay phases)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-harmonic-profile-evolution" checked>
+                        <div>
+                            <strong>Harmonic Profile Evolution</strong>
+                            <button class="binaural-reverb-button" id="harmonic-profile-evolution-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                Higher harmonics decay 2-10x faster than lower harmonics, creating realistic spectral evolution over time. Key held maintains brightness, pedal only decays faster.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Continuous (over note lifetime)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Medium impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-realistic-sustain" checked>
+                        <div>
+                            <strong>Realistic Piano Sustain System</strong>
+                            <div class="setting-description">
+                                Tracks note state (key down/up, pedal state) and smoothly transitions envelope parameters. Integrates with piano envelope model and harmonic evolution.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Continuous (state transitions)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Medium impact</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Timbre Category -->
+            <div class="settings-category" id="category-timbre">
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-velocity-timbre" checked>
+                        <div>
+                            <strong>Velocity-Dependent Timbre</strong>
+                            <div class="setting-description">
+                                Higher velocities produce brighter sounds with more harmonics. Based on piano hammer-string physics.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Instant (on note attack)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low impact</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Frequency & Pitch Category -->
+            <div class="settings-category" id="category-frequency">
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-frequency-compensation" checked>
+                        <div>
+                            <strong>Frequency Compensation</strong>
+                            <button class="binaural-reverb-button" id="frequency-compensation-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                Applies ISO 226 equal-loudness contour compensation to make notes sound equally loud across the piano range (A0-C8).
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Instant (on note attack)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Medium impact (runs on every note)</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" checked disabled>
+                        <div>
+                            <strong>Velocity Mapping</strong>
+                            <button class="binaural-reverb-button" id="velocity-mapping-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                Maps MIDI velocity (0-127) to amplitude using a power curve. Controls the "feel" of velocity response and applies frequency compensation for equal-loudness perception.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Instant (on note attack)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low impact (runs on every note)</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Master Volume Category -->
+            <div class="settings-category" id="category-master">
+                
+                <div class="setting-item">
+                    <label>
+                        <div style="width: 100%;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <strong>Master Volume</strong>
+                                <span id="master-volume-value" style="color: rgba(255, 255, 255, 0.7); font-size: 12px; font-weight: 500;">50%</span>
+                            </div>
+                            <input type="range" id="master-volume-slider" min="0" max="100" value="50" step="1" style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; outline: none; cursor: pointer; accent-color: #1a5a3a;">
+                            <div class="setting-description">
+                                Controls the final output volume of the entire audio chain. This is the last stage before audio reaches your speakers.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Instant (affects all audio)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: No impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+            </div>
+            
+            <!-- Delay & Resonance Category -->
+            <div class="settings-category" id="category-delay">
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-velocity-sensitive-delay" checked>
+                        <div>
+                            <strong>Velocity-Sensitive Delay</strong>
+                            <div class="setting-description">
+                                Delay mapped to velocity: softer playing = longer delays (50-500ms), harder playing = tighter delays. Not common on traditional pianos, but creative and useful for creating "living" sounds.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 50-500ms (delay times)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Medium impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-sympathetic-resonance-delay" checked>
+                        <div>
+                            <strong>Sympathetic String Resonance Delay</strong>
+                            <div class="setting-description">
+                                Simulates natural piano resonance when sustain pedal is held. Creates frequency-dependent delay/reverb effect based on harmonic multiples. Delay time = 1/frequency of sympathetic string.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Frequency-dependent (harmonic periods)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Medium impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-spectral-resonance-delay" checked>
+                        <div>
+                            <strong>Dynamic Frequency-Dependent Delay (Spectral Resonance)</strong>
+                            <div class="setting-description">
+                                Innovative feature: Frequency-dependent delays entangled with velocity. Lower frequencies get longer delays, velocity affects delay characteristics. Creates powerful "living" sounds through spectral analysis.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Dynamic (frequency and velocity dependent)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: High impact</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-delay-pseudo-reverb" checked>
+                        <div>
+                            <strong>Delay Pseudo-Reverb (Stereo Widening)</strong>
+                            <button class="binaural-reverb-button" id="delay-pseudo-reverb-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                CPU-efficient alternative to reverb using multi-delay network. Crossover at 300Hz keeps bass mono, applies stereo delays to highs. Parallel delays (Left: 13ms, Right: 29ms, Center: 3ms) with feedback and modulation create spacious stereo image.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: 1-30ms (Haas/precedence effect)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low-Medium impact (much more efficient than reverb)</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enable-tremolo" checked>
+                        <div>
+                            <strong>Chorus/Ping-Pong (Fake Binaural Movement)</strong>
+                            <button class="binaural-reverb-button" id="chorus-settings-btn">[...]</button>
+                            <div class="setting-description">
+                                Creates a sense of spatial movement and depth with modulated delays and ping-pong stereo panning. Simulates subtle recording movement (fake binaural) - like someone subtly moving while recording. CPU-efficient alternative to true binaural processing.
+                                <br><span style="color: rgba(255, 255, 255, 0.5); font-size: 11px;">⏱️ Timescale: Continuous (LFO-modulated delays + ping-pong)</span>
+                            </div>
+                            <div class="setting-cpu-warning">CPU: Low-Medium impact</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <!-- Web Audio API Engine (replaces Tone.js) -->
+    <script src="audio/web-audio-engine/additive-synth.js"></script>
+    <script src="audio/web-audio-engine/poly-synth-wrapper.js"></script>
+    <!-- Audio Processing Modules -->
+    <script src="audio/physics-settings/physics-settings.js"></script>
+    <!-- Pitch-dependent harmonic rolloff (bass has more harmonics than treble) -->
+    <script src="audio/pitch-harmonic-rolloff/pitch-harmonic-rolloff-settings.js"></script>
+    <script src="audio/pitch-harmonic-rolloff/pitch-harmonic-rolloff.js"></script>
+    <!-- Odd/even harmonic balance (pianos emphasize odd harmonics) -->
+    <script src="audio/odd-even-harmonic-balance/odd-even-harmonic-balance-settings.js"></script>
+    <script src="audio/odd-even-harmonic-balance/odd-even-harmonic-balance.js"></script>
+    <!-- Time-varying brightness (harmonics evolve during note) -->
+    <script src="audio/time-varying-brightness/time-varying-brightness-settings.js"></script>
+    <script src="audio/time-varying-brightness/time-varying-brightness.js"></script>
+    <script src="audio/velocity-timbre/velocity-timbre.js"></script>
+    <script src="audio/velocity-attack/velocity-attack.js"></script>
+    <script src="audio/two-stage-decay/two-stage-decay.js"></script>
+    <script src="audio/frequency-compensation/frequency-compensation.js"></script>
+    <script src="audio/frequency-compensation/frequency-compensation-settings.js"></script>
+    <script src="audio/velocity-mapping-two-stage/velocity-mapping-two-stage.js"></script>
+    <script src="audio/velocity-mapping-two-stage/velocity-mapping-settings.js"></script>
+    <script src="audio/envelope-settings/envelope-settings.js"></script>
+    <script src="audio/inharmonicity/inharmonicity.js"></script>
+    <script src="audio/per-partial-decay/per-partial-decay.js"></script>
+    <script src="audio/sustain-decay/sustain-decay.js"></script>
+    <!-- Enhanced Attack Noise (Meeting 4: Realistic hammer strike transients) -->
+    <script src="audio/attack-noise/attack-noise.js"></script>
+    <!-- New Research Features: Delay & Resonance -->
+    <script src="audio/velocity-sensitive-delay/velocity-sensitive-delay.js"></script>
+    <script src="audio/sympathetic-resonance-delay/sympathetic-resonance-delay.js"></script>
+    <script src="audio/spectral-resonance-delay/spectral-resonance-delay.js"></script>
+    <!-- Delay Pseudo-Reverb (CPU-efficient stereo widening) -->
+    <script src="audio/delay-pseudo-reverb/delay-pseudo-reverb.js"></script>
+    <script src="audio/delay-pseudo-reverb/delay-pseudo-reverb-settings.js"></script>
+    <script src="audio/tremolo/tremolo.js"></script>
+    <script src="audio/tremolo/tremolo-settings.js"></script>
+    <!-- New Research Features: Sustain Physics -->
+    <script src="audio/piano-envelope-model/piano-envelope-model.js"></script>
+    <script src="audio/piano-envelope-model/piano-envelope-model-settings.js"></script>
+    <script src="audio/harmonic-profile-evolution/harmonic-profile-evolution.js"></script>
+    <script src="audio/harmonic-profile-evolution/harmonic-profile-evolution-settings.js"></script>
+    <script src="audio/realistic-sustain/realistic-sustain.js"></script>
+    <!-- Keyboard Visual & Input Modules -->
+    <script src="keyboard/key-highlight/key-highlight.js"></script>
+    <script src="keyboard/key-movement/key-movement.js"></script>
+    <script src="keyboard/key-labels/key-labels.js"></script>
+    <script src="keyboard/keypress-input/keypress-input.js"></script>
+    <script src="keyboard/keyboard-visual-settings/keyboard-visual-settings.js"></script>
+    <script src="keyboard/midi-debug/midi-debug.js"></script>
+    <!-- MIDI Modules -->
+    <script src="midi/midi-input/midi-input.js"></script>
+    <script src="midi/midi-mapping/midi-mapping.js"></script>
+    <!-- Chord Modules -->
+    <script src="chord/chord-play-settings/chord-intervals-config.js"></script>
+    <script src="chord/humanisation/humanisation.js"></script>
+    <script src="chord/volumemod/volumemod-settings.js"></script>
+    <script src="chord/chord-play-settings/chord-input.js"></script>
+    <script type="module" src="main.js"></script>
+    <script>
+            // Initialize keyboard visual settings when DOM is ready
+            document.addEventListener('DOMContentLoaded', () => {
+                // Initialize keyboard visual settings module
+                if (window.initKeyboardVisualSettings) {
+                    window.initKeyboardVisualSettings();
+                }
+                
+                // Header toggle button functionality
+                const headerToggleBtn = document.getElementById('header-toggle-btn');
+                const headerControls = document.getElementById('header-controls');
+                
+                if (headerToggleBtn && headerControls) {
+                    // Initialize: controls are hidden by default
+                    let controlsVisible = false;
+                    
+                    headerToggleBtn.addEventListener('click', () => {
+                        controlsVisible = !controlsVisible;
+                        if (controlsVisible) {
+                            headerControls.classList.add('visible');
+                            headerControls.classList.remove('hidden');
+                        } else {
+                            headerControls.classList.remove('visible');
+                            headerControls.classList.add('hidden');
+                        }
+                    });
+                }
+            
+            // Show credits modal when clicking on the title
+            const title = document.querySelector('.overlay h1');
+            const creditsModal = document.getElementById('credits-modal');
+            const creditsClose = document.querySelector('.credits-close');
+            
+            if (title && creditsModal) {
+                title.addEventListener('click', () => {
+                    creditsModal.classList.add('active');
+                });
+            }
+            
+            if (creditsClose && creditsModal) {
+                creditsClose.addEventListener('click', () => {
+                    creditsModal.classList.remove('active');
+                });
+                // Also close when clicking outside the panel
+                creditsModal.addEventListener('click', (e) => {
+                    if (e.target === creditsModal) {
+                        creditsModal.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Set up click handler for 🎹 emoji
+            const keyboardVisualIcon = document.getElementById('keyboard-visual-icon');
+            if (keyboardVisualIcon && window.showKeyboardVisualSettings) {
+                keyboardVisualIcon.addEventListener('click', () => {
+                    window.showKeyboardVisualSettings();
+                });
+            }
+            
+            // Chord settings modal toggle
+            const chordSettingsIcon = document.getElementById('chord-settings-icon');
+            const chordSettingsModal = document.getElementById('chord-settings-modal');
+            const chordSettingsClose = document.getElementById('chord-settings-close');
+            
+            if (chordSettingsIcon && chordSettingsModal) {
+                chordSettingsIcon.addEventListener('click', () => {
+                    chordSettingsModal.classList.add('active');
+                });
+            }
+            
+            if (chordSettingsClose && chordSettingsModal) {
+                chordSettingsClose.addEventListener('click', () => {
+                    chordSettingsModal.classList.remove('active');
+                });
+                // Also close when clicking outside the panel
+                chordSettingsModal.addEventListener('click', (e) => {
+                    if (e.target === chordSettingsModal) {
+                        chordSettingsModal.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Humanisation toggle handler
+            const humanisationCheckbox = document.getElementById('enable-humanisation');
+            if (humanisationCheckbox) {
+                // Initialize from stored preference or default to true (enabled by default)
+                const stored = localStorage.getItem('humanisationEnabled');
+                if (stored === null || stored === 'true') {
+                    humanisationCheckbox.checked = true;
+                    localStorage.setItem('humanisationEnabled', 'true');
+                } else if (stored === 'true') {
+                    humanisationCheckbox.checked = true;
+                }
+                
+                humanisationCheckbox.addEventListener('change', function() {
+                    const enabled = this.checked;
+                    localStorage.setItem('humanisationEnabled', enabled);
+                    // The humanisation logic will check this state when playing notes
+                });
+            }
+            
+            // Humanisation settings button handler
+            const humanisationSettingsBtn = document.getElementById('humanisation-settings-btn');
+            if (humanisationSettingsBtn) {
+                humanisationSettingsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (window.openHumanisationSettings) {
+                        window.openHumanisationSettings();
+                    }
+                });
+            }
+            
+            // Initialize humanisation settings
+            if (window.initHumanisationSettings) {
+                window.initHumanisationSettings();
+            }
+            
+            // VolumeMod settings button handler
+            const volumemodSettingsBtn = document.getElementById('volumemod-settings-btn');
+            if (volumemodSettingsBtn) {
+                volumemodSettingsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (window.openVolumeModSettings) {
+                        window.openVolumeModSettings();
+                    }
+                });
+            }
+            
+            // Initialize volumemod settings
+            if (window.initVolumeModSettings) {
+                window.initVolumeModSettings();
+            }
+            
+            // Settings modal toggle
+            const settingsIcon = document.getElementById('settings-icon');
+            const settingsModal = document.getElementById('settings-modal');
+            const settingsClose = document.getElementById('settings-close');
+            
+            if (settingsIcon && settingsModal) {
+                settingsIcon.addEventListener('click', () => {
+                    settingsModal.classList.add('active');
+                    // Auto-refresh settings diff when settings modal opens
+                    if (window.logSettingsDifferences) {
+                        setTimeout(() => {
+                            window.logSettingsDifferences();
+                        }, 100);
+                    }
+                });
+            }
+            
+            if (settingsClose && settingsModal) {
+                settingsClose.addEventListener('click', () => {
+                    settingsModal.classList.remove('active');
+                });
+            }
+            
+            // Settings category tabs
+            const navTabs = document.querySelectorAll('.nav-tab');
+            const categories = document.querySelectorAll('.settings-category');
+            
+            navTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const category = tab.getAttribute('data-category');
+                    
+                    // Update active tab
+                    navTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    // Update active category
+                    categories.forEach(c => c.classList.remove('active'));
+                    const targetCategory = document.getElementById(`category-${category}`);
+                    if (targetCategory) {
+                        targetCategory.classList.add('active');
+                    }
+                });
+            });
+            
+            // Master volume control
+            const masterVolumeSlider = document.getElementById('master-volume-slider');
+            const masterVolumeValue = document.getElementById('master-volume-value');
+            if (masterVolumeSlider && masterVolumeValue) {
+                // Initialize volume to 50% (0.5)
+                const defaultVolume = 0.5;
+                if (window.setMasterVolume) {
+                    window.setMasterVolume(defaultVolume);
+                }
+                masterVolumeSlider.value = 50;
+                masterVolumeValue.textContent = '50%';
+                
+                masterVolumeSlider.addEventListener('input', function() {
+                    const volume = parseFloat(this.value) / 100;
+                    if (window.setMasterVolume) {
+                        window.setMasterVolume(volume);
+                    }
+                    masterVolumeValue.textContent = Math.round(volume * 100) + '%';
+                });
+            }
+            
+            // Settings diff panel refresh button
+            const refreshBtn = document.getElementById('refresh-settings-diff');
+            if (refreshBtn && window.logSettingsDifferences) {
+                refreshBtn.addEventListener('click', () => {
+                    window.logSettingsDifferences();
+                });
+            }
+            
+            // Camera toggle functionality - cycles through 6 views
+            const cameraIcon = document.getElementById('camera-icon');
+            let currentCameraView = 0; // Track current camera view (0, 1, 2, 3, 4, 5, or 6)
+            
+            // Camera view 0: Default camera settings (first view on page load)
+            const cameraView0 = {
+                position: { x: 0, y: 2.893, z: 2.748 },
+                rotation: { x: -0.555, y: 0.000, z: 0.000 },
+                target: { x: -0.097, y: 0.919, z: -0.775 }
+            };
+            
+            // Camera view 1: Alternate camera settings
+            const cameraView1 = {
+                position: { x: 0.750, y: 1.326, z: 1.407 },
+                rotation: { x: -0.756, y: 0.370, z: 0.328 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 2: Third camera settings
+            const cameraView2 = {
+                position: { x: 0.000, y: 1.060, z: 2.382 },
+                rotation: { x: -0.419, y: 0.000, z: 0.000 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 3: Fourth camera settings
+            const cameraView3 = {
+                position: { x: -0.808, y: 1.398, z: 1.652 },
+                rotation: { x: -0.702, y: -0.357, z: -0.288 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 4: Fifth camera settings
+            const cameraView4 = {
+                position: { x: 2.302, y: 1.176, z: -0.018 },
+                rotation: { x: -1.586, y: 1.098, z: 1.588 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 5: Sixth camera settings
+            const cameraView5 = {
+                position: { x: 0.003, y: 3.821, z: 2.390 },
+                rotation: { x: -1.012, y: 0.001, z: 0.001 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 6: Previous default camera settings
+            const cameraView6 = {
+                position: { x: 0.995, y: 1.338, z: 1.232 },
+                rotation: { x: -0.826, y: 0.501, z: 0.480 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Array of all camera views for easy cycling
+            const cameraViews = [cameraView0, cameraView1, cameraView2, cameraView3, cameraView4, cameraView5, cameraView6];
+            
+            // Universal camera transition function
+            // Gradually transitions camera parameters to target settings
+            // Made globally available for use elsewhere
+            window.transitionCameraTo = function(targetView, duration = 1000, tolerance = 0.01) {
+                if (!window.camera || !window.controls) {
+                    console.warn('Camera or controls not available');
+                    return;
+                }
+                
+                const camera = window.camera;
+                const controls = window.controls;
+                
+                // Get current values
+                const startPosition = {
+                    x: camera.position.x,
+                    y: camera.position.y,
+                    z: camera.position.z
+                };
+                const startRotation = {
+                    x: camera.rotation.x,
+                    y: camera.rotation.y,
+                    z: camera.rotation.z
+                };
+                const startTarget = {
+                    x: controls.target.x,
+                    y: controls.target.y,
+                    z: controls.target.z
+                };
+                
+                // Target values
+                const targetPosition = targetView.position;
+                const targetRotation = targetView.rotation;
+                const targetTarget = targetView.target;
+                
+                const startTime = performance.now();
+                
+                function animate() {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Easing function (ease-in-out)
+                    const eased = progress < 0.5
+                        ? 2 * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    
+                    // Interpolate position
+                    const currentPosition = {
+                        x: startPosition.x + (targetPosition.x - startPosition.x) * eased,
+                        y: startPosition.y + (targetPosition.y - startPosition.y) * eased,
+                        z: startPosition.z + (targetPosition.z - startPosition.z) * eased
+                    };
+                    
+                    // Interpolate rotation
+                    const currentRotation = {
+                        x: startRotation.x + (targetRotation.x - startRotation.x) * eased,
+                        y: startRotation.y + (targetRotation.y - startRotation.y) * eased,
+                        z: startRotation.z + (targetRotation.z - startRotation.z) * eased
+                    };
+                    
+                    // Interpolate target
+                    const currentTarget = {
+                        x: startTarget.x + (targetTarget.x - startTarget.x) * eased,
+                        y: startTarget.y + (targetTarget.y - startTarget.y) * eased,
+                        z: startTarget.z + (targetTarget.z - startTarget.z) * eased
+                    };
+                    
+                    // Apply values
+                    camera.position.set(currentPosition.x, currentPosition.y, currentPosition.z);
+                    camera.rotation.set(currentRotation.x, currentRotation.y, currentRotation.z);
+                    controls.target.set(currentTarget.x, currentTarget.y, currentTarget.z);
+                    controls.update();
+                    
+                    // Check if we're close enough to target (within tolerance)
+                    const positionDiff = Math.sqrt(
+                        Math.pow(currentPosition.x - targetPosition.x, 2) +
+                        Math.pow(currentPosition.y - targetPosition.y, 2) +
+                        Math.pow(currentPosition.z - targetPosition.z, 2)
+                    );
+                    const rotationDiff = Math.sqrt(
+                        Math.pow(currentRotation.x - targetRotation.x, 2) +
+                        Math.pow(currentRotation.y - targetRotation.y, 2) +
+                        Math.pow(currentRotation.z - targetRotation.z, 2)
+                    );
+                    const targetDiff = Math.sqrt(
+                        Math.pow(currentTarget.x - targetTarget.x, 2) +
+                        Math.pow(currentTarget.y - targetTarget.y, 2) +
+                        Math.pow(currentTarget.z - targetTarget.z, 2)
+                    );
+                    
+                    // Continue animation if not complete
+                    if (progress < 1 && (positionDiff > tolerance || rotationDiff > tolerance || targetDiff > tolerance)) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Snap to exact target values at the end
+                        camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
+                        camera.rotation.set(targetRotation.x, targetRotation.y, targetRotation.z);
+                        controls.target.set(targetTarget.x, targetTarget.y, targetTarget.z);
+                        controls.update();
+                    }
+                }
+                
+                animate();
+            }
+            
+            // Function to apply a camera view (with smooth transition)
+            function applyCameraView(viewIndex) {
+                const view = cameraViews[viewIndex];
+                if (view) {
+                    window.transitionCameraTo(view, 1000, 0.01); // 1 second transition, 0.01 tolerance
+                }
+            }
+            
+            // Function to setup camera toggle (waits for camera/controls to be available)
+            function setupCameraToggle() {
+                if (cameraIcon && window.camera && window.controls) {
+                    cameraIcon.addEventListener('click', () => {
+                        // Cycle to next view (0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 0)
+                        currentCameraView = (currentCameraView + 1) % 7;
+                        applyCameraView(currentCameraView);
+                    });
+                } else {
+                    // Retry after a short delay if camera/controls not ready yet
+                    setTimeout(setupCameraToggle, 100);
+                }
+            }
+            
+            // Initialize camera toggle
+            setupCameraToggle();
+            
+            // Tutorial button handler
+            const tutorialIcon = document.getElementById('tutorial-icon');
+            let currentTutorialStep = 0;
+            let revealedGrids = new Set(); // Track which grids we've revealed
+            const tutorialSteps = [
+                {
+                    target: 'chord-input',
+                    text: 'Write your chords here, separated by commas.',
+                    revealGrid: null
+                },
+                {
+                    target: 'play-chord-btn',
+                    text: 'Click Play to start/stop looping the chord sequence.',
+                    revealGrid: null
+                },
+                {
+                    target: 'rhythm-title',
+                    text: 'Rhythm grid: Set rhythms by clicking cells. Row rhythm for bass notes. Column rhythm for high notes.',
+                    revealGrid: 'rhythmGrid'
+                },
+                {
+                    target: 'cell-sequence-input',
+                    text: 'Enter cell sequences (e.g., "A1 B2 C3") to automatically cycle through rhythm patterns instead of clicking cells manually.',
+                    revealGrid: 'rhythmGrid'
+                },
+                {
+                    target: 'arpeggio-title',
+                    text: 'Arpeggio grid: Control how notes play - all at once, one at a time ascending/descending, or skip patterns.',
+                    revealGrid: 'arpeggioGrid'
+                },
+                {
+                    target: 'arpeggio-sequence-input',
+                    text: 'Enter arpeggio sequences to cycle through different note-playing patterns automatically instead of clicking cells manually.',
+                    revealGrid: 'arpeggioGrid'
+                },
+                {
+                    target: 'volumemod-title',
+                    text: 'VolumeMod grid: Click to reveal. Control velocity dynamics - uphill (louder over time), downhill (quieter), valley, hill patterns.',
+                    revealGrid: 'volumemodGrid'
+                },
+                {
+                    target: 'volumemod-sequence-input',
+                    text: 'Enter volume mod sequences to cycle through different velocity patterns automatically instead of clicking cells manually.',
+                    revealGrid: 'volumemodGrid'
+                },
+                {
+                    target: 'header-toggle-btn',
+                    text: 'Click "..." to reveal sound presets, BPM control, and other settings.',
+                    revealGrid: null
+                },
+                {
+                    target: 'chord-settings-icon',
+                    text: 'Chord settings: Adjust humanisation and volume modulation intensity.',
+                    revealGrid: null,
+                    revealHeaderControls: true
+                },
+                {
+                    target: 'keyboard-visual-icon',
+                    text: 'Customize keyboard visuals. Connect a MIDI controller via USB to play with physical keys...',
+                    revealGrid: null,
+                    revealHeaderControls: true
+                },
+                {
+                    target: 'settings-icon',
+                    text: 'Sound settings: Adjust envelope, timbre, frequency, delay effects, and master volume...',
+                    revealGrid: null,
+                    revealHeaderControls: true
+                }
+            ];
+            
+            function showTutorial() {
+                const overlay = document.getElementById('tutorial-overlay');
+                if (!overlay) {
+                    // Create tutorial overlay
+                    const tutorialOverlay = document.createElement('div');
+                    tutorialOverlay.id = 'tutorial-overlay';
+                    tutorialOverlay.className = 'tutorial-overlay active';
+                    document.body.appendChild(tutorialOverlay);
+                    // Use setTimeout to ensure DOM is ready
+                    setTimeout(() => {
+                        showTutorialStep(0);
+                    }, 10);
+                } else {
+                    overlay.classList.add('active');
+                    showTutorialStep(0);
+                }
+            }
+            
+            function showTutorialStep(stepIndex) {
+                if (stepIndex >= tutorialSteps.length) {
+                    closeTutorial();
+                    return;
+                }
+                
+                currentTutorialStep = stepIndex;
+                const step = tutorialSteps[stepIndex];
+                const targetElement = document.getElementById(step.target);
+                const overlay = document.getElementById('tutorial-overlay');
+                
+                if (!targetElement || !overlay) {
+                    console.warn('Tutorial: target element or overlay not found');
+                    return;
+                }
+                
+                // Ensure overlay is active
+                overlay.classList.add('active');
+                
+                // Handle grid reveal/hide
+                // First, check if we need to hide grids from previous steps
+                const allGridIds = ['rhythmGrid', 'arpeggioGrid', 'volumemodGrid'];
+                const currentStepNeedsGrids = new Set();
+                
+                // Collect all grids needed by current and future steps
+                for (let i = stepIndex; i < tutorialSteps.length; i++) {
+                    if (tutorialSteps[i].revealGrid) {
+                        currentStepNeedsGrids.add(tutorialSteps[i].revealGrid);
+                    }
+                }
+                
+                // Hide grids that are no longer needed
+                allGridIds.forEach(gridId => {
+                    if (!currentStepNeedsGrids.has(gridId) && revealedGrids.has(gridId)) {
+                        const grid = document.getElementById(gridId);
+                        let titleId = '';
+                        if (gridId === 'rhythmGrid') titleId = 'rhythm-title';
+                        else if (gridId === 'arpeggioGrid') titleId = 'arpeggio-title';
+                        else if (gridId === 'volumemodGrid') titleId = 'volumemod-title';
+                        
+                        const title = titleId ? document.getElementById(titleId) : null;
+                        if (grid && title) {
+                            grid.style.display = 'none';
+                            if (gridId === 'rhythmGrid') title.textContent = '▶ Rhythm';
+                            else if (gridId === 'arpeggioGrid') title.textContent = '▶ Arpeggio';
+                            else if (gridId === 'volumemodGrid') title.textContent = '▶ VolumeMod';
+                            revealedGrids.delete(gridId);
+                        }
+                    }
+                });
+                
+                // Reveal grid if needed for current step
+                if (step.revealGrid) {
+                    const grid = document.getElementById(step.revealGrid);
+                    let titleId = '';
+                    if (step.revealGrid === 'rhythmGrid') titleId = 'rhythm-title';
+                    else if (step.revealGrid === 'arpeggioGrid') titleId = 'arpeggio-title';
+                    else if (step.revealGrid === 'volumemodGrid') titleId = 'volumemod-title';
+                    
+                    const title = titleId ? document.getElementById(titleId) : null;
+                    if (grid && title && grid.style.display === 'none') {
+                        grid.style.display = '';
+                        if (step.revealGrid === 'rhythmGrid') title.textContent = '▼ Rhythm';
+                        else if (step.revealGrid === 'arpeggioGrid') title.textContent = '▼ Arpeggio';
+                        else if (step.revealGrid === 'volumemodGrid') title.textContent = '▼ VolumeMod';
+                        revealedGrids.add(step.revealGrid);
+                    }
+                }
+                
+                // Reveal header controls if needed for current step
+                if (step.revealHeaderControls) {
+                    const headerControls = document.getElementById('header-controls');
+                    if (headerControls) {
+                        // Check if header controls are not already visible (by checking if visible class exists)
+                        // If user hasn't manually revealed them, they won't have the 'visible' class
+                        if (!headerControls.classList.contains('visible')) {
+                            headerControls.classList.add('visible');
+                            headerControls.classList.remove('hidden');
+                        }
+                    }
+                }
+                
+                // Remove highlight from previous element
+                const previousHighlight = document.querySelector('.tutorial-highlight');
+                if (previousHighlight) {
+                    previousHighlight.classList.remove('tutorial-highlight');
+                }
+                
+                // Add highlight to current target element
+                targetElement.classList.add('tutorial-highlight');
+                
+                // Remove existing box
+                const existingBox = overlay.querySelector('.tutorial-box');
+                if (existingBox) {
+                    existingBox.remove();
+                }
+                
+                // Create centered box
+                const box = document.createElement('div');
+                box.className = 'tutorial-box';
+                
+                // Add content
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'tutorial-close';
+                closeBtn.textContent = '×';
+                closeBtn.onclick = closeTutorial;
+                
+                const text = document.createElement('div');
+                text.textContent = step.text;
+                text.style.marginBottom = '16px';
+                
+                const nextBtn = document.createElement('button');
+                nextBtn.className = 'tutorial-next';
+                nextBtn.textContent = stepIndex === tutorialSteps.length - 1 ? 'Got it!' : 'Next';
+                nextBtn.onclick = () => showTutorialStep(stepIndex + 1);
+                nextBtn.style.width = '100%';
+                
+                box.appendChild(closeBtn);
+                box.appendChild(text);
+                box.appendChild(nextBtn);
+                overlay.appendChild(box);
+            }
+            
+            function closeTutorial() {
+                const overlay = document.getElementById('tutorial-overlay');
+                if (overlay) {
+                    overlay.classList.remove('active');
+                    const box = overlay.querySelector('.tutorial-box');
+                    if (box) {
+                        box.remove();
+                    }
+                }
+                // Remove highlight from any element
+                const highlighted = document.querySelector('.tutorial-highlight');
+                if (highlighted) {
+                    highlighted.classList.remove('tutorial-highlight');
+                }
+                
+                // Hide all grids that were revealed during tutorial
+                revealedGrids.forEach(gridId => {
+                    const grid = document.getElementById(gridId);
+                    let titleId = '';
+                    if (gridId === 'rhythmGrid') titleId = 'rhythm-title';
+                    else if (gridId === 'arpeggioGrid') titleId = 'arpeggio-title';
+                    else if (gridId === 'volumemodGrid') titleId = 'volumemod-title';
+                    
+                    const title = titleId ? document.getElementById(titleId) : null;
+                    if (grid && title) {
+                        grid.style.display = 'none';
+                        if (gridId === 'rhythmGrid') title.textContent = '▶ Rhythm';
+                        else if (gridId === 'arpeggioGrid') title.textContent = '▶ Arpeggio';
+                        else if (gridId === 'volumemodGrid') title.textContent = '▶ VolumeMod';
+                    }
+                });
+                revealedGrids.clear();
+                
+                currentTutorialStep = 0;
+            }
+            
+            if (tutorialIcon) {
+                tutorialIcon.addEventListener('click', showTutorial);
+            }
+            
+            // Tutorial prompt on page load
+            function showTutorialPrompt() {
+                // Check if user has chosen to never show this again
+                const neverShowAgain = localStorage.getItem('tutorialNeverShowAgain');
+                if (neverShowAgain === 'true') {
+                    return; // Don't show prompt
+                }
+                
+                // Create prompt modal if it doesn't exist
+                let promptModal = document.getElementById('tutorial-prompt-modal');
+                if (!promptModal) {
+                    promptModal = document.createElement('div');
+                    promptModal.id = 'tutorial-prompt-modal';
+                    promptModal.className = 'tutorial-prompt-modal';
+                    
+                    const panel = document.createElement('div');
+                    panel.className = 'tutorial-prompt-panel';
+                    
+                    const title = document.createElement('h3');
+                    title.innerHTML = 'Welcome to <span style="font-family: \'Pacifico\', cursive; font-weight: 200;">Chord Canvas</span>';
+                    
+                    const text = document.createElement('p');
+                    text.textContent = 'Would you like to see a quick tutorial guide to learn about the features?';
+                    
+                    const checkboxContainer = document.createElement('div');
+                    checkboxContainer.className = 'tutorial-prompt-checkbox';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'tutorial-never-ask';
+                    const checkboxLabel = document.createElement('label');
+                    checkboxLabel.htmlFor = 'tutorial-never-ask';
+                    checkboxLabel.textContent = 'Never ask this again';
+                    checkboxContainer.appendChild(checkbox);
+                    checkboxContainer.appendChild(checkboxLabel);
+                    
+                    const buttons = document.createElement('div');
+                    buttons.className = 'tutorial-prompt-buttons';
+                    
+                    const yesBtn = document.createElement('button');
+                    yesBtn.className = 'tutorial-prompt-btn tutorial-prompt-btn-primary';
+                    yesBtn.textContent = 'Yes, show tutorial';
+                    yesBtn.onclick = () => {
+                        if (checkbox.checked) {
+                            localStorage.setItem('tutorialNeverShowAgain', 'true');
+                        }
+                        promptModal.classList.remove('active');
+                        setTimeout(() => {
+                            showTutorial();
+                        }, 300);
+                    };
+                    
+                    const noBtn = document.createElement('button');
+                    noBtn.className = 'tutorial-prompt-btn tutorial-prompt-btn-secondary';
+                    noBtn.textContent = 'No, thanks';
+                    noBtn.onclick = () => {
+                        if (checkbox.checked) {
+                            localStorage.setItem('tutorialNeverShowAgain', 'true');
+                        }
+                        promptModal.classList.remove('active');
+                    };
+                    
+                    buttons.appendChild(noBtn);
+                    buttons.appendChild(yesBtn);
+                    
+                    panel.appendChild(title);
+                    panel.appendChild(text);
+                    panel.appendChild(checkboxContainer);
+                    panel.appendChild(buttons);
+                    promptModal.appendChild(panel);
+                    document.body.appendChild(promptModal);
+                }
+                
+                // Show the prompt
+                promptModal.classList.add('active');
+            }
+            
+            // Show tutorial prompt on page load (after a short delay)
+            setTimeout(() => {
+                showTutorialPrompt();
+            }, 1000);
+            
+            // Initial refresh after a short delay to ensure all modules are loaded
+            if (window.logSettingsDifferences) {
+                setTimeout(() => {
+                    window.logSettingsDifferences();
+                }, 500);
+            }
+
+            // Chord input functionality
+            const chordInput = document.getElementById('chord-input');
+            const playChordBtn = document.getElementById('play-chord-btn');
+
+            // Handle chord input on Enter key and on input change
+            if (chordInput) {
+                chordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const input = chordInput.value.trim();
+                        if (input && window.processChordInput) {
+                            window.processChordInput(input);
+                        }
+                    }
+                });
+
+                // Handle chord input on input event (real-time updates)
+                chordInput.addEventListener('input', function() {
+                    const input = chordInput.value.trim();
+                    if (window.processChordInput) {
+                        window.processChordInput(input);
+                    }
+                });
+
+                // Handle chord input on blur (when user leaves the field)
+                chordInput.addEventListener('blur', function() {
+                    const input = chordInput.value.trim();
+                    if (input && window.processChordInput) {
+                        window.processChordInput(input);
+                    }
+                });
+            }
+
+            // Handle play button click - toggle play/stop
+            if (playChordBtn) {
+                playChordBtn.addEventListener('click', function() {
+                    if (window.startPlaying) {
+                        window.startPlaying();
+                    }
+                });
+            }
+            
+            // Rhythm Grid System
+            const DURATION_MULTIPLIERS = [null, 240, 120, 60, 40, 30, 20, 15];
+            let currentBassDuration = 240;
+            let currentHighDuration = 30;
+            let pendingBassDuration = null;
+            let pendingHighDuration = null;
+            let activeCellRow = 1;
+            let activeCellCol = 5;
+            let pendingCellRow = null;
+            let pendingCellCol = null;
+            
+            // Cell sequence system
+            let cellSequence = []; // Array of {row, col} objects
+            let currentSequenceIndex = 0;
+            let sequenceInterval = null;
+            
+            // Map duration multipliers to musical note names
+            const NOTE_NAMES = {
+                240: 'Semibreve (Whole Note)',
+                120: 'Minim (Half Note)',
+                60: 'Crotchet (Quarter Note)',
+                40: 'Minim Triplet',
+                30: 'Quaver (Eighth Note)',
+                20: 'Crotchet Triplet',
+                15: 'Semiquaver (Sixteenth Note)'
+            };
+            
+            function calculateHeaders(bpm) {
+                const noteSymbols = ['', '𝅝', '𝅗𝅥', '𝅘𝅥', '𝅘𝅥₃', '𝅘𝅥𝅮', '𝅘𝅥𝅮₃', '𝅘𝅥𝅯'];
+                const headers = [''];
+                for (let i = 1; i < DURATION_MULTIPLIERS.length; i++) {
+                    const seconds = DURATION_MULTIPLIERS[i] / bpm;
+                    const formatted = seconds.toFixed(2);
+                    headers.push(noteSymbols[i] + ' ' + formatted + 's');
+                }
+                return headers;
+            }
+            
+            function getNoteName(multiplier) {
+                return NOTE_NAMES[multiplier] || '';
+            }
+            
+            // Convert row/col to Excel-style cell reference (A1, B2, etc.)
+            function getCellLabel(row, col) {
+                // Row 1-7 maps to A-G, Column 1-7 maps to 1-7
+                const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+                if (row >= 1 && row <= 7 && col >= 1 && col <= 7) {
+                    return letters[row - 1] + col;
+                }
+                return '';
+            }
+            
+            // Convert Excel-style cell reference to row/col
+            function parseCellLabel(label) {
+                const trimmed = label.trim().toUpperCase();
+                if (trimmed.length < 2) return null;
+                
+                const letter = trimmed[0];
+                const number = parseInt(trimmed.substring(1));
+                
+                const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+                const row = letters.indexOf(letter) + 1;
+                
+                if (row >= 1 && row <= 7 && number >= 1 && number <= 7) {
+                    return { row: row, col: number };
+                }
+                return null;
+            }
+            
+            function createRhythmGrid() {
+                const grid = document.getElementById('rhythmGrid');
+                if (!grid) return;
+                
+                grid.innerHTML = '';
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const headers = calculateHeaders(currentBPM);
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        
+                        if (row === 0 || col === 0) {
+                            cell.className += ' header';
+                            if (row === 0 && col === 0) {
+                                cell.textContent = '';
+                            } else if (row === 0) {
+                                cell.className += ' col-header';
+                                cell.textContent = headers[col] || '';
+                                // Add title attribute with note name
+                                const multiplier = DURATION_MULTIPLIERS[col];
+                                if (multiplier) {
+                                    const noteName = getNoteName(multiplier);
+                                    if (noteName) {
+                                        cell.title = noteName;
+                                    }
+                                }
+                            } else {
+                                cell.className += ' row-header';
+                                cell.textContent = headers[row] || '';
+                                // Add title attribute with note name
+                                const multiplier = DURATION_MULTIPLIERS[row];
+                                if (multiplier) {
+                                    const noteName = getNoteName(multiplier);
+                                    if (noteName) {
+                                        cell.title = noteName;
+                                    }
+                                }
+                            }
+                        } else {
+                            cell.dataset.row = row;
+                            cell.dataset.col = col;
+                            cell.dataset.cellLabel = getCellLabel(row, col);
+                            // Add cell label as text content
+                            cell.textContent = getCellLabel(row, col);
+                            cell.addEventListener('click', () => {
+                                handleGridCellClick(row, col, cell);
+                            });
+                        }
+                        
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                // Set default active cell (row 1, col 5 = A5)
+                const defaultCell = grid.querySelector('.grid-cell[data-row="1"][data-col="5"]');
+                if (defaultCell) {
+                    defaultCell.classList.add('active');
+                    // Set default durations
+                    currentBassDuration = DURATION_MULTIPLIERS[1]; // 240
+                    currentHighDuration = DURATION_MULTIPLIERS[5]; // 30
+                    activeCellRow = 1;
+                    activeCellCol = 5;
+                }
+                
+                // Setup tooltips for headers
+                setTimeout(() => {
+                    const headers = grid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title && !header.hasAttribute('data-tooltip-setup')) {
+                            header.setAttribute('data-tooltip-setup', 'true');
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (this.title) {
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }, 10);
+            }
+            
+            function handleGridCellClick(row, col, cell) {
+                // Row determines bass note rhythm, Column determines high note rhythm
+                const bassDurationMultiplier = DURATION_MULTIPLIERS[row];
+                const highDurationMultiplier = DURATION_MULTIPLIERS[col];
+                
+                if (!bassDurationMultiplier || !highDurationMultiplier) return;
+                
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                
+                if (isPlaying) {
+                    // If playing, set as pending (will apply on next cycle)
+                    document.querySelectorAll('#rhythmGrid .grid-cell.pending').forEach(c => {
+                        c.classList.remove('pending');
+                    });
+                    cell.classList.add('pending');
+                    pendingBassDuration = bassDurationMultiplier;
+                    pendingHighDuration = highDurationMultiplier;
+                    pendingCellRow = row;
+                    pendingCellCol = col;
+                    // Don't update animations yet - wait for applyPendingRhythm
+                } else {
+                    // If not playing, set as active immediately
+                    document.querySelectorAll('#rhythmGrid .grid-cell.active').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    cell.classList.add('active');
+                    currentBassDuration = bassDurationMultiplier;
+                    currentHighDuration = highDurationMultiplier;
+                    activeCellRow = row;
+                    activeCellCol = col;
+                    // Update animations (will be cleared since not playing)
+                    updateGridHeaderAnimations(null, null, null, null);
+                }
+            }
+            
+            function updateGridHeaders() {
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const headers = calculateHeaders(currentBPM);
+                const grid = document.getElementById('rhythmGrid');
+                if (!grid) return;
+                
+                const allCells = grid.querySelectorAll('.grid-cell');
+                allCells.forEach((cell, index) => {
+                    if (cell.classList.contains('col-header')) {
+                        const col = index;
+                        if (col > 0 && col < headers.length) {
+                            cell.textContent = headers[col];
+                            // Update title attribute with note name
+                            const multiplier = DURATION_MULTIPLIERS[col];
+                            if (multiplier) {
+                                const noteName = getNoteName(multiplier);
+                                if (noteName) {
+                                    cell.title = noteName;
+                                }
+                            }
+                        }
+                    } else if (cell.classList.contains('row-header')) {
+                        const row = Math.floor(index / 8);
+                        if (row > 0 && row < headers.length) {
+                            cell.textContent = headers[row];
+                            // Update title attribute with note name
+                            const multiplier = DURATION_MULTIPLIERS[row];
+                            if (multiplier) {
+                                const noteName = getNoteName(multiplier);
+                                if (noteName) {
+                                    cell.title = noteName;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function updateGridHeaderAnimations(bassDuration, highDuration, activeRow, activeCol) {
+                const grid = document.getElementById('rhythmGrid');
+                if (!grid) return;
+                
+                // Stop all animations first
+                grid.querySelectorAll('.grid-cell.header.animated').forEach(header => {
+                    header.classList.remove('animated');
+                    header.style.animationDuration = '';
+                });
+                
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                if (!isPlaying || !bassDuration || !highDuration || activeRow === null || activeCol === null) {
+                    return;
+                }
+                
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const bassCycleDuration = bassDuration / currentBPM; // in seconds
+                const highCycleDuration = highDuration / currentBPM; // in seconds
+                
+                // Get all cells in the grid
+                const allCells = grid.querySelectorAll('.grid-cell');
+                
+                // Animate the specific row header (row = activeRow, col = 0)
+                const rowHeaderIndex = activeRow * 8; // Row headers are in column 0
+                if (allCells[rowHeaderIndex] && allCells[rowHeaderIndex].classList.contains('row-header')) {
+                    allCells[rowHeaderIndex].classList.add('animated');
+                    allCells[rowHeaderIndex].style.animationDuration = `${bassCycleDuration}s`;
+                }
+                
+                // Animate the specific column header (col = activeCol, row = 0)
+                const colHeaderIndex = activeCol; // Column headers are in row 0
+                if (allCells[colHeaderIndex] && allCells[colHeaderIndex].classList.contains('col-header')) {
+                    allCells[colHeaderIndex].classList.add('animated');
+                    allCells[colHeaderIndex].style.animationDuration = `${highCycleDuration}s`;
+                }
+            }
+            
+            function applyPendingRhythm() {
+                if (pendingBassDuration !== null || pendingHighDuration !== null) {
+                    const oldBassDuration = currentBassDuration;
+                    const oldHighDuration = currentHighDuration;
+                    
+                    currentBassDuration = pendingBassDuration !== null ? pendingBassDuration : currentBassDuration;
+                    currentHighDuration = pendingHighDuration !== null ? pendingHighDuration : currentHighDuration;
+                    
+                    if (pendingCellRow !== null && pendingCellCol !== null) {
+                        const pendingCell = document.querySelector(`#rhythmGrid .grid-cell[data-row="${pendingCellRow}"][data-col="${pendingCellCol}"]`);
+                        if (pendingCell) {
+                            document.querySelectorAll('#rhythmGrid .grid-cell.active').forEach(c => {
+                                c.classList.remove('active');
+                            });
+                            pendingCell.classList.remove('pending');
+                            pendingCell.classList.add('active');
+                            activeCellRow = pendingCellRow;
+                            activeCellCol = pendingCellCol;
+                        }
+                    }
+                    
+                    // Update header animations
+                    updateGridHeaderAnimations(currentBassDuration, currentHighDuration, activeCellRow, activeCellCol);
+                    
+                    // Signal that rhythms changed (for chord-input.js to restart intervals)
+                    if (window.onRhythmChanged && (oldBassDuration !== currentBassDuration || oldHighDuration !== currentHighDuration)) {
+                        window.onRhythmChanged(currentBassDuration, currentHighDuration);
+                    }
+                    
+                    pendingBassDuration = null;
+                    pendingHighDuration = null;
+                    pendingCellRow = null;
+                    pendingCellCol = null;
+                }
+            }
+            
+            // Update header animations when playing starts
+            const originalStartPlaying = window.startPlaying;
+            if (originalStartPlaying) {
+                window.startPlaying = function() {
+                    originalStartPlaying();
+                    // Update animations after a short delay to ensure rhythms are set
+                    setTimeout(() => {
+                        const rhythms = window.getRhythmDurations ? window.getRhythmDurations() : { bass: 240, high: 30 };
+                        updateGridHeaderAnimations(rhythms.bass, rhythms.high, activeCellRow, activeCellCol);
+                        // Start cell sequence if there's a sequence defined
+                        if (cellSequence.length > 0) {
+                            startCellSequence();
+                        }
+                        // Start arpeggio sequence if there's a sequence defined
+                        if (arpeggioSequence.length > 0) {
+                            startArpeggioSequence();
+                        }
+                        // Start volume mod sequence if there's a sequence defined
+                        if (volumeModSequence.length > 0) {
+                            startVolumeModSequence();
+                        }
+                    }, 100);
+                };
+            }
+            
+            // Stop animations when playing stops
+            const originalStopPlaying = window.stopPlaying;
+            if (originalStopPlaying) {
+                window.stopPlaying = function() {
+                    originalStopPlaying();
+                    updateGridHeaderAnimations(null, null, null, null);
+                    stopCellSequence();
+                    stopArpeggioSequence();
+                    stopVolumeModSequence();
+                };
+            }
+            
+            // Parse cell sequence input
+            function parseCellSequence(input) {
+                if (!input || !input.trim()) {
+                    return [];
+                }
+                
+                // Split by spaces, commas, or any whitespace
+                const parts = input.trim().split(/[\s,]+/).filter(p => p.length > 0);
+                const sequence = [];
+                
+                for (const part of parts) {
+                    const cell = parseCellLabel(part);
+                    if (cell) {
+                        sequence.push(cell);
+                    }
+                }
+                
+                return sequence;
+            }
+            
+            // Apply cell from sequence
+            function applyCellFromSequence() {
+                if (cellSequence.length === 0) return;
+                
+                const cell = cellSequence[currentSequenceIndex];
+                if (!cell) return;
+                
+                const grid = document.getElementById('rhythmGrid');
+                if (!grid) return;
+                
+                const targetCell = grid.querySelector(`.grid-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                if (targetCell) {
+                    handleGridCellClick(cell.row, cell.col, targetCell);
+                }
+                
+                // Move to next cell in sequence (loop)
+                currentSequenceIndex = (currentSequenceIndex + 1) % cellSequence.length;
+            }
+            
+            // Start cell sequence cycling
+            function startCellSequence() {
+                if (sequenceInterval) {
+                    clearInterval(sequenceInterval);
+                    sequenceInterval = null;
+                }
+                
+                if (cellSequence.length === 0) return;
+                
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const cycleDurationMs = (240 / currentBPM) * 1000; // Use full note duration as cycle
+                
+                // Apply first cell immediately
+                applyCellFromSequence();
+                
+                // Set up interval to cycle through sequence
+                sequenceInterval = setInterval(() => {
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        applyCellFromSequence();
+                    } else {
+                        // Stop sequence if not playing
+                        if (sequenceInterval) {
+                            clearInterval(sequenceInterval);
+                            sequenceInterval = null;
+                        }
+                    }
+                }, cycleDurationMs);
+            }
+            
+            // Stop cell sequence cycling
+            function stopCellSequence() {
+                if (sequenceInterval) {
+                    clearInterval(sequenceInterval);
+                    sequenceInterval = null;
+                }
+                currentSequenceIndex = 0;
+            }
+            
+            // Expose functions globally for chord-input.js to use
+            window.getRhythmDurations = function() {
+                return {
+                    bass: currentBassDuration,
+                    high: currentHighDuration
+                };
+            };
+            
+            window.applyPendingRhythm = applyPendingRhythm;
+            
+            // Arpeggio names for arpeggio grid headers
+            const ARPEGGIO_NAMES = ['', 'none', '-uphill', 'uphill', 'downhill', '-Any', 'Any2', 'Any'];
+            const ARPEGGIO_DESCRIPTIONS = {
+                'none': 'Play all notes normally',
+                '-uphill': 'Skip one note in ascending order (remembers last skipped)',
+                'uphill': 'Ascending arpeggio (one note at a time, cycling)',
+                'downhill': 'Descending arpeggio (one note at a time, cycling)',
+                '-Any': 'Randomly skip one note each time',
+                'Any2': 'Play 2 random notes each time',
+                'Any': 'Play 1 random note each time'
+            };
+            
+            // VolumeMod names for volume mod grid headers
+            const VOLUMEMOD_NAMES = ['', 'none', 'uphill', 'downhill', 'valley', 'hill', '2hill', '4hill'];
+            const VOLUMEMOD_DESCRIPTIONS = {
+                'none': 'No volume adjustment for notes',
+                'uphill': 'Velocity increases along 240/bpm bar cycle',
+                'downhill': 'Velocity decreases along 240/bpm bar cycle',
+                'valley': 'Velocity decreases to mid, then increases to end of cycle',
+                'hill': 'Velocity increases to mid, then decreases to end of cycle',
+                '2hill': 'Velocity increases/decreases twice in one cycle',
+                '4hill': 'Velocity increases/decreases 4 times in one cycle'
+            };
+            
+            // Arpeggio grid state
+            let currentArpeggioRow = 1; // none (default)
+            let currentArpeggioCol = 1; // none (default)
+            let pendingArpeggioRow = null;
+            let pendingArpeggioCol = null;
+            
+            // Arpeggio behavior state tracking
+            let bassUphillSkipIndex = 0; // Track which note to skip for -uphill (bass)
+            let highUphillSkipIndex = 0; // Track which note to skip for -uphill (high)
+            let bassUphillIndex = 0; // Track which note to play for uphill (bass) - ascending
+            let highUphillIndex = 0; // Track which note to play for uphill (high) - ascending
+            let bassDownhillIndex = 0; // Track which note to play for downhill (bass) - descending
+            let highDownhillIndex = 0; // Track which note to play for downhill (high) - descending
+            
+            // VolumeMod grid state
+            let currentVolumeModRow = 1; // none (default)
+            let currentVolumeModCol = 1; // none (default)
+            let pendingVolumeModRow = null;
+            let pendingVolumeModCol = null;
+            
+            // VolumeMod sequence state
+            let volumeModSequence = [];
+            let currentVolumeModSequenceIndex = 0;
+            let volumeModSequenceInterval = null;
+            
+            function createArpeggioGrid() {
+                // Remove old tooltip listeners before recreating
+                const oldGrid = document.getElementById('arpeggioGrid');
+                if (oldGrid) {
+                    const oldHeaders = oldGrid.querySelectorAll('.header');
+                    oldHeaders.forEach(header => {
+                        header.replaceWith(header.cloneNode(true));
+                    });
+                }
+                const grid = document.getElementById('arpeggioGrid');
+                if (!grid) return;
+                
+                grid.innerHTML = '';
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        
+                        if (row === 0 || col === 0) {
+                            cell.className += ' header';
+                            if (row === 0 && col === 0) {
+                                cell.textContent = '';
+                            } else if (row === 0) {
+                                cell.className += ' col-header';
+                                const arpeggioName = ARPEGGIO_NAMES[col] || '';
+                                cell.textContent = arpeggioName;
+                                // Add descriptive title
+                                if (arpeggioName && ARPEGGIO_DESCRIPTIONS[arpeggioName]) {
+                                    cell.title = `High notes: ${arpeggioName} - ${ARPEGGIO_DESCRIPTIONS[arpeggioName]}`;
+                                }
+                            } else {
+                                cell.className += ' row-header';
+                                const arpeggioName = ARPEGGIO_NAMES[row] || '';
+                                cell.textContent = arpeggioName;
+                                // Add descriptive title
+                                if (arpeggioName && ARPEGGIO_DESCRIPTIONS[arpeggioName]) {
+                                    cell.title = `Bass notes: ${arpeggioName} - ${ARPEGGIO_DESCRIPTIONS[arpeggioName]}`;
+                                }
+                            }
+                        } else {
+                            cell.dataset.row = row;
+                            cell.dataset.col = col;
+                            cell.dataset.cellLabel = getCellLabel(row, col);
+                            cell.textContent = getCellLabel(row, col);
+                            cell.addEventListener('click', () => {
+                                handleArpeggioGridCellClick(row, col, cell);
+                            });
+                        }
+                        
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                // Set default active cell (row 1, col 1 = A1 = none/none)
+                const defaultCell = grid.querySelector('.grid-cell[data-row="1"][data-col="1"]');
+                if (defaultCell) {
+                    defaultCell.classList.add('active');
+                    currentArpeggioRow = 1;
+                    currentArpeggioCol = 1;
+                }
+                
+                // Setup tooltips for headers
+                setTimeout(() => {
+                    const headers = grid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title && !header.hasAttribute('data-tooltip-setup')) {
+                            header.setAttribute('data-tooltip-setup', 'true');
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (this.title) {
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }, 10);
+            }
+            
+            function handleArpeggioGridCellClick(row, col, cell) {
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                
+                if (isPlaying) {
+                    // If playing, set as pending (will apply on next cycle)
+                    document.querySelectorAll('#arpeggioGrid .grid-cell.pending').forEach(c => {
+                        c.classList.remove('pending');
+                    });
+                    cell.classList.add('pending');
+                    pendingArpeggioRow = row;
+                    pendingArpeggioCol = col;
+                } else {
+                    // If not playing, set as active immediately
+                    document.querySelectorAll('#arpeggioGrid .grid-cell.active').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    cell.classList.add('active');
+                    currentArpeggioRow = row;
+                    currentArpeggioCol = col;
+                }
+            }
+            
+            function applyPendingArpeggio() {
+                if (pendingArpeggioRow !== null || pendingArpeggioCol !== null) {
+                    currentArpeggioRow = pendingArpeggioRow !== null ? pendingArpeggioRow : currentArpeggioRow;
+                    currentArpeggioCol = pendingArpeggioCol !== null ? pendingArpeggioCol : currentArpeggioCol;
+                    
+                    const pendingCell = document.querySelector(`#arpeggioGrid .grid-cell[data-row="${pendingArpeggioRow}"][data-col="${pendingArpeggioCol}"]`);
+                    if (pendingCell) {
+                        document.querySelectorAll('#arpeggioGrid .grid-cell.active').forEach(c => {
+                            c.classList.remove('active');
+                        });
+                        pendingCell.classList.remove('pending');
+                        pendingCell.classList.add('active');
+                    }
+                    
+                    // Reset behavior indices when arpeggio changes
+                    if (window.arpeggioBehaviorState) {
+                        window.arpeggioBehaviorState.bassUphillSkipIndex = 0;
+                        window.arpeggioBehaviorState.highUphillSkipIndex = 0;
+                        window.arpeggioBehaviorState.bassUphillIndex = 0;
+                        window.arpeggioBehaviorState.highUphillIndex = 0;
+                        window.arpeggioBehaviorState.bassDownhillIndex = 0;
+                        window.arpeggioBehaviorState.highDownhillIndex = 0;
+                    }
+                    
+                    pendingArpeggioRow = null;
+                    pendingArpeggioCol = null;
+                }
+            }
+            
+            // Expose function to get current arpeggio selection
+            window.getArpeggioSelection = function() {
+                return {
+                    row: currentArpeggioRow,
+                    col: currentArpeggioCol,
+                    rowArpeggio: ARPEGGIO_NAMES[currentArpeggioRow] || 'none',
+                    colArpeggio: ARPEGGIO_NAMES[currentArpeggioCol] || 'none'
+                };
+            };
+            
+            window.applyPendingArpeggio = applyPendingArpeggio;
+            
+            // Arpeggio sequence state
+            let arpeggioSequence = [];
+            let currentArpeggioSequenceIndex = 0;
+            let arpeggioSequenceInterval = null;
+            
+            // Parse arpeggio sequence input
+            function parseArpeggioSequence(input) {
+                if (!input || !input.trim()) {
+                    return [];
+                }
+                
+                const parts = input.trim().split(/[\s,]+/).filter(p => p.length > 0);
+                const sequence = [];
+                
+                for (const part of parts) {
+                    const cell = parseCellLabel(part);
+                    if (cell) {
+                        sequence.push(cell);
+                    }
+                }
+                
+                return sequence;
+            }
+            
+            // Apply arpeggio cell from sequence
+            function applyArpeggioCellFromSequence() {
+                if (arpeggioSequence.length === 0) return;
+                
+                const cell = arpeggioSequence[currentArpeggioSequenceIndex];
+                if (!cell) return;
+                
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                
+                if (isPlaying) {
+                    // If playing, set as pending (will apply on next cycle via applyPendingArpeggio)
+                    document.querySelectorAll('#arpeggioGrid .grid-cell.pending').forEach(c => {
+                        c.classList.remove('pending');
+                    });
+                    
+                    const grid = document.getElementById('arpeggioGrid');
+                    if (!grid) return;
+                    
+                    const targetCell = grid.querySelector(`.grid-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                    if (targetCell) {
+                        targetCell.classList.add('pending');
+                        pendingArpeggioRow = cell.row;
+                        pendingArpeggioCol = cell.col;
+                    }
+                } else {
+                    // If not playing, apply immediately
+                    const grid = document.getElementById('arpeggioGrid');
+                    if (!grid) return;
+                    
+                    const targetCell = grid.querySelector(`.grid-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                    if (targetCell) {
+                        handleArpeggioGridCellClick(cell.row, cell.col, targetCell);
+                    }
+                }
+                
+                // Move to next cell in sequence (loop)
+                currentArpeggioSequenceIndex = (currentArpeggioSequenceIndex + 1) % arpeggioSequence.length;
+            }
+            
+            // Start arpeggio sequence cycling
+            function startArpeggioSequence() {
+                if (arpeggioSequenceInterval) {
+                    clearInterval(arpeggioSequenceInterval);
+                    arpeggioSequenceInterval = null;
+                }
+                
+                if (arpeggioSequence.length === 0) return;
+                
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const cycleDurationMs = (240 / currentBPM) * 1000; // Use full note duration as cycle
+                
+                // Apply first cell immediately
+                applyArpeggioCellFromSequence();
+                
+                // Set up interval to cycle through sequence
+                arpeggioSequenceInterval = setInterval(() => {
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        // Apply pending changes first, then move to next cell
+                        if (window.applyPendingArpeggio) {
+                            window.applyPendingArpeggio();
+                        }
+                        applyArpeggioCellFromSequence();
+                    } else {
+                        // Stop sequence if not playing
+                        if (arpeggioSequenceInterval) {
+                            clearInterval(arpeggioSequenceInterval);
+                            arpeggioSequenceInterval = null;
+                        }
+                    }
+                }, cycleDurationMs);
+            }
+            
+            // Stop arpeggio sequence cycling
+            function stopArpeggioSequence() {
+                if (arpeggioSequenceInterval) {
+                    clearInterval(arpeggioSequenceInterval);
+                    arpeggioSequenceInterval = null;
+                }
+                currentArpeggioSequenceIndex = 0;
+            }
+            
+            // Create VolumeMod grid
+            function createVolumeModGrid() {
+                const grid = document.getElementById('volumemodGrid');
+                if (!grid) return;
+                
+                grid.innerHTML = '';
+                
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        
+                        if (row === 0 || col === 0) {
+                            cell.className += ' header';
+                            if (row === 0 && col === 0) {
+                                cell.textContent = '';
+                            } else if (row === 0) {
+                                cell.className += ' col-header';
+                                const volumeModName = VOLUMEMOD_NAMES[col] || '';
+                                cell.textContent = volumeModName;
+                                // Add descriptive title
+                                if (volumeModName && VOLUMEMOD_DESCRIPTIONS[volumeModName]) {
+                                    cell.title = `High notes: ${volumeModName} - ${VOLUMEMOD_DESCRIPTIONS[volumeModName]}`;
+                                }
+                            } else {
+                                cell.className += ' row-header';
+                                const volumeModName = VOLUMEMOD_NAMES[row] || '';
+                                cell.textContent = volumeModName;
+                                // Add descriptive title
+                                if (volumeModName && VOLUMEMOD_DESCRIPTIONS[volumeModName]) {
+                                    cell.title = `Bass notes: ${volumeModName} - ${VOLUMEMOD_DESCRIPTIONS[volumeModName]}`;
+                                }
+                            }
+                        } else {
+                            cell.dataset.row = row;
+                            cell.dataset.col = col;
+                            cell.dataset.cellLabel = getCellLabel(row, col);
+                            cell.textContent = getCellLabel(row, col);
+                            cell.addEventListener('click', () => {
+                                handleVolumeModGridCellClick(row, col, cell);
+                            });
+                        }
+                        
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                // Set default active cell (row 1, col 1 = A1 = none/none)
+                const defaultCell = grid.querySelector('.grid-cell[data-row="1"][data-col="1"]');
+                if (defaultCell) {
+                    defaultCell.classList.add('active');
+                    currentVolumeModRow = 1;
+                    currentVolumeModCol = 1;
+                }
+                
+                // Setup tooltips for headers
+                setTimeout(() => {
+                    const headers = grid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title && !header.hasAttribute('data-tooltip-setup')) {
+                            header.setAttribute('data-tooltip-setup', 'true');
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (this.title) {
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }, 10);
+            }
+            
+            function handleVolumeModGridCellClick(row, col, cell) {
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                
+                if (isPlaying) {
+                    // If playing, set as pending (will apply on next cycle)
+                    document.querySelectorAll('#volumemodGrid .grid-cell.pending').forEach(c => {
+                        c.classList.remove('pending');
+                    });
+                    cell.classList.add('pending');
+                    pendingVolumeModRow = row;
+                    pendingVolumeModCol = col;
+                } else {
+                    // If not playing, set as active immediately
+                    document.querySelectorAll('#volumemodGrid .grid-cell.active').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    cell.classList.add('active');
+                    currentVolumeModRow = row;
+                    currentVolumeModCol = col;
+                }
+            }
+            
+            function applyPendingVolumeMod() {
+                if (pendingVolumeModRow !== null || pendingVolumeModCol !== null) {
+                    currentVolumeModRow = pendingVolumeModRow !== null ? pendingVolumeModRow : currentVolumeModRow;
+                    currentVolumeModCol = pendingVolumeModCol !== null ? pendingVolumeModCol : currentVolumeModCol;
+                    
+                    const pendingCell = document.querySelector(`#volumemodGrid .grid-cell[data-row="${pendingVolumeModRow}"][data-col="${pendingVolumeModCol}"]`);
+                    if (pendingCell) {
+                        document.querySelectorAll('#volumemodGrid .grid-cell.active').forEach(c => {
+                            c.classList.remove('active');
+                        });
+                        pendingCell.classList.remove('pending');
+                        pendingCell.classList.add('active');
+                    }
+                    
+                    pendingVolumeModRow = null;
+                    pendingVolumeModCol = null;
+                }
+            }
+            
+            // Expose function to get current volume mod selection
+            window.getVolumeModSelection = function() {
+                return {
+                    row: currentVolumeModRow,
+                    col: currentVolumeModCol,
+                    rowVolumeMod: VOLUMEMOD_NAMES[currentVolumeModRow] || 'none',
+                    colVolumeMod: VOLUMEMOD_NAMES[currentVolumeModCol] || 'none'
+                };
+            };
+            
+            window.applyPendingVolumeMod = applyPendingVolumeMod;
+            
+            // Parse volume mod sequence input
+            function parseVolumeModSequence(input) {
+                if (!input || !input.trim()) {
+                    return [];
+                }
+                
+                const parts = input.trim().split(/[\s,]+/).filter(p => p.length > 0);
+                const sequence = [];
+                
+                for (const part of parts) {
+                    const cell = parseCellLabel(part);
+                    if (cell) {
+                        sequence.push(cell);
+                    }
+                }
+                
+                return sequence;
+            }
+            
+            // Apply volume mod cell from sequence
+            function applyVolumeModCellFromSequence() {
+                if (volumeModSequence.length === 0) return;
+                
+                const cell = volumeModSequence[currentVolumeModSequenceIndex];
+                if (!cell) return;
+                
+                const isPlaying = window.getIsPlaying && window.getIsPlaying();
+                
+                if (isPlaying) {
+                    // If playing, set as pending (will apply on next cycle via applyPendingVolumeMod)
+                    document.querySelectorAll('#volumemodGrid .grid-cell.pending').forEach(c => {
+                        c.classList.remove('pending');
+                    });
+                    
+                    const grid = document.getElementById('volumemodGrid');
+                    if (!grid) return;
+                    
+                    const targetCell = grid.querySelector(`.grid-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                    if (targetCell) {
+                        targetCell.classList.add('pending');
+                        pendingVolumeModRow = cell.row;
+                        pendingVolumeModCol = cell.col;
+                    }
+                } else {
+                    // If not playing, apply immediately
+                    const grid = document.getElementById('volumemodGrid');
+                    if (!grid) return;
+                    
+                    const targetCell = grid.querySelector(`.grid-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                    if (targetCell) {
+                        handleVolumeModGridCellClick(cell.row, cell.col, targetCell);
+                    }
+                }
+                
+                // Move to next cell in sequence (loop)
+                currentVolumeModSequenceIndex = (currentVolumeModSequenceIndex + 1) % volumeModSequence.length;
+            }
+            
+            // Start volume mod sequence cycling
+            function startVolumeModSequence() {
+                if (volumeModSequenceInterval) {
+                    clearInterval(volumeModSequenceInterval);
+                    volumeModSequenceInterval = null;
+                }
+                
+                if (volumeModSequence.length === 0) return;
+                
+                const currentBPM = parseInt(document.getElementById('bpm-input')?.value || 120);
+                const cycleDurationMs = (240 / currentBPM) * 1000; // Use full note duration as cycle
+                
+                // Apply first cell immediately
+                applyVolumeModCellFromSequence();
+                
+                // Set up interval to cycle through sequence
+                volumeModSequenceInterval = setInterval(() => {
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        // Apply pending changes first, then move to next cell
+                        if (window.applyPendingVolumeMod) {
+                            window.applyPendingVolumeMod();
+                        }
+                        applyVolumeModCellFromSequence();
+                    } else {
+                        // Stop sequence if not playing
+                        if (volumeModSequenceInterval) {
+                            clearInterval(volumeModSequenceInterval);
+                            volumeModSequenceInterval = null;
+                        }
+                    }
+                }, cycleDurationMs);
+            }
+            
+            // Stop volume mod sequence cycling
+            function stopVolumeModSequence() {
+                if (volumeModSequenceInterval) {
+                    clearInterval(volumeModSequenceInterval);
+                    volumeModSequenceInterval = null;
+                }
+                currentVolumeModSequenceIndex = 0;
+            }
+            
+            // Grid section toggle functionality
+            const rhythmTitle = document.getElementById('rhythm-title');
+            const rhythmSection = document.getElementById('rhythm-section');
+            const arpeggioTitle = document.getElementById('arpeggio-title');
+            const arpeggioSection = document.getElementById('arpeggio-section');
+            const volumemodTitle = document.getElementById('volumemod-title');
+            const volumemodSection = document.getElementById('volumemod-section');
+            
+            if (rhythmTitle && rhythmSection) {
+                rhythmTitle.addEventListener('click', () => {
+                    const grid = document.getElementById('rhythmGrid');
+                    const isHidden = grid.style.display === 'none';
+                    
+                    if (isHidden) {
+                        grid.style.display = '';
+                        rhythmTitle.textContent = '▼ Rhythm';
+                    } else {
+                        grid.style.display = 'none';
+                        rhythmTitle.textContent = '▶ Rhythm';
+                    }
+                });
+            }
+            
+            if (arpeggioTitle && arpeggioSection) {
+                arpeggioTitle.addEventListener('click', () => {
+                    const grid = document.getElementById('arpeggioGrid');
+                    const isHidden = grid.style.display === 'none';
+                    
+                    if (isHidden) {
+                        grid.style.display = '';
+                        arpeggioTitle.textContent = '▼ Arpeggio';
+                    } else {
+                        grid.style.display = 'none';
+                        arpeggioTitle.textContent = '▶ Arpeggio';
+                    }
+                });
+            }
+            
+            if (volumemodTitle && volumemodSection) {
+                volumemodTitle.addEventListener('click', () => {
+                    const grid = document.getElementById('volumemodGrid');
+                    const isHidden = grid.style.display === 'none';
+                    
+                    if (isHidden) {
+                        grid.style.display = '';
+                        volumemodTitle.textContent = '▼ VolumeMod';
+                    } else {
+                        grid.style.display = 'none';
+                        volumemodTitle.textContent = '▶ VolumeMod';
+                    }
+                });
+            }
+            
+            // Function to show tooltip on tap/click for mobile
+            function setupHeaderTooltips() {
+                // For rhythm grid headers
+                const rhythmGrid = document.getElementById('rhythmGrid');
+                if (rhythmGrid) {
+                    const headers = rhythmGrid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title) {
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // Show tooltip using alert or custom tooltip
+                                if (this.title) {
+                                    // Create a temporary tooltip
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // For arpeggio grid headers
+                const arpeggioGrid = document.getElementById('arpeggioGrid');
+                if (arpeggioGrid) {
+                    const headers = arpeggioGrid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title) {
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // Show tooltip using alert or custom tooltip
+                                if (this.title) {
+                                    // Create a temporary tooltip
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // For volume mod grid headers
+                const volumemodGrid = document.getElementById('volumemodGrid');
+                if (volumemodGrid) {
+                    const headers = volumemodGrid.querySelectorAll('.header');
+                    headers.forEach(header => {
+                        if (header.title) {
+                            header.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // Show tooltip using alert or custom tooltip
+                                if (this.title) {
+                                    // Create a temporary tooltip
+                                    const tooltip = document.createElement('div');
+                                    tooltip.textContent = this.title;
+                                    tooltip.style.cssText = 'position: fixed; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 12px; border-radius: 4px; z-index: 10000; pointer-events: none; font-size: 13px; max-width: 300px; word-wrap: break-word;';
+                                    document.body.appendChild(tooltip);
+                                    
+                                    const rect = this.getBoundingClientRect();
+                                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                                    
+                                    setTimeout(() => {
+                                        if (tooltip.parentElement) {
+                                            tooltip.parentElement.removeChild(tooltip);
+                                        }
+                                    }, 2000);
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+            
+            // Set initial collapsed state for all grids
+            const rhythmGrid = document.getElementById('rhythmGrid');
+            const arpeggioGrid = document.getElementById('arpeggioGrid');
+            const volumemodGrid = document.getElementById('volumemodGrid');
+            
+            if (rhythmGrid) rhythmGrid.style.display = 'none';
+            if (arpeggioGrid) arpeggioGrid.style.display = 'none';
+            if (volumemodGrid) volumemodGrid.style.display = 'none';
+            
+            // Initialize grids
+            createRhythmGrid();
+            createArpeggioGrid();
+            createVolumeModGrid();
+            
+            // Setup tooltips after grids are created
+            setTimeout(() => {
+                setupHeaderTooltips();
+            }, 100);
+            
+            // Expose updateGridHeaders globally
+            window.updateGridHeaders = updateGridHeaders;
+            
+            // Arpeggio sequence input handler
+            const arpeggioSequenceInput = document.getElementById('arpeggio-sequence-input');
+            if (arpeggioSequenceInput) {
+                arpeggioSequenceInput.addEventListener('input', function() {
+                    const input = arpeggioSequenceInput.value.trim();
+                    arpeggioSequence = parseArpeggioSequence(input);
+                    currentArpeggioSequenceIndex = 0;
+                    
+                    // If playing, restart sequence
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        stopArpeggioSequence();
+                        startArpeggioSequence();
+                    }
+                });
+                
+                arpeggioSequenceInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const input = arpeggioSequenceInput.value.trim();
+                        arpeggioSequence = parseArpeggioSequence(input);
+                        currentArpeggioSequenceIndex = 0;
+                        
+                        // If playing, restart sequence
+                        if (window.getIsPlaying && window.getIsPlaying()) {
+                            stopArpeggioSequence();
+                            startArpeggioSequence();
+                        }
+                    }
+                });
+            }
+            
+            // VolumeMod sequence input handler
+            const volumemodSequenceInput = document.getElementById('volumemod-sequence-input');
+            if (volumemodSequenceInput) {
+                volumemodSequenceInput.addEventListener('input', function() {
+                    const input = volumemodSequenceInput.value.trim();
+                    volumeModSequence = parseVolumeModSequence(input);
+                    currentVolumeModSequenceIndex = 0;
+                    
+                    // If playing, restart sequence
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        stopVolumeModSequence();
+                        startVolumeModSequence();
+                    }
+                });
+                
+                volumemodSequenceInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const input = volumemodSequenceInput.value.trim();
+                        volumeModSequence = parseVolumeModSequence(input);
+                        currentVolumeModSequenceIndex = 0;
+                        
+                        // If playing, restart sequence
+                        if (window.getIsPlaying && window.getIsPlaying()) {
+                            stopVolumeModSequence();
+                            startVolumeModSequence();
+                        }
+                    }
+                });
+            }
+            
+            // Cell sequence input handler
+            const cellSequenceInput = document.getElementById('cell-sequence-input');
+            if (cellSequenceInput) {
+                cellSequenceInput.addEventListener('input', function() {
+                    const input = cellSequenceInput.value.trim();
+                    cellSequence = parseCellSequence(input);
+                    currentSequenceIndex = 0;
+                    
+                    // If playing, restart sequence
+                    if (window.getIsPlaying && window.getIsPlaying()) {
+                        stopCellSequence();
+                        startCellSequence();
+                    }
+                });
+                
+                cellSequenceInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const input = cellSequenceInput.value.trim();
+                        cellSequence = parseCellSequence(input);
+                        currentSequenceIndex = 0;
+                        
+                        // If playing, restart sequence
+                        if (window.getIsPlaying && window.getIsPlaying()) {
+                            stopCellSequence();
+                            startCellSequence();
+                        }
+                    }
+                });
+            }
+            
+            // Handle BPM input
+            const bpmInput = document.getElementById('bpm-input');
+            if (bpmInput) {
+                // Initialize BPM from input value
+                const initialBPM = parseInt(bpmInput.value);
+                if (isFinite(initialBPM) && initialBPM >= 40 && initialBPM <= 240) {
+                    if (window.setBPM) {
+                        window.setBPM(initialBPM);
+                    }
+                }
+                
+                // Update BPM when input changes
+                bpmInput.addEventListener('input', function() {
+                    const bpm = parseInt(bpmInput.value);
+                    if (isFinite(bpm) && bpm >= 40 && bpm <= 240) {
+                        // Update grid headers
+                        updateGridHeaders();
+                        // Update chord playback BPM
+                        if (window.setBPM) {
+                            window.setBPM(bpm);
+                        }
+                        // Restart sequences with new BPM if playing
+                        if (window.getIsPlaying && window.getIsPlaying()) {
+                            if (cellSequence.length > 0) {
+                                stopCellSequence();
+                                startCellSequence();
+                            }
+                            if (arpeggioSequence.length > 0) {
+                                stopArpeggioSequence();
+                                startArpeggioSequence();
+                            }
+                            if (volumeModSequence.length > 0) {
+                                stopVolumeModSequence();
+                                startVolumeModSequence();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Load livid preset on page load and update dropdown
+            // Wait for applySoundPreset to be available
+            function loadLividPresetOnInit() {
+                if (window.applySoundPreset) {
+                    // Apply livid preset
+                    console.log('Loading livid preset on page load...');
+                    window.applySoundPreset('livid');
+                    
+                    // Update dropdown to show livid
+                    const presetSelect = document.getElementById('preset-select');
+                    if (presetSelect) {
+                        presetSelect.value = 'livid';
+                    }
+                } else {
+                    // Retry after a short delay
+                    setTimeout(loadLividPresetOnInit, 100);
+                }
+            }
+            
+            // Start loading livid preset after a delay to ensure all modules are initialized
+            setTimeout(loadLividPresetOnInit, 800);
+            
+            // Preset dropdown handler
+            const presetSelect = document.getElementById('preset-select');
+            if (presetSelect) {
+                // Track the value before it gets cleared
+                let pendingSelection = null;
+                
+                // Use input event which fires when selection changes - process preset here directly
+                presetSelect.addEventListener('input', function(e) {
+                    const selectedIndex = e.target.selectedIndex;
+                    const presetName = selectedIndex >= 0 && selectedIndex < e.target.options.length 
+                        ? e.target.options[selectedIndex].value 
+                        : (e.target.value || null);
+                    
+                    if (presetName) {
+                        pendingSelection = presetName;
+                        // Process the preset immediately in input event
+                        processPresetSelection(presetName);
+                    }
+                });
+                
+                // Function to process preset selection
+                function processPresetSelection(presetName) {
+                    if (!presetName) return;
+                    
+                    console.log(`Dropdown changed to: ${presetName}`);
+                    
+                    // Store the value FIRST to preserve it
+                    const selectedValue = presetName;
+                    
+                    // Function to apply preset (with retry logic)
+                    function tryApplyPreset() {
+                        if (window.applySoundPreset) {
+                            console.log('Calling applySoundPreset...');
+                            
+                            try {
+                                window.applySoundPreset(selectedValue);
+                            } catch (error) {
+                                console.error('Error calling applySoundPreset:', error);
+                            }
+                            
+                            // Ensure dropdown value stays
+                            if (presetSelect.value !== selectedValue) {
+                                presetSelect.value = selectedValue;
+                            }
+                        } else {
+                            console.warn('applySoundPreset not available yet, retrying...');
+                            setTimeout(tryApplyPreset, 100);
+                        }
+                    }
+                    
+                    // Try to apply preset
+                    tryApplyPreset();
+                    
+                    // Also ensure value is preserved after a delay
+                    setTimeout(() => {
+                        if (presetSelect.value !== selectedValue) {
+                            presetSelect.value = selectedValue;
+                        }
+                    }, 200);
+                }
+                
+                // Also handle change event as fallback (but input should fire first)
+                presetSelect.addEventListener('change', function(e) {
+                    // Only process if we didn't already process via input event
+                    if (pendingSelection) {
+                        // Already processed in input event, just clear the flag
+                        pendingSelection = null;
+                        return;
+                    }
+                    
+                    // Fallback: try to get value if input event didn't fire
+                    const selectedIndex = e.target.selectedIndex;
+                    const presetName = selectedIndex >= 0 && selectedIndex < e.target.options.length 
+                        ? e.target.options[selectedIndex].value 
+                        : (e.target.value || null);
+                    
+                    if (presetName) {
+                        processPresetSelection(presetName);
+                    }
+                });
+            }
+            
+            // Keyboard shortcut: Shift+S to toggle settings diff panel
+            window.addEventListener('keydown', (e) => {
+                if (e.shiftKey && e.key === 'S') {
+                    e.preventDefault();
+                    const diffPanel = document.getElementById('settings-diff-panel');
+                    if (diffPanel) {
+                        diffPanel.classList.toggle('visible');
+                        // Refresh differences when showing
+                        if (diffPanel.classList.contains('visible') && window.logSettingsDifferences) {
+                            setTimeout(() => {
+                                window.logSettingsDifferences();
+                            }, 50);
+                        }
+                    }
+                }
+                
+                // Keyboard shortcut: 9 to log camera settings (for debug and future use)
+                if (e.key === '9' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    if (window.camera && window.controls) {
+                        const camera = window.camera;
+                        const controls = window.controls;
+                        const cameraSettings = {
+                            position: {
+                                x: camera.position.x.toFixed(3),
+                                y: camera.position.y.toFixed(3),
+                                z: camera.position.z.toFixed(3)
+                            },
+                            rotation: {
+                                x: camera.rotation.x.toFixed(3),
+                                y: camera.rotation.y.toFixed(3),
+                                z: camera.rotation.z.toFixed(3)
+                            },
+                            fov: camera.fov,
+                            aspect: camera.aspect,
+                            near: camera.near,
+                            far: camera.far,
+                            target: {
+                                x: controls.target.x.toFixed(3),
+                                y: controls.target.y.toFixed(3),
+                                z: controls.target.z.toFixed(3)
+                            },
+                            minDistance: controls.minDistance,
+                            maxDistance: controls.maxDistance,
+                            enableDamping: controls.enableDamping,
+                            dampingFactor: controls.dampingFactor,
+                            enableRotate: controls.enableRotate,
+                            enableZoom: controls.enableZoom,
+                            enablePan: controls.enablePan
+                        };
+                        console.log('📷 Camera Settings:', cameraSettings);
+                        console.log('📋 Copy-paste format:', JSON.stringify(cameraSettings, null, 2));
+                    } else {
+                        console.warn('Camera or controls not available yet');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
