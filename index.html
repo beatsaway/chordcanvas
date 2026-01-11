@@ -6,7 +6,7 @@
     <title>Chord Canvas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Pacifico&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,9 +15,9 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            background: #ffffff;
-            color: #1a1a1a;
+            font-family: 'Lexend', sans-serif;
+            background: radial-gradient(circle at center, rgba(0, 20, 10, 0.8) 0%, rgba(0, 10, 5, 1) 100%);
+            color: rgba(255, 255, 255, 0.9);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -33,10 +33,12 @@
             text-align: center;
             max-width: min(90vw, 800px);
             width: 100%;
-            background: #ffffff;
-            border: 1px solid #e5e5e5;
-            border-radius: 2px;
-            padding: 20px;
+            background: rgba(8, 12, 16, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
         }
 
         .title {
@@ -48,38 +50,40 @@
         }
 
         .title-link {
-            font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Pacifico', cursive;
             font-size: clamp(1.5rem, 6vw, 2.5rem);
             font-weight: 400;
-            color: #1a1a1a;
+            color: #ffffff;
             text-decoration: none;
             margin-right: 8px;
             cursor: pointer;
             transition: opacity 0.2s ease;
             display: inline-block;
+            letter-spacing: 1px;
         }
 
         .title-link:hover {
-            opacity: 0.7;
+            opacity: 0.8;
         }
 
         .title-by {
             font-size: clamp(1rem, 3vw, 1.5rem);
             font-weight: 500;
-            color: #1a1a1a;
+            color: rgba(255, 255, 255, 0.9);
         }
 
         .title-by .by-link {
-            color: #1a1a1a;
+            color: rgba(255, 255, 255, 0.7);
             text-decoration: none;
-            border-bottom: 1px solid #d0d0d0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
             padding-bottom: 1px;
             cursor: pointer;
-            transition: border-bottom-color 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .title-by .by-link:hover {
-            border-bottom-color: #1a1a1a;
+            border-bottom-color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.9);
         }
 
         .tagline {
@@ -88,13 +92,14 @@
             margin-bottom: 20px;
             letter-spacing: -0.01em;
             line-height: 1.4;
-            color: #666;
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .settings-overlay {
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
             display: none;
             z-index: 30;
         }
@@ -104,27 +109,30 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: #fff;
-            border: 1px solid #e5e5e5;
-            border-radius: 2px;
-            padding: 16px;
+            background: rgba(8, 12, 16, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            padding: 32px;
             width: min(320px, 90vw);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             display: none;
             z-index: 31;
             font-size: 13px;
             line-height: 1.5;
             text-align: center;
+            backdrop-filter: blur(20px);
         }
 
         .info-modal a {
-            color: #1a1a1a;
+            color: rgba(255, 255, 255, 0.7);
             text-decoration: none;
-            border-bottom: 1px solid #d0d0d0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.2s ease;
         }
 
         .info-modal a:hover {
-            border-bottom-color: #1a1a1a;
+            color: rgba(255, 255, 255, 0.9);
+            border-bottom-color: rgba(255, 255, 255, 0.9);
         }
 
         .links {
@@ -138,28 +146,31 @@
             font-size: 16px;
             font-weight: 500;
             padding: 8px 16px;
-            border: 1px solid #e5e5e5;
-            border-radius: 2px;
-            background: #ffffff;
-            color: #1a1a1a;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
             text-decoration: none;
             transition: all 0.2s ease;
             display: inline-block;
         }
 
         .link:hover {
-            border-color: #1a1a1a;
-            background: #f8f8f8;
+            border-color: rgba(26, 90, 58, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            color: #2a7a5a;
         }
 
         .link.old {
-            color: #999;
-            border-color: #e5e5e5;
+            color: rgba(255, 255, 255, 0.5);
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .link.old:hover {
-            opacity: 0.7;
-            border-color: #999;
+            opacity: 0.8;
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         @keyframes pulse {
@@ -173,8 +184,15 @@
 
         .link.pulse {
             animation: pulse 2s ease-in-out infinite;
-            color: rgb(33, 150, 243);
-            border-color: rgb(33, 150, 243);
+            color: #2a7a5a;
+            border-color: rgba(26, 90, 58, 0.5);
+            background: rgba(26, 90, 58, 0.3);
+        }
+
+        .link.pulse:hover {
+            background: rgba(26, 90, 58, 0.4);
+            color: #3a9a7a;
+            border-color: rgba(26, 90, 58, 0.6);
         }
 
         @media (max-width: 767px) {
@@ -183,7 +201,7 @@
             }
 
             .container {
-                padding: 16px;
+                padding: 24px;
             }
 
             .links {
@@ -208,9 +226,10 @@
             <a class="title-link" href="#" id="titleLink">Chord Canvas</a>
             <span class="title-by"> by <a class="by-link" href="#" id="byLink">Beats Away</a></span>
         </div>
-        <div class="tagline">Write chords. Music plays instantly.</div>
+        <div class="tagline">Write chords. Music plays instantly. And more...</div>
         <div class="links">
-            <a href="v1_51/index.html" class="link pulse">V1.51</a>
+            <a href="v1_6/index.html" class="link pulse">V1.6</a>
+            <a href="v1_51/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.51</a>
             <a href="v1_5/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.5</a>
             <a href="v1_4/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.4</a>
             <a href="v1_3/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.3</a>
