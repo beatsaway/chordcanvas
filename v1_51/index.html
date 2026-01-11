@@ -1548,23 +1548,33 @@ chordType = 'minor-7th';
                     // Ensure Tone.js is loaded before initializing audio
                     loadToneJs().then(() => {
                         if (window.Tone && window.Tone.start) {
-                            window.Tone.start().then(() => {
+                            window.Tone.start().then(async () => {
                         // CRITICAL: Resume AudioContext on mobile (starts suspended)
                         // Tone.start() may not be sufficient on mobile devices
+                        // We MUST await resume() to ensure context is actually running
                         if (window.Tone && window.Tone.context) {
                             const toneContext = window.Tone.context;
                             if (toneContext.state === 'suspended') {
-                                toneContext.resume().catch(err => {
+                                try {
+                                    await toneContext.resume();
+                                    console.log('Tone.js AudioContext resumed successfully');
+                                } catch (err) {
                                     console.warn('Failed to resume Tone.js AudioContext:', err);
-                                });
+                                }
+                            }
+                            // Double-check: ensure context is actually running
+                            if (toneContext.state !== 'running') {
+                                console.warn('Tone.js AudioContext state:', toneContext.state);
                             }
                         }
                         
                         // Also resume any custom audio engine contexts (PolySynthWrapper)
                         if (window.PianoSound && window.PianoSound.resumeAudioContext) {
-                            window.PianoSound.resumeAudioContext().catch(err => {
+                            try {
+                                await window.PianoSound.resumeAudioContext();
+                            } catch (err) {
                                 console.warn('Failed to resume PianoSound AudioContext:', err);
-                            });
+                            }
                         }
                         
                         if (!masterVolume) {
@@ -1590,6 +1600,11 @@ chordType = 'minor-7th';
                             masterVolume.connect(masterLimiter);
                             masterLimiter.toDestination();
                         }
+                        // Verify Tone.js context is running before creating synths
+                        if (window.Tone && window.Tone.context && window.Tone.context.state !== 'running') {
+                            console.warn('Warning: Tone.js AudioContext is not running before creating synths');
+                        }
+                        
                         if (!waterSynth) {
                             waterSynth = new WaterSynthTone(masterVolume);
                             // Set initial reverb gain
@@ -1598,6 +1613,12 @@ chordType = 'minor-7th';
                             }
                             if (waterSynth.outputVolume) {
                                 waterSynth.outputVolume.gain.value = waterVolumeGain;
+                            }
+                            // Wait for reverb to generate (async, but don't block)
+                            if (waterSynth.reverb && waterSynth.reverb.generate) {
+                                waterSynth.reverb.generate().catch(err => {
+                                    console.warn('Water synth reverb generation failed:', err);
+                                });
                             }
                         }
                     if (!pluckySynth) {
@@ -1608,6 +1629,12 @@ chordType = 'minor-7th';
                         }
                         if (pluckySynth.outputVolume) {
                             pluckySynth.outputVolume.gain.value = pluckyVolumeGain;
+                        }
+                        // Wait for reverb to generate (async, but don't block)
+                        if (pluckySynth.reverb && pluckySynth.reverb.generate) {
+                            pluckySynth.reverb.generate().catch(err => {
+                                console.warn('Plucky synth reverb generation failed:', err);
+                            });
                         }
                     }
                     if (!subSynth) {
@@ -1622,8 +1649,15 @@ chordType = 'minor-7th';
                         if (subSynth.outputVolume) {
                             subSynth.outputVolume.gain.value = subVolumeGain;
                         }
+                        // Wait for reverb to generate (async, but don't block)
+                        if (subSynth.reverb && subSynth.reverb.generate) {
+                            subSynth.reverb.generate().catch(err => {
+                                console.warn('Sub synth reverb generation failed:', err);
+                            });
+                        }
                     }
-                        console.log('Audio initialized with all three synths');
+                        console.log('Audio initialized with all three synths. Tone.js context state:', 
+                            window.Tone && window.Tone.context ? window.Tone.context.state : 'unknown');
                         resolve();
                         }).catch(reject);
                     } else {
@@ -2838,6 +2872,33 @@ chordType = 'minor-7th';
             
             if (!waterSynth || !pluckySynth || !subSynth) {
                 console.error('Synths not initialized');
+                return;
+            }
+            
+            // CRITICAL: Verify Tone.js AudioContext is running before starting playback
+            if (window.Tone && window.Tone.context) {
+                const toneContext = window.Tone.context;
+                if (toneContext.state !== 'running') {
+                    console.error('Cannot start playback: Tone.js AudioContext is not running. State:', toneContext.state);
+                    // Try to resume one more time
+                    toneContext.resume().then(() => {
+                        console.log('AudioContext resumed, retrying playback...');
+                        // Retry after a short delay
+                        setTimeout(() => {
+                            if (toneContext.state === 'running') {
+                                startPlaying();
+                            } else {
+                                alert('Audio is not ready. Please tap the play button again.');
+                            }
+                        }, 100);
+                    }).catch(err => {
+                        console.error('Failed to resume AudioContext:', err);
+                        alert('Audio is not ready. Please refresh the page and try again.');
+                    });
+                    return;
+                }
+            } else {
+                console.error('Tone.js context not available!');
                 return;
             }
             
@@ -4833,17 +4894,52 @@ chordType = 'minor-7th';
                     if (window.Tone && window.Tone.context) {
                         const toneContext = window.Tone.context;
                         if (toneContext.state === 'suspended') {
-                            await toneContext.resume().catch(err => {
+                            try {
+                                await toneContext.resume();
+                                console.log('Tone.js AudioContext resumed before playback');
+                            } catch (err) {
                                 console.warn('Failed to resume Tone.js AudioContext before playback:', err);
-                            });
+                            }
                         }
+                        // Verify it's actually running
+                        if (toneContext.state !== 'running') {
+                            console.error('Tone.js AudioContext is not running! State:', toneContext.state);
+                            alert('Audio is not ready. Please try tapping the play button again.');
+                            return;
+                        }
+                        
+                        // Test: Try to get currentTime to verify context is actually working
+                        try {
+                            const testTime = toneContext.currentTime;
+                            if (!isFinite(testTime) || testTime <= 0) {
+                                console.warn('AudioContext currentTime is invalid:', testTime);
+                            }
+                        } catch (err) {
+                            console.error('Failed to access AudioContext currentTime:', err);
+                        }
+                    } else {
+                        console.error('Tone.js context not available!');
+                        alert('Audio is not ready. Please refresh the page.');
+                        return;
                     }
                     
                     // Resume custom audio engine context
                     if (window.PianoSound && window.PianoSound.resumeAudioContext) {
-                        await window.PianoSound.resumeAudioContext().catch(err => {
+                        try {
+                            await window.PianoSound.resumeAudioContext();
+                        } catch (err) {
                             console.warn('Failed to resume PianoSound AudioContext before playback:', err);
-                        });
+                        }
+                    }
+                    
+                    // Verify synths are properly connected
+                    if (waterSynth && waterSynth.masterGain) {
+                        try {
+                            // Check if masterGain is connected
+                            console.log('Water synth ready, masterGain connected:', waterSynth.masterGain.numberOfOutputs > 0);
+                        } catch (err) {
+                            console.warn('Error checking water synth connection:', err);
+                        }
                     }
                     
                     // Set defaults if no cells are selected
