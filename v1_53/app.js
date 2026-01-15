@@ -735,17 +735,14 @@ function updatePreviewToggleLabel() {
 
 const helpSteps = [
     {
-        text: "Struggle with notes-dragging to make just one chord? There's a better way.",
-        selector: null
-    },
-    {
-        text: 'Instantly write, tweak, and finalize your progressions. When it\'s right, just drop the clean MIDI into Ableton, Logic, or any DAW!',
-        selector: null
-    },
-    {
-        text: 'Write any chords here to make a sequence.',
+        text: 'Write any chords here.',
         selector: '#chordInput'
     },
+    {
+        text: 'Make sure to separate them with commas.',
+        selector: '#chordInput'
+    },
+
     {
         text: "Tap to listen to what you wrote.",
         selector: '#previewToggle'
@@ -755,7 +752,7 @@ const helpSteps = [
         selector: '#exportBtn'
     },
     {
-        text: 'Customise here the rhythms, notes, and more!',
+        text: 'Customise their rhythms, notes, and more!',
         selector: 'nav'
     }
 ];
