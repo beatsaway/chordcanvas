@@ -4,271 +4,342 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chord Canvas</title>
+    <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Pacifico&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
     <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f7f9;
+            --panel: #ffffff;
+            --text: #0f172a;
+            --muted: #475569;
+            --border: #e2e8f0;
+            --accent: #0f766e;
+            --accent-soft: rgba(15, 118, 110, 0.12);
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Lexend', sans-serif;
-            background: radial-gradient(circle at center, rgba(0, 20, 10, 0.8) 0%, rgba(0, 10, 5, 1) 100%);
-            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 45%, var(--bg) 100%);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .page {
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            padding: 24px clamp(20px, 4vw, 48px);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 16px;
-            font-size: 13px;
-            font-weight: 400;
-            letter-spacing: -0.01em;
-            line-height: 1.4;
-        }
-
-        .container {
+            gap: 16px;
             text-align: center;
-            max-width: min(90vw, 800px);
-            width: 100%;
-            background: rgba(8, 12, 16, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1px;
-            padding: 32px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px);
         }
 
-        .title {
-            font-size: clamp(1.5rem, 6vw, 2.5rem);
-            font-weight: 500;
-            margin-bottom: 20px;
-            letter-spacing: -0.02em;
-            line-height: 1.2;
-        }
-
-        .title-link {
-            font-family: 'Pacifico', cursive;
-            font-size: clamp(1.5rem, 6vw, 2.5rem);
-            font-weight: 400;
-            color: #ffffff;
-            text-decoration: none;
-            margin-right: 8px;
+        .brand {
+            font-family: "Pacifico", cursive;
+            font-size: 24px;
+            border: none;
+            background: transparent;
+            color: var(--text);
             cursor: pointer;
-            transition: opacity 0.2s ease;
-            display: inline-block;
-            letter-spacing: 1px;
+            letter-spacing: 0.2px;
         }
 
-        .title-link:hover {
-            opacity: 0.8;
-        }
 
-        .title-by {
-            font-size: clamp(1rem, 3vw, 1.5rem);
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        .title-by .by-link {
-            color: rgba(255, 255, 255, 0.7);
+        .text-link {
+            color: var(--muted);
             text-decoration: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 1px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .title-by .by-link:hover {
-            border-bottom-color: rgba(255, 255, 255, 0.9);
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        .tagline {
-            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
             font-weight: 500;
-            margin-bottom: 20px;
-            letter-spacing: -0.01em;
-            line-height: 1.4;
-            color: rgba(255, 255, 255, 0.7);
         }
 
-        .settings-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(8px);
-            display: none;
-            z-index: 30;
-        }
-
-        .info-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(8, 12, 16, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1px;
-            padding: 32px;
-            width: min(320px, 90vw);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            display: none;
-            z-index: 31;
-            font-size: 13px;
-            line-height: 1.5;
-            text-align: center;
-            backdrop-filter: blur(20px);
-        }
-
-        .info-modal a {
-            color: rgba(255, 255, 255, 0.7);
+        .ghost-button {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: 999px;
             text-decoration: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.2s ease;
+            font-weight: 500;
+            transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
         }
 
-        .info-modal a:hover {
-            color: rgba(255, 255, 255, 0.9);
-            border-bottom-color: rgba(255, 255, 255, 0.9);
+        .ghost-button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(15, 118, 110, 0.06);
         }
 
-        .links {
+        main {
+            flex: 1;
+            width: min(100%, 980px);
+            margin: 0 auto;
+            padding: 0 clamp(20px, 4vw, 48px) 40px;
             display: flex;
-            gap: 8px;
-            justify-content: center;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .hero {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: clamp(24px, 5vw, 48px);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .eyebrow {
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 4vw, 44px);
+            line-height: 1.1;
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .versions {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
-        .link {
-            font-size: 16px;
-            font-weight: 500;
-            padding: 8px 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 1px;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.9);
+        .section-header h2 {
+            font-size: 18px;
+        }
+
+
+        .version-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .version-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px 16px;
             text-decoration: none;
-            transition: all 0.2s ease;
-            display: inline-block;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .link:hover {
-            border-color: rgba(26, 90, 58, 0.5);
-            background: rgba(255, 255, 255, 0.15);
-            color: #2a7a5a;
+        .version-card:hover {
+            border-color: rgba(15, 118, 110, 0.45);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
         }
 
-        .link.old {
-            color: rgba(255, 255, 255, 0.5);
-            border-color: rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.05);
+        .version-card strong {
+            font-size: 16px;
         }
 
-        .link.old:hover {
-            opacity: 0.8;
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.1);
+        .version-card span {
+            color: var(--muted);
+            font-size: 12px;
         }
 
-        @keyframes pulse {
+        @keyframes shrinkPulse {
             0%, 100% {
                 transform: scale(1);
             }
             50% {
-                transform: scale(1.1);
+                transform: scale(0.96);
             }
         }
 
-        .link.pulse {
-            animation: pulse 2s ease-in-out infinite;
-            color: #2a7a5a;
-            border-color: rgba(26, 90, 58, 0.5);
-            background: rgba(26, 90, 58, 0.3);
+        .version-card.pulse {
+            animation: shrinkPulse 2.4s ease-in-out infinite;
         }
 
-        .link.pulse:hover {
-            background: rgba(26, 90, 58, 0.4);
-            color: #3a9a7a;
-            border-color: rgba(26, 90, 58, 0.6);
+
+        #aboutModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            backdrop-filter: blur(6px);
         }
 
-        @media (max-width: 767px) {
-            body {
-                padding: 12px 16px;
-            }
+        #aboutModal[aria-hidden="false"] {
+            display: flex;
+        }
 
-            .container {
-                padding: 24px;
-            }
+        #aboutModal > div {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 420px;
+            width: 100%;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
 
-            .links {
+        #aboutModal > div > div:first-child {
+            font-family: "Pacifico", cursive;
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        #aboutModal a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        #aboutModal button {
+            margin-top: 12px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @media (max-width: 640px) {
+            .topbar {
                 flex-direction: column;
-                gap: 8px;
+                align-items: flex-start;
             }
 
-            .link {
-                width: 100%;
-            }
         }
     </style>
 </head>
 <body>
-    <div id="settingsOverlay" class="settings-overlay"></div>
-    <div id="infoModal" class="info-modal" role="dialog" aria-modal="true" aria-label="About">
-        Developed by <a href="https://youtube.com/beatsaway" target="_blank">BeatsAway</a> <br>
-        <a href="https://buymeacoffee.com/beatsaway" target="_blank">Support this developer</a>
+    <div class="page">
+        <header class="topbar">
+            <button class="brand" id="titleLink" type="button">Chord Canvas</button>
+        </header>
+        <main>
+            <section class="hero">
+                <h1>Write chords. Hear them instantly.</h1>
+                <p>Launch V1.53 to export as MIDI files for DAWs!</p>
+            </section>
+            <section class="versions">
+                <div class="section-header">
+                    <h2>Versions</h2>
+                </div>
+                <div class="version-grid">
+                    
+                    <a class="version-card pulse" href="v1_53/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.53</strong>
+                        <span>Stable legacy</span>
+                    </a>
+                    <a class="version-card" href="v1_51/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.51</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_5/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.5</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_4/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.4</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_3/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.3</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_2/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.2</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_1/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.1</strong>
+                        <span>Legacy build</span>
+                    </a>
+                    <a class="version-card" href="v1_0/index.html" target="_blank" rel="noopener noreferrer">
+                        <strong>V1.0</strong>
+                        <span>First release</span>
+                    </a>
+                </div>
+            </section>
+        </main>
     </div>
-    <div class="container">
-        <div class="title">
-            <a class="title-link" href="#" id="titleLink">Chord Canvas</a>
-            <span class="title-by"> by <a class="by-link" href="#" id="byLink">Beats Away</a></span>
-        </div>
-        <div class="tagline">Write chords. Music plays instantly. And more...</div>
-        <div class="links">
-            <a href="v1_6/index.html" class="link pulse">V1.6</a>
-            <a href="v1_51/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.51</a>
-            <a href="v1_5/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.5</a>
-            <a href="v1_4/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.4</a>
-            <a href="v1_3/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.3</a>
-            <a href="v1_2/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.2</a>
-            <a href="v1_1/index.html" class="link old" target="_blank" rel="noopener noreferrer">V1.1</a>
-            <a href="v1_0.html" class="link old" target="_blank" rel="noopener noreferrer">V1.0</a>  
+    <div id="aboutModal" aria-hidden="true">
+        <div>
+            <div>Chord Canvas</div>
+            <div>Landing page for versioned builds.</div>
+            <div>Developed by <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a></div>
+            <div><a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">buy him a coffee 🤗☕</a></div>
+            <button id="aboutClose" type="button">Close</button>
         </div>
     </div>
     <script>
         const titleLink = document.getElementById('titleLink');
-        const byLink = document.getElementById('byLink');
-        const settingsOverlay = document.getElementById('settingsOverlay');
-        const infoModal = document.getElementById('infoModal');
-
-        function closeModal() {
-            settingsOverlay.style.display = 'none';
-            infoModal.style.display = 'none';
-        }
+        const aboutModal = document.getElementById('aboutModal');
+        const aboutClose = document.getElementById('aboutClose');
 
         function openModal() {
-            settingsOverlay.style.display = 'block';
-            infoModal.style.display = 'block';
+            aboutModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeModal() {
+            aboutModal.setAttribute('aria-hidden', 'true');
         }
 
         if (titleLink) {
-            titleLink.addEventListener('click', (e) => {
-                e.preventDefault();
+            titleLink.addEventListener('click', () => {
                 openModal();
             });
         }
 
-        if (byLink) {
-            byLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                openModal();
-            });
+        if (aboutClose) {
+            aboutClose.addEventListener('click', closeModal);
         }
 
-        settingsOverlay.addEventListener('click', closeModal);
+        if (aboutModal) {
+            aboutModal.addEventListener('click', (e) => {
+                if (e.target === aboutModal) {
+                    closeModal();
+                }
+            });
+        }
     </script>
 </body>
 </html>
