@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disco club – VFX wall</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #container { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a14);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.4;
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        const wallVertex = `
+            varying vec2 vUv;
+            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+        `;
+        const wallFragment = `
+            uniform vec2 uResolution;
+            uniform float uTime;
+            uniform int uMode;
+            varying vec2 vUv;
+            float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            vec2 hash22(vec2 p) {
+                vec2 q = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+                return fract(sin(q) * 43758.5453);
+            }
+            float noise2D(vec2 p) {
+                vec2 i = floor(p); vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = hash21(i), b = hash21(i + vec2(1,0)), c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));
+                return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+            }
+            float fbm(vec2 p) {
+                float v = 0.0, a = 0.5;
+                mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+                for (int i = 0; i < 5; i++) { v += a * noise2D(p); p = rot * p * 2.0 + 100.0; a *= 0.5; }
+                return v;
+            }
+            // Club-style palettes: saturated neon, deep purple/magenta, electric cyan/green
+            vec3 palCool(float t) {
+                return mix(mix(vec3(0.02, 0.05, 0.18), vec3(0.0, 0.75, 1.0), t), vec3(0.1, 0.9, 1.0), smoothstep(0.35, 0.9, t));
+            }
+            vec3 palWarm(float t) {
+                return mix(mix(vec3(0.15, 0.0, 0.0), vec3(1.0, 0.2, 0.0), t), vec3(1.0, 0.95, 0.3), smoothstep(0.4, 0.85, t));
+            }
+            vec3 palCyanMagenta(float t) {
+                return mix(vec3(0.0, 0.7, 0.9), vec3(1.0, 0.0, 0.85), t);
+            }
+            vec3 palAurora(float t) {
+                return mix(mix(vec3(0.0, 0.1, 0.18), vec3(0.0, 1.0, 0.8), t), vec3(0.2, 0.7, 1.0), smoothstep(0.3, 0.8, t));
+            }
+            vec3 palFire(float t) {
+                return mix(mix(vec3(0.12, 0.0, 0.0), vec3(1.0, 0.08, 0.0), smoothstep(0.0, 0.3, t)), vec3(1.0, 0.8, 0.1), smoothstep(0.3, 0.8, t));
+            }
+            vec3 palMonoCyan(float t) {
+                return mix(vec3(0.0, 0.03, 0.1), vec3(0.0, 1.0, 1.0), t);
+            }
+            vec3 palPurplePink(float t) {
+                return mix(vec3(0.3, 0.0, 0.5), vec3(1.0, 0.1, 0.9), t);
+            }
+            vec3 palAmber(float t) {
+                return mix(vec3(0.12, 0.04, 0.0), vec3(1.0, 0.7, 0.0), t);
+            }
+            vec3 palTealGreen(float t) {
+                return mix(vec3(0.0, 0.12, 0.18), vec3(0.0, 1.0, 0.85), t);
+            }
+            vec3 palClubNeon(float t) {
+                return mix(mix(vec3(0.5, 0.0, 0.6), vec3(1.0, 0.0, 0.95), t), vec3(0.0, 1.0, 0.95), smoothstep(0.45, 0.95, t));
+            }
+            vec3 palCrystal(float t) {
+                vec3 a = vec3(0.0, 0.5, 0.9);
+                vec3 b = vec3(0.6, 0.0, 0.9);
+                vec3 c = vec3(0.0, 0.9, 0.95);
+                vec3 d = vec3(0.95, 0.95, 1.0);
+                return mix(mix(a, b, smoothstep(0.0, 0.35, t)), mix(c, d, smoothstep(0.5, 0.85, t)), smoothstep(0.35, 0.5, t));
+            }
+            void main() {
+                vec2 px = (vUv - 0.5) * 2.0;
+                px.x *= uResolution.x / uResolution.y;
+                vec2 pt = px * 1.15;
+                vec3 col = vec3(0.02, 0.02, 0.06);
+                float t = 0.0;
+
+                if (uMode == 0) {
+                    vec2 dir1 = vec2(cos(uTime * 0.8), sin(uTime * 0.8));
+                    vec2 dir2 = vec2(cos(uTime * 0.5 + 1.2), sin(uTime * 0.5 + 1.2));
+                    vec2 dir3 = vec2(cos(uTime * 1.1 + 2.5), sin(uTime * 1.1 + 2.5));
+                    float line1 = 0.5 + 0.5 * sin(dot(pt, dir1) * 14.0 + uTime * 5.0);
+                    float line2 = 0.5 + 0.5 * sin(dot(pt, dir2) * 12.0 - uTime * 4.0);
+                    float line3 = 0.5 + 0.5 * sin(dot(pt, dir3) * 10.0 + uTime * 3.5);
+                    float beam = smoothstep(0.72, 0.88, line1) + smoothstep(0.72, 0.88, line2);
+                    beam += 0.6 * smoothstep(0.68, 0.82, line3);
+                    float pulse = 0.75 + 0.25 * sin(uTime * 4.0);
+                    beam *= pulse;
+                    beam = min(1.0, beam);
+                    t = fract(dot(pt, dir1) * 0.1 + uTime * 0.12);
+                    col = 0.03 + 0.97 * palCyanMagenta(t) * (0.45 + 0.55 * beam);
+                } else if (uMode == 1) {
+                    vec2 dir = vec2(cos(uTime * 0.4), sin(uTime * 0.3));
+                    float stripe = 0.5 + 0.5 * sin(dot(pt, dir) * 5.0 + uTime * 2.5);
+                    stripe = smoothstep(0.3, 0.7, stripe);
+                    vec2 dir2 = vec2(cos(uTime * 0.25 + 1.5), sin(uTime * 0.2 + 1.0));
+                    float stripe2 = 0.5 + 0.5 * sin(dot(pt, dir2) * 4.0 - uTime * 1.8);
+                    stripe2 = smoothstep(0.35, 0.65, stripe2);
+                    t = fract(length(pt) * 0.15 + uTime * 0.08 + (stripe + stripe2) * 0.35);
+                    col = 0.08 + 0.92 * palCyanMagenta(t) * (0.5 + 0.5 * (stripe + stripe2 * 0.6));
+                } else if (uMode == 2) {
+                    float mirror = 0.5 + 0.5 * sin(pt.x * 4.0 + uTime * 2.0);
+                    mirror += 0.5 * sin(pt.y * 5.0 - uTime * 1.5);
+                    mirror = mirror * 0.5 + 0.5;
+                    float shine = smoothstep(0.45, 0.55, mirror) + 0.6 * smoothstep(0.3, 0.5, abs(sin((pt.x + pt.y) * 3.0 + uTime)));
+                    t = fract(mirror * 0.5 + pt.x * 0.1 + pt.y * 0.08 + uTime * 0.05);
+                    col = 0.05 + 0.95 * palPurplePink(t) * (0.5 + 0.5 * shine);
+                } else if (uMode == 3) {
+                    float prism = fract(pt.x * 0.4 + pt.y * 0.3 + uTime * 0.15);
+                    float edge = smoothstep(0.0, 0.08, abs(fract(pt.y * 2.5 + uTime * 0.5) - 0.5));
+                    prism = prism * (0.7 + 0.3 * edge);
+                    float band = 0.5 + 0.5 * sin(pt.x * 6.0 + uTime * 2.0);
+                    band = smoothstep(0.35, 0.65, band);
+                    t = fract(prism + band * 0.3);
+                    col = 0.04 + 0.96 * palCrystal(t);
+                } else if (uMode == 4) {
+                    float wave = 0.5 + 0.5 * sin(pt.x * 5.0 + uTime * 2.5);
+                    wave += 0.5 * (0.5 + 0.5 * sin(pt.y * 4.0 - uTime * 2.0));
+                    float sweep = smoothstep(0.0, 0.2, fract(pt.y * 0.3 + uTime * 0.4)) * smoothstep(1.0, 0.8, fract(pt.y * 0.3 + uTime * 0.4));
+                    wave = wave * (0.65 + 0.35 * sweep);
+                    t = fract(wave * 0.65 + pt.x * 0.08 + pt.y * 0.1 + uTime * 0.08);
+                    col = 0.04 + 0.96 * palClubNeon(t) * (0.55 + 0.45 * wave);
+                } else if (uMode == 5) {
+                    float drop = 0.0;
+                    for (int i = 0; i < 48; i++) {
+                        float fi = float(i);
+                        vec2 seed = vec2(fi * 1.17, fi * 0.93);
+                        vec2 cen = (hash22(seed) - 0.5) * 2.6;
+                        cen += 0.25 * vec2(sin(uTime * 0.6 + fi * 0.5), cos(uTime * 0.45 + fi * 0.3));
+                        float r = length(pt - cen);
+                        float phase = fract(hash21(seed + 1.0) + uTime * 0.15);
+                        float rad = 0.14 + phase * 0.06;
+                        drop += (1.0 - smoothstep(0.0, rad, r)) * (0.6 + 0.4 * sin(uTime * 2.5 + fi));
+                    }
+                    drop = min(1.0, drop * 0.35);
+                    t = fract(pt.x * 0.15 + pt.y * 0.12 + uTime * 0.05);
+                    col = 0.04 + 0.96 * palClubNeon(t) * (0.45 + 0.55 * drop);
+                } else if (uMode == 6) {
+                    float rings = 0.0;
+                    for (int i = 0; i < 9; i++) {
+                        float fi = float(i);
+                        vec2 off = vec2(mod(fi, 3.0) - 1.0, floor(fi / 3.0) - 1.0) * 1.4;
+                        float r = length(pt - off);
+                        rings += 0.5 + 0.5 * sin(r * 10.0 - uTime * 8.0 + fi);
+                    }
+                    rings = rings / 9.0;
+                    rings = smoothstep(0.3, 0.7, rings);
+                    float sweep = 0.5 + 0.5 * sin(pt.x * 4.0 + uTime * 3.0);
+                    sweep = smoothstep(0.4, 0.6, sweep);
+                    rings = rings * (0.7 + 0.3 * sweep);
+                    t = fract(rings * 0.6 + pt.x * 0.1 + uTime * 0.04);
+                    col = 0.04 + 0.96 * palCyanMagenta(t) * (0.55 + 0.45 * rings);
+                } else if (uMode == 7) {
+                    float segments = 8.0;
+                    float angle = atan(px.y, px.x);
+                    float r = length(px);
+                    float seg = floor(mod(angle / 6.28318 * segments + uTime * 0.2, segments));
+                    float a2 = mod(angle, 6.28318 / segments) - 3.14159 / segments;
+                    vec2 kaleido = r * vec2(cos(a2), sin(a2));
+                    float facet = abs(sin(kaleido.x * 2.0 + uTime * 0.8)) * abs(sin(kaleido.y * 2.0 - uTime * 0.6));
+                    facet = smoothstep(0.0, 0.15, facet) + 0.3 * smoothstep(0.5, 0.8, facet);
+                    float edge = 1.0 - smoothstep(0.0, 0.04, abs(fract(kaleido.x * 0.8) - 0.5));
+                    edge += 1.0 - smoothstep(0.0, 0.04, abs(fract(kaleido.y * 0.8) - 0.5));
+                    facet = min(1.0, facet + edge * 0.9);
+                    float prism = fract(seg * 0.12 + r * 0.25 + uTime * 0.04);
+                    t = fract(prism + facet * 0.4);
+                    col = 0.02 + 0.98 * palCrystal(t) * (0.5 + 0.5 * facet);
+                } else if (uMode == 8) {
+                    vec2 pt2 = px * 2.8;
+                    float ripple = 0.0;
+                    for (int i = 0; i < 12; i++) {
+                        float fi = float(i);
+                        vec2 cen = 2.0 * vec2(cos(fi * 0.52 + uTime * 0.4), sin(fi * 0.41 + uTime * 0.3));
+                        ripple += 0.5 + 0.5 * sin(length(pt2 - cen) * 7.0 - uTime * 6.0 + fi * 1.5);
+                    }
+                    ripple = ripple / 12.0;
+                    ripple = smoothstep(0.35, 0.65, ripple);
+                    float travel = 0.5 + 0.5 * sin(pt.x * 5.0 + pt.y * 3.0 + uTime * 3.0);
+                    travel = smoothstep(0.4, 0.6, travel);
+                    ripple = ripple * (0.7 + 0.3 * travel);
+                    t = fract(ripple * 0.6 + pt.x * 0.08 + pt.y * 0.08 + uTime * 0.04);
+                    col = 0.04 + 0.96 * palPurplePink(t) * (0.5 + 0.5 * ripple);
+                } else if (uMode == 9) {
+                    float iridescent = sin(pt.x * 2.5 + pt.y * 2.0 + uTime) * 0.5 + 0.5;
+                    iridescent += 0.5 * sin((pt.x - pt.y) * 3.0 + uTime * 1.2) * 0.5 + 0.5;
+                    float shift = fract(iridescent * 0.5 + length(pt) * 0.2 + uTime * 0.08);
+                    float bubble = 0.5 + 0.5 * sin(pt.x * 8.0 + uTime * 2.0) * sin(pt.y * 6.0 - uTime * 1.5);
+                    bubble = smoothstep(0.4, 0.6, bubble);
+                    t = fract(shift + bubble * 0.3);
+                    col = 0.04 + 0.96 * palCrystal(t);
+                } else if (uMode == 10) {
+                    float band = sin(pt.y * 4.0 + uTime * 1.2) * 0.5 + 0.5;
+                    band += 0.6 * (sin(pt.y * 2.5 + pt.x * 2.0 - uTime * 0.8) * 0.5 + 0.5);
+                    band = smoothstep(0.25, 0.75, band);
+                    float sweep = smoothstep(0.0, 0.2, fract(pt.x * 0.5 + uTime * 0.5)) * smoothstep(1.0, 0.8, fract(pt.x * 0.5 + uTime * 0.5));
+                    band = band * (0.65 + 0.35 * sweep);
+                    t = fract(band * 0.7 + pt.y * 0.12 + uTime * 0.06);
+                    col = 0.03 + 0.97 * palAurora(t) * (0.55 + 0.45 * band);
+                } else if (uMode == 11) {
+                    float spark = 0.0;
+                    for (int i = 0; i < 56; i++) {
+                        float fi = float(i);
+                        vec2 seed = vec2(fi * 2.31, fi * 1.71);
+                        vec2 cen = (hash22(seed) - 0.5) * 2.4;
+                        cen += 0.2 * vec2(sin(uTime * 0.8 + fi * 0.4), cos(uTime * 0.6 + fi * 0.35));
+                        float d = length(pt - cen);
+                        float phase = fract(hash21(seed + 2.0) + uTime * 0.3);
+                        float rad = 0.055 + phase * 0.035;
+                        spark += (1.0 - smoothstep(0.0, rad, d)) * (0.5 + 0.5 * sin(uTime * 6.0 + fi * 1.5));
+                    }
+                    spark = min(1.0, spark * 0.4);
+                    float glow = 0.5 + 0.5 * sin(pt.x * 2.5 + uTime) * sin(pt.y * 2.5 - uTime * 0.8);
+                    t = fract(spark + glow * 0.35 + uTime * 0.02);
+                    col = 0.03 + 0.97 * palFire(t) * (0.5 + 0.5 * spark);
+                } else if (uMode == 12) {
+                    float breath = 0.5 + 0.5 * sin(uTime * 1.8);
+                    float wave = 0.5 + 0.5 * sin(pt.x * 1.8 + uTime * 1.2);
+                    wave *= 0.5 + 0.5 * sin(pt.y * 1.5 + uTime * 1.0);
+                    float pulse = breath * (0.6 + 0.4 * wave);
+                    float overlay = 0.5 + 0.5 * sin(pt.x * 4.0 + uTime * 2.0) * sin(pt.y * 3.0 - uTime * 1.5);
+                    pulse = pulse * (0.75 + 0.25 * overlay);
+                    t = fract(pulse + pt.x * 0.05 + pt.y * 0.05 + uTime * 0.03);
+                    col = 0.04 + 0.96 * palMonoCyan(t);
+                }
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+        const WALL_RADIUS = 8;
+        const WALL_HEIGHT = 5;
+        const wallMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uResolution: { value: new THREE.Vector2(2 * Math.PI * WALL_RADIUS, WALL_HEIGHT) },
+                uTime: { value: 0 },
+                uMode: { value: 0 }
+            },
+            vertexShader: wallVertex,
+            fragmentShader: wallFragment,
+            side: THREE.BackSide,
+            depthWrite: true,
+            depthTest: true
+        });
+
+        let currentBgMode = 0;
+        let lastModeSwitchTime = 0;
+        const MODE_CYCLE_SEC = 10;
+        const NUM_VFX_MODES = 13;
+        function setVfxMode(n) {
+            if (n < 0 || n >= NUM_VFX_MODES) return;
+            currentBgMode = n;
+            wallMaterial.uniforms.uMode.value = currentBgMode;
+        }
+        window.addEventListener('keydown', (e) => {
+            const n = e.code === 'Digit1' ? 0 : e.code === 'Digit2' ? 1 : e.code === 'Digit3' ? 2 : e.code === 'Digit4' ? 3 : e.code === 'Digit5' ? 4 : e.code === 'Digit6' ? 5 : e.code === 'Digit7' ? 6 : e.code === 'Digit8' ? 7 : e.code === 'Digit9' ? 8 : e.code === 'Digit0' ? 9 : -1;
+            if (n >= 0) setVfxMode(n);
+        });
+
+        // Base lights (dimmed for club vibe)
+        scene.add(new THREE.AmbientLight(0x8899ff, 0.25));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+        sun.position.set(15, 25, 15);
+        scene.add(sun);
+        const fill = new THREE.DirectionalLight(0xffaacc, 0.12);
+        fill.position.set(-10, 5, -10);
+        scene.add(fill);
+
+        // Disco / neon: main ring of colored point lights (disco ball) – rotates one way
+        const DISCO_RADIUS = 2.6;
+        const DISCO_HEIGHT = 4.5;
+        const NEON_COLORS = [0xff00ff, 0x00ffff, 0xffff00, 0x00ff88, 0xff0088, 0xff8800];
+        const discoLightsGroup = new THREE.Group();
+        discoLightsGroup.position.set(0, DISCO_HEIGHT, 0);
+        const discoLights = [];
+        NEON_COLORS.forEach((color, i) => {
+            const angle = (i / NEON_COLORS.length) * Math.PI * 2;
+            const pl = new THREE.PointLight(color, 2, 16, 1.8);
+            pl.position.set(Math.cos(angle) * DISCO_RADIUS, 0, Math.sin(angle) * DISCO_RADIUS);
+            pl.userData.baseIntensity = 2;
+            pl.userData.phase = i * 0.7;
+            discoLightsGroup.add(pl);
+            discoLights.push(pl);
+        });
+        scene.add(discoLightsGroup);
+
+        // Second ring: lower, counter-rotating (party floor wash)
+        const RIM_RADIUS = 3.2;
+        const RIM_HEIGHT = 1.8;
+        const RIM_COLORS = [0xcc00ff, 0x00ffcc, 0xffcc00];
+        const rimLightsGroup = new THREE.Group();
+        rimLightsGroup.position.set(0, RIM_HEIGHT, 0);
+        RIM_COLORS.forEach((color, i) => {
+            const angle = (i / RIM_COLORS.length) * Math.PI * 2;
+            const pl = new THREE.PointLight(color, 1.4, 12, 1.8);
+            pl.position.set(Math.cos(angle) * RIM_RADIUS, 0, Math.sin(angle) * RIM_RADIUS);
+            pl.userData.baseIntensity = 1.4;
+            pl.userData.phase = i * 1.2;
+            rimLightsGroup.add(pl);
+            discoLights.push(pl);
+        });
+        scene.add(rimLightsGroup);
+
+        // Third ring: outer rotating lights (different speed = more movement)
+        const OUTER_RADIUS = 3.8;
+        const OUTER_HEIGHT = 3.5;
+        const OUTER_COLORS = [0xff2288, 0x22ffaa, 0xffaa00];
+        const outerLightsGroup = new THREE.Group();
+        outerLightsGroup.position.set(0, OUTER_HEIGHT, 0);
+        OUTER_COLORS.forEach((color, i) => {
+            const angle = (i / OUTER_COLORS.length) * Math.PI * 2;
+            const pl = new THREE.PointLight(color, 1.6, 14, 1.8);
+            pl.position.set(Math.cos(angle) * OUTER_RADIUS, 0, Math.sin(angle) * OUTER_RADIUS);
+            pl.userData.baseIntensity = 1.6;
+            pl.userData.phase = i * 0.5;
+            outerLightsGroup.add(pl);
+            discoLights.push(pl);
+        });
+        scene.add(outerLightsGroup);
+
+        const DISCO_ROTATE_SPEED = 0.52;
+        const RIM_ROTATE_SPEED = -0.38;
+        const OUTER_ROTATE_SPEED = 0.31;
+        const PULSE_SPEED = 3.2;
+
+        // Disco spotlights: beams sweeping the floor – primary moving heads
+        const SPOT_HEIGHT = 5.5;
+        const SPOT_RADIUS = 2.2;
+        const SPOT_COLORS = [0xff00ff, 0x00ffff, 0xffff00, 0xff4400, 0x00ff88];
+        const spotLightsGroup = new THREE.Group();
+        spotLightsGroup.position.set(0, SPOT_HEIGHT, 0);
+        const spotLights = [];
+        SPOT_COLORS.forEach((color, i) => {
+            const angle = (i / SPOT_COLORS.length) * Math.PI * 2;
+            const spot = new THREE.SpotLight(color, 5, 20, Math.PI * 0.24, 0.3, 1.1);
+            spot.position.set(Math.cos(angle) * SPOT_RADIUS, 0, Math.sin(angle) * SPOT_RADIUS);
+            spot.target.position.set(0, -SPOT_HEIGHT - 1, 0);
+            spotLightsGroup.add(spot);
+            spotLightsGroup.add(spot.target);
+            spot.castShadow = false;
+            spot.userData.baseIntensity = 5;
+            spot.userData.phase = i * 0.9;
+            spotLights.push(spot);
+        });
+        scene.add(spotLightsGroup);
+
+        // Second ring of spots: counter-rotating, different colors (like more fixtures)
+        const SPOT2_RADIUS = 2.8;
+        const SPOT2_COLORS = [0xdd00ff, 0x00ddff, 0xffdd00];
+        const spotLightsGroup2 = new THREE.Group();
+        spotLightsGroup2.position.set(0, SPOT_HEIGHT, 0);
+        SPOT2_COLORS.forEach((color, i) => {
+            const angle = (i / SPOT2_COLORS.length) * Math.PI * 2 + 0.5;
+            const spot = new THREE.SpotLight(color, 3.5, 18, Math.PI * 0.2, 0.4, 1.2);
+            spot.position.set(Math.cos(angle) * SPOT2_RADIUS, 0, Math.sin(angle) * SPOT2_RADIUS);
+            spot.target.position.set(0, -SPOT_HEIGHT - 1, 0);
+            spotLightsGroup2.add(spot);
+            spotLightsGroup2.add(spot.target);
+            spot.castShadow = false;
+            spot.userData.baseIntensity = 3.5;
+            spot.userData.phase = i * 1.1;
+            spotLights.push(spot);
+        });
+        scene.add(spotLightsGroup2);
+
+        const SPOT_ROTATE_SPEED = 0.48;
+        const SPOT2_ROTATE_SPEED = -0.36;
+
+        function normalizeMaterial(m) {
+            if (!m || !m.isMaterial) return;
+            if (m.map && m.map.colorSpace !== undefined) m.map.colorSpace = THREE.SRGBColorSpace;
+            if (m.emissiveMap && m.emissiveMap.colorSpace !== undefined) m.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+            if (scene.environment && m.envMap !== undefined) m.envMap = scene.environment;
+            if (m.envMapIntensity !== undefined) m.envMapIntensity = 1;
+        }
+
+        function hash(seed) {
+            const n = (seed * 0x6D2B79F5) >>> 0;
+            const t = Math.imul(n ^ (n >>> 15), n | 1);
+            return (t >>> 0) / 4294967296;
+        }
+        function createRng(baseSeed) {
+            let state = (baseSeed * 0x6D2B79F5) >>> 0;
+            return function () {
+                state = (state + 0x6D2B79F5) >>> 0;
+                let t = state;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                return (t >>> 0) / 4294967296;
+            };
+        }
+
+        const TIMECLOCK_OPTIONS = [2, 5, 7, 11, 17];
+
+        class ConcertAvatar extends THREE.Group {
+            constructor(seed) {
+                super();
+                this.avatarId = seed;
+                const r = createRng(seed);
+                const skin = new THREE.Color().set(r(), r(), r());
+                const clothes = new THREE.Color().set(r(), r(), r());
+                const pants = clothes.clone().multiplyScalar(0.65);
+
+                const head = new THREE.Mesh(
+                    new THREE.BoxGeometry(1, 1, 1),
+                    new THREE.MeshStandardMaterial({ color: skin, roughness: 0.9 })
+                );
+                head.position.y = 1.15;
+                this.add(head);
+
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 0.7, 0.5),
+                    new THREE.MeshStandardMaterial({ color: clothes, roughness: 0.8 })
+                );
+                body.position.y = 0.55;
+                this.add(body);
+
+                const armGeom = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+                const armMat = new THREE.MeshStandardMaterial({ color: clothes, roughness: 0.8 });
+                const leftArm = new THREE.Mesh(armGeom, armMat);
+                leftArm.position.set(-0.5, 0.55, 0);
+                this.add(leftArm);
+                const rightArm = new THREE.Mesh(armGeom, armMat);
+                rightArm.position.set(0.5, 0.55, 0);
+                this.add(rightArm);
+
+                const legGeom = new THREE.BoxGeometry(0.26, 0.5, 0.26);
+                const legMat = new THREE.MeshStandardMaterial({ color: pants, roughness: 0.8 });
+                const leftLeg = new THREE.Mesh(legGeom, legMat);
+                leftLeg.position.set(-0.2, -0.05, 0);
+                this.add(leftLeg);
+                const rightLeg = new THREE.Mesh(legGeom, legMat);
+                rightLeg.position.set(0.2, -0.05, 0);
+                this.add(rightLeg);
+
+                this.scale.setScalar(0.08);
+                this.head = head;
+                this.leftArm = leftArm;
+                this.rightArm = rightArm;
+                this.leftLeg = leftLeg;
+                this.rightLeg = rightLeg;
+
+                this.baseX = 0;
+                this.baseZ = 0;
+                this.baseAngle = 0;
+                this.baseY = 0;
+                this.phase = r() * Math.PI * 2;
+                this.walkPhase = r() * Math.PI * 2;
+                this.waveFreq = 1.5 + r() * 3.5;
+                this.waveAmount = 0.4 + r() * 1.0;
+                this.rotateFreq = 0.1 + r() * 0.25;
+                this.walkFreq = 0.35 + r() * 0.5;
+                this.walkAmountBase = 0.004 + r() * 0.006;
+                this.walkRange = 0.08 + r() * 0.14;
+                this.jumpFreq = 1.2 + r() * 1.2;
+                this.jumpHeightBase = 0.07 + r() * 0.1;
+
+                this.timeclock = TIMECLOCK_OPTIONS[Math.floor(r() * 5)];
+                this.timeclockRemaining = this.timeclock;
+                this.fireCount = 0;
+
+                this.walkTier = Math.floor(r() * 5);
+                this.nodTier = Math.floor(r() * 5);
+                this.nodNext = r() * 3;
+                this.nodEnd = -1;
+                this.nodStart = -1;
+                this.nodAmp = 0.15;
+
+                this.jumpOn = r() < 0.33;
+                this.jumpTier = this.jumpOn ? Math.floor(r() * 5) : 0;
+
+                this.selfRotateTier = Math.floor(r() * 5);
+                const rotIntensity = this.selfRotateTier / 4;
+                this.selfRotateSpeed = this.selfRotateTier > 0 ? (r() - 0.5) * 2.5 * rotIntensity : 0;
+            }
+
+            onCountdownReached(t) {
+                const id = this.avatarId;
+                const fc = this.fireCount;
+                const h = (off) => hash(id + fc * 31 + off);
+                this.timeclockRemaining = TIMECLOCK_OPTIONS[Math.floor(h(0) * 5)];
+                this.walkTier = Math.floor(h(1) * 5);
+                if (h(2) < 0.5) this.nodTier = Math.floor(h(3) * 5);
+                if (h(4) < 0.5) {
+                    this.jumpOn = true;
+                    this.jumpTier = Math.floor(h(5) * 5);
+                } else {
+                    this.jumpOn = false;
+                    this.jumpTier = 0;
+                }
+                this.selfRotateTier = Math.floor(h(6) * 5);
+                if (this.selfRotateTier > 0) {
+                    const intensity = this.selfRotateTier / 4;
+                    this.selfRotateSpeed = (hash(id + fc * 31 + 7) - 0.5) * 2.5 * intensity;
+                } else this.selfRotateSpeed = 0;
+                this.fireCount++;
+            }
+
+            update(dt, t) {
+                this.timeclockRemaining -= dt;
+                if (this.timeclockRemaining <= 0) this.onCountdownReached(t);
+
+                this.position.x = this.baseX;
+                this.position.z = this.baseZ;
+                this.rotation.y = -this.baseAngle;
+
+                const phase = this.phase;
+                const walkMul = this.walkTier / 4;
+                const nodMul = this.nodTier / 4;
+                const jumpMul = this.jumpOn ? (this.jumpTier + 1) / 5 : 0;
+                const jumpU = this.jumpOn && jumpMul > 0 ? ((t * this.jumpFreq + phase) % 1 + 1) % 1 : 0;
+                const jump = this.jumpOn && jumpMul > 0 ? 4 * jumpU * (1 - jumpU) * this.jumpHeightBase * jumpMul : 0;
+                this.position.y = this.baseY + jump;
+
+                this.rotation.y += Math.sin(t * this.rotateFreq + phase * 2) * 0.12;
+                this.rotation.z = Math.sin(t * this.rotateFreq * 0.7 + phase) * 0.04;
+                if (this.selfRotateTier > 0) this.rotation.y += this.selfRotateSpeed * dt;
+
+                const wave = Math.sin(t * this.waveFreq + phase) * this.waveAmount;
+                this.leftArm.rotation.x = -wave;
+                this.rightArm.rotation.x = -wave;
+                this.leftArm.rotation.z = wave * 0.3;
+                this.rightArm.rotation.z = -wave * 0.3;
+
+                const walkLegPhase = t * this.walkFreq * 2 + this.walkPhase;
+                const legSwingWalk = walkMul > 0 ? Math.sin(walkLegPhase) * 0.5 * walkMul : 0;
+                const legSwingJump = this.jumpOn && jumpMul > 0 ? Math.sin(jumpU * Math.PI * 2) * 0.35 * jumpMul : 0;
+                this.leftLeg.rotation.x = legSwingWalk + legSwingJump;
+                this.rightLeg.rotation.x = -legSwingWalk - legSwingJump;
+
+                if (walkMul > 0) {
+                    const wander = this.walkRange * walkMul;
+                    this.position.x += Math.cos(t * this.walkFreq + this.walkPhase) * wander;
+                    this.position.z += Math.sin(t * this.walkFreq + this.walkPhase) * wander;
+                }
+
+                if (this.head) {
+                    if (t >= this.nodEnd) { this.head.rotation.x = 0; this.head.rotation.y = 0; }
+                    if (t >= this.nodNext && t >= this.nodEnd && nodMul > 0) {
+                        this.nodStart = t;
+                        this.nodEnd = t + 0.2 + hash(this.avatarId + 9) * 0.25;
+                        this.nodNext = t + 1.2 + hash(this.avatarId + Math.floor(t * 0.5)) * 4;
+                        this.nodAmp = (0.12 + hash(this.avatarId + 10) * 0.18) * nodMul;
+                    }
+                    if (this.nodStart >= 0 && t >= this.nodStart && t < this.nodEnd) {
+                        const dur = this.nodEnd - this.nodStart;
+                        const p = (t - this.nodStart) / dur;
+                        this.head.rotation.x = Math.sin(p * Math.PI) * this.nodAmp;
+                        this.head.rotation.y = Math.sin(p * Math.PI) * 0.05 * (hash(this.avatarId + 11) - 0.5);
+                    }
+                }
+            }
+        }
+
+        const floorRadius = 8;
+        const floorGeom = new THREE.CircleGeometry(floorRadius, 64);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0d0d1a, roughness: 0.9 });
+        const floor = new THREE.Mesh(floorGeom, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const stageGeom = new THREE.CylinderGeometry(1, 1.05, 0.25, 32);
+        const stageMat = new THREE.MeshStandardMaterial({ color: 0x1a0a2e, roughness: 0.55, metalness: 0.35 });
+        const stage = new THREE.Mesh(stageGeom, stageMat);
+        stage.position.y = 0.125;
+        scene.add(stage);
+
+        const wallCylinder = new THREE.Mesh(
+            new THREE.CylinderGeometry(WALL_RADIUS, WALL_RADIUS, WALL_HEIGHT, 64, 16, true),
+            wallMaterial
+        );
+        wallCylinder.position.y = WALL_HEIGHT * 0.5;
+        scene.add(wallCylinder);
+
+        let stageModel = null;
+        let stageModelMixer = null;
+        let stageModelActions = [];
+        let currentStageAction = null;
+        const stageModelClock = new THREE.Clock();
+        const STAGE_MODEL_ROTATE_SPEED = 0.12;
+        const GLBLoader = new GLTFLoader();
+        GLBLoader.load(
+            './shiteyanyo.glb',
+            (gltf) => {
+                const model = gltf.scene;
+                stageModel = model;
+                model.position.set(0, 0.25, 0);
+                const box = new THREE.Box3().setFromObject(model);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = maxDim > 0 ? 0.5 / maxDim : 1;
+                model.scale.setScalar(scale);
+                box.setFromObject(model);
+                box.getCenter(model.position);
+                model.position.y += 0.12 - box.min.y;
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        const mat = child.material;
+                        if (mat) {
+                            if (Array.isArray(mat)) mat.forEach(m => normalizeMaterial(m));
+                            else normalizeMaterial(mat);
+                        }
+                    }
+                });
+                scene.add(model);
+                const ALLOWED_ANIM_NAMES = new Set([
+                    'Sprint_Loop', 'Sword_Block', 'Dance Body Roll', 'Sword_Regular_C',
+                    'Walk_Carry_Loop', 'Walk_Formal_Loop', 'Zombie_Walk_Fwd_Loop',
+                    'Hit_Knockback', 'Jumping Jacks', 'Roll'
+                ]);
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const clips = gltf.animations.filter((clip) => ALLOWED_ANIM_NAMES.has(clip.name));
+                    stageModelMixer = new THREE.AnimationMixer(model);
+                    stageModelMixer.timeScale = 2;
+                    clips.forEach((clip) => {
+                        const action = stageModelMixer.clipAction(clip);
+                        action.setLoop(THREE.LoopRepeat);
+                        action.clampWhenFinished = false;
+                        stageModelActions.push(action);
+                    });
+                    const startIndex = stageModelActions.length ? Math.floor(Math.random() * stageModelActions.length) : 0;
+                    currentStageAction = stageModelActions[startIndex];
+                    if (currentStageAction) {
+                        currentStageAction.reset();
+                        currentStageAction.play();
+                    }
+                    let lastSwitchTime = 0;
+                    const LOOP_SWITCH_COOLDOWN = 1.2;
+                    stageModelMixer.addEventListener('loop', (e) => {
+                        if (e.action !== currentStageAction) return;
+                        if (Math.random() >= 0.33 || !currentStageAction || stageModelActions.length < 2) return;
+                        const now = performance.now() / 1000;
+                        if (now - lastSwitchTime < LOOP_SWITCH_COOLDOWN) return;
+                        lastSwitchTime = now;
+                        const currentIndex = stageModelActions.indexOf(currentStageAction);
+                        let nextIndex = Math.floor(Math.random() * stageModelActions.length);
+                        while (nextIndex === currentIndex) nextIndex = Math.floor(Math.random() * stageModelActions.length);
+                        const nextAction = stageModelActions[nextIndex];
+                        nextAction.reset();
+                        nextAction.play();
+                        currentStageAction.crossFadeTo(nextAction, CROSSFADE_DURATION, true);
+                        currentStageAction = nextAction;
+                    });
+                }
+            },
+            undefined,
+            (err) => console.error('Error loading shiteyanyo.glb:', err)
+        );
+
+        const CROSSFADE_DURATION = 0.4;
+        window.addEventListener('keydown', (e) => {
+            if (e.code !== 'Space' || e.repeat || stageModelActions.length === 0) return;
+            e.preventDefault();
+            const nextIndex = Math.floor(Math.random() * stageModelActions.length);
+            const nextAction = stageModelActions[nextIndex];
+            if (currentStageAction) currentStageAction.crossFadeTo(nextAction, CROSSFADE_DURATION, true);
+            nextAction.play();
+            currentStageAction = nextAction;
+        });
+
+        const innerR = 1.6, outerR = 6.8, numRings = 12;
+        const avatarList = [];
+        const ringStep = (outerR - innerR) / numRings;
+        for (let ring = 0; ring < numRings; ring++) {
+            const radius = innerR + ring * ringStep + ringStep * 0.5;
+            const circumference = 2 * Math.PI * radius;
+            const density = 1.75 - 0.6 * (radius - innerR) / (outerR - innerR);
+            const count = Math.max(8, Math.floor(circumference * density));
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2 + hash(ring * 7 + i * 11) * 0.3;
+                const seed = ring * 1000 + i * 37;
+                const avatar = new ConcertAvatar(seed);
+                avatar.position.set(radius * Math.cos(angle), 0, radius * Math.sin(angle));
+                avatar.baseX = avatar.position.x;
+                avatar.baseZ = avatar.position.z;
+                avatar.baseAngle = angle;
+                scene.add(avatar);
+                avatarList.push(avatar);
+            }
+        }
+
+        const clock = new THREE.Clock();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1, 0);
+        camera.position.set(0, 3, 8);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.1;
+        controls.minDistance = 0.8;
+        controls.maxDistance = 16;
+        controls.enableZoom = false;
+        let desiredZoomDistance = camera.position.distanceTo(controls.target);
+        const ZOOM_IN_FACTOR = 0.92;
+        const ZOOM_OUT_FACTOR = 1 / ZOOM_IN_FACTOR;
+        const ZOOM_LERP = 0.12;
+        const zoomDir = new THREE.Vector3();
+        function onWheel(e) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 1 : -1;
+            const factor = delta > 0 ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR;
+            desiredZoomDistance *= Math.pow(factor, Math.min(Math.abs(e.deltaY) / 100, 3));
+            desiredZoomDistance = Math.max(controls.minDistance, Math.min(controls.maxDistance, desiredZoomDistance));
+        }
+        renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            const dt = Math.min(clock.getDelta(), 0.1);
+
+            if (t - lastModeSwitchTime >= MODE_CYCLE_SEC) {
+                setVfxMode((currentBgMode + 1) % NUM_VFX_MODES);
+                lastModeSwitchTime = t;
+            }
+            wallMaterial.uniforms.uTime.value = t;
+
+            discoLightsGroup.rotation.y += DISCO_ROTATE_SPEED * dt;
+            rimLightsGroup.rotation.y += RIM_ROTATE_SPEED * dt;
+            outerLightsGroup.rotation.y += OUTER_ROTATE_SPEED * dt;
+            spotLightsGroup.rotation.y += SPOT_ROTATE_SPEED * dt;
+            spotLightsGroup2.rotation.y += SPOT2_ROTATE_SPEED * dt;
+            discoLights.forEach((light) => {
+                const base = light.userData.baseIntensity;
+                const phase = light.userData.phase || 0;
+                light.intensity = base * (0.8 + 0.35 * Math.sin(t * PULSE_SPEED + phase));
+            });
+            spotLights.forEach((spot) => {
+                const base = spot.userData.baseIntensity;
+                const phase = spot.userData.phase || 0;
+                spot.intensity = base * (0.85 + 0.3 * Math.sin(t * 2.5 + phase));
+            });
+
+            for (let i = 0; i < avatarList.length; i++) avatarList[i].update(dt, t);
+            if (stageModel) stageModel.rotation.y += STAGE_MODEL_ROTATE_SPEED * dt;
+            if (stageModelMixer) {
+                const stageDelta = Math.min(stageModelClock.getDelta(), 0.1) || 1/60;
+                stageModelMixer.update(stageDelta);
+            }
+
+            const target = controls.target;
+            zoomDir.copy(camera.position).sub(target);
+            const currentDist = zoomDir.length();
+            const newDist = currentDist + (desiredZoomDistance - currentDist) * ZOOM_LERP;
+            desiredZoomDistance = newDist;
+            zoomDir.normalize().multiplyScalar(newDist);
+            camera.position.copy(target).add(zoomDir);
+
+            controls.update();
+            renderer.clear();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
