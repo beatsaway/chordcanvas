@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maker — Sound Lab</title>
+  <style>
+    :root {
+      --bg: #0d0c10;
+      --surface: #16151c;
+      --border: #2a2835;
+      --text: #eae8f0;
+      --muted: #7a7686;
+      --accent: #8b5cf6;
+      --dice: #f59e0b;
+      --radius: 8px;
+      --font: 'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      padding: 24px;
+    }
+    h1 { font-size: 1.4rem; font-weight: 600; margin: 0 0 6px 0; }
+    .subtitle { color: var(--muted); margin: 0 0 20px 0; font-size: 0.9rem; }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .tab {
+      padding: 10px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .tab:hover { color: var(--text); background: #1e1d24; }
+    .tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 480px;
+    }
+    .sound-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .sound-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .sound-label:hover { background: rgba(139, 92, 246, 0.15); }
+    .sound-label:active { background: rgba(139, 92, 246, 0.25); }
+    .btn-dice {
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--dice);
+      color: #1a1a1a;
+      transition: background 0.15s, transform 0.08s;
+    }
+    .btn-dice:hover { background: #fbbf24; }
+    .btn-dice:active { transform: scale(0.97); }
+    .hint {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .popup-overlay.open { display: flex; }
+    .popup {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow: auto;
+    }
+    .popup-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .popup-head h2 { margin: 0; font-size: 1rem; color: var(--text); }
+    .popup-close {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      background: var(--border);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+    .popup-close:hover { background: #3a3845; }
+    .popup pre {
+      margin: 0;
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 6px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <h1>Maker</h1>
+  <p class="subtitle">Click a sound tab, then roll the dice to randomize and hear it. Tap the sound name to see its current settings.</p>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="panel">
+    <div class="sound-row">
+      <span class="sound-label" id="soundLabel">—</span>
+      <button class="btn-dice" id="diceBtn" type="button" title="Randomize this sound and play">🎲 Roll & play</button>
+    </div>
+    <p class="hint">Dice: new random settings and play. Label: show settings popup.</p>
+  </div>
+
+  <div class="popup-overlay" id="popupOverlay">
+    <div class="popup">
+      <div class="popup-head">
+        <h2 id="popupTitle">Settings</h2>
+        <button class="popup-close" id="popupClose">Close</button>
+      </div>
+      <pre id="popupContent"></pre>
+    </div>
+  </div>
+
+  <script src="kick-synth.js"></script>
+  <script src="snare-synth.js"></script>
+  <script src="clap-synth.js"></script>
+  <script src="hat-synth.js"></script>
+  <script src="tom-synth.js"></script>
+  <script src="ride-synth.js"></script>
+  <script src="cowbell-synth.js"></script>
+  <script>
+    (function () {
+      const SOUNDS = [
+        { id: 'kick',  name: 'Kick',   play: (ctx, dest, p, t) => window.playKickTest(ctx, dest, p, t) },
+        { id: 'snare', name: 'Snare',  play: (ctx, dest, p, t) => window.playSnareTest(ctx, dest, p, t) },
+        { id: 'clap',  name: 'Clap',   play: (ctx, dest, p, t) => window.playClapTest(ctx, dest, p, t) },
+        { id: 'hat',   name: 'Hat',    play: (ctx, dest, p, t) => window.playHatTest(ctx, dest, p, t, false) },
+        { id: 'tom',   name: 'Tom',    play: (ctx, dest, p, t) => window.playTomTest(ctx, dest, p, t) },
+        { id: 'ride',  name: 'Ride',   play: (ctx, dest, p, t) => window.playRideTest(ctx, dest, p, t) },
+        { id: 'cowbell', name: 'Cowbell', play: (ctx, dest, p, t) => window.playCowbellTest(ctx, dest, p, t) }
+      ];
+
+      const RANGES = {
+        kick: {
+          f0: [48, 250], f1: [20, 62], pitchRampTime: [0.012, 0.48], decayBase: [0.1, 1.4],
+          bodyLevel: [0.2, 1.02], bodyPunchHold: [0.003, 0.035], bodyPunchTime: [0.02, 0.14],
+          bodyTailLevel: [0.05, 0.4], bodyHighpassHz: [0, 78], bodyShape: [0, 1],
+          clickNoiseLevel: [0, 0.82], clickOscLevel: [0, 0.68], clickFreq: [600, 7200],
+          clickDecay: [0.0015, 0.036], clickFilterQ: [0.4, 7],
+          fmAmount: [0, 1.25], fmDecay: [0.018, 0.2], fmFreqMult: [0.6, 3]
+        },
+        snare: {
+          bodyF: [75, 500], bodyFEnd: [50, 280], decayT: [0.02, 0.42], toneLevel: [0.08, 0.98],
+          fmAmount: [0, 1.5], fmRatio: [1, 6.5], decayN: [0.03, 0.55], noiseLevel: [0.2, 1.5],
+          noiseFilterFreq: [600, 10000], noiseFilterQ: [0.3, 4],
+          crackLevel: [0, 1.85], crackDecay: [0.01, 0.26], crackFreq: [1800, 14000], crackQ: [0.4, 4.2]
+        },
+        clap: {
+          decay: [0.035, 0.2], level: [0.45, 1.05], attack: [0, 0.011],
+          bpF: [2000, 6000], bpQ: [0.28, 2.4], crackLevel: [0, 0.52], crackFreq: [2200, 7200], crackDecay: [0.004, 0.018],
+          toneFreq: [130, 520], toneDecay: [0.014, 0.052], toneLevel: [0.02, 0.38],
+          clapCount: [1, 8], clapSpacingMs: [6, 26], lastDecayMul: [1.1, 2.9]
+        },
+        hat: {
+          durClosed: [0.01, 0.21], durOpen: [0.06, 0.82], levelClosed: [0.08, 0.98], levelOpen: [0.08, 0.98],
+          attack: [0, 0.024], stickLevel: [0, 0.58], stickDecay: [0.002, 0.018],
+          bodyLevel: [0, 0.82], bodyFreq: [300, 5400], bodyDecay: [0.006, 0.115],
+          resonantLevel: [0, 0.48], resonantFreq: [8000, 12000], resonantQ: [2, 9.5], resonantDecay: [0.008, 0.058],
+          hpF: [2000, 15800], bpQ: [0.25, 4.8], oscFreq1: [3600, 14800], oscFreq2: [4600, 17800], oscLevel: [0.04, 0.72]
+        },
+        tom: {
+          level: [0.35, 0.95], decay: [0.18, 0.85], f0: [70, 200], f1: [48, 110],
+          sweepTime: [0.06, 0.28], attack: [0, 0.028],
+          stickLevel: [0, 0.48], stickDecay: [0.01, 0.045], stickFreq: [900, 2800], stickQ: [0.6, 2.8]
+        },
+        ride: {
+          decay: [0.14, 0.82], level: [0.12, 0.82], stickDip: [0.38, 0.98], attack: [0, 0.019],
+          hpF: [3800, 11800], bpF: [5800, 13800], bpQ: [0.25, 1.9],
+          oscFreq1: [4200, 11800], oscFreq2: [5800, 13800], oscLevel: [0.06, 0.48]
+        },
+        cowbell: {
+          level: [0.2, 0.95], decay1: [0.05, 0.32], decay2: [0.025, 0.18],
+          f1: [450, 2100], f2: [700, 3000], level1: [0.3, 1], level2: [0.15, 0.85],
+          secondF1: [400, 1700], secondF2: [600, 2300], secondLevel: [0.08, 0.55], secondDecay: [0.025, 0.14],
+          stickLevel: [0, 0.58], stickDecay: [0.008, 0.038], stickFreq: [2000, 5500], stickQ: [0.6, 3.8]
+        }
+      };
+
+      const ROUND_KEYS = {
+        kick: ['f0', 'f1', 'clickFreq'],
+        snare: ['bodyF', 'bodyFEnd', 'noiseFilterFreq', 'crackFreq'],
+        clap: ['bpF', 'clapCount', 'clapSpacingMs', 'crackFreq', 'toneFreq'],
+        hat: ['hpF', 'oscFreq1', 'oscFreq2', 'bodyFreq', 'resonantFreq'],
+        tom: ['f0', 'f1', 'stickFreq'],
+        ride: ['hpF', 'bpF', 'oscFreq1', 'oscFreq2'],
+        cowbell: ['f1', 'f2', 'secondF1', 'secondF2', 'stickFreq']
+      };
+
+      const DEFAULTS = {
+        kick: { f0: 150, f1: 42, pitchRampTime: 0.055, decayBase: 0.45, bodyLevel: 0.75, bodyPunchHold: 0.012, bodyPunchTime: 0.045, bodyTailLevel: 0.12, bodyHighpassHz: 32, bodyShape: 0.7, clickNoiseLevel: 0.3, clickOscLevel: 0.22, clickFreq: 3800, clickDecay: 0.005, clickFilterQ: 2, fmAmount: 0.35, fmDecay: 0.06, fmFreqMult: 1.6 },
+        snare: { bodyF: 200, bodyFEnd: 120, decayT: 0.2, toneLevel: 0.5, fmAmount: 0.5, fmRatio: 2, decayN: 0.2, noiseLevel: 0.7, noiseFilterFreq: 4000, noiseFilterQ: 1.2, noiseFilterType: 'highpass', crackLevel: 0.5, crackDecay: 0.05, crackFreq: 6000, crackQ: 1.5 },
+        clap: { decay: 0.08, level: 0.85, attack: 0, bpF: 4000, bpQ: 1.2, crackLevel: 0.2, crackFreq: 4500, crackDecay: 0.008, addTone: false, toneFreq: 280, toneDecay: 0.028, toneLevel: 0.18, clapCount: 4, clapSpacingMs: 10, lastDecayMul: 2.5 },
+        hat: { durClosed: 0.05, durOpen: 0.2, hpF: 6500, levelClosed: 0.58, levelOpen: 0.58, noiseType: 'pink', filterType: 'highpass', bpQ: 0.7, addOscillators: false, oscFreq1: 8000, oscFreq2: 10000, oscLevel: 0.2, bodyLevel: 0.3, bodyFreq: 1400, bodyDecay: 0.022, attack: 0, stickLevel: 0.28, stickDecay: 0.006, stickFreq: 5500, resonantLevel: 0.15, resonantFreq: 10000, resonantQ: 4, resonantDecay: 0.025, hatOpen: false },
+        tom: { level: 0.6, decay: 0.4, f0: 155, f1: 78, sweepTime: 0.18, bodyOscType: 'sine', attack: 0, stickLevel: 0.2, stickDecay: 0.02, stickFreq: 1800, stickQ: 1.2 },
+        ride: { decay: 0.35, level: 0.4, stickDip: 0.7, attack: 0, hpF: 8000, bpF: 10000, bpQ: 0.8, addOscillators: false, oscFreq1: 8000, oscFreq2: 11000, oscLevel: 0.2 },
+        cowbell: { level: 0.6, decay1: 0.15, decay2: 0.08, f1: 800, level1: 0.6, f2: 1200, level2: 0.4, osc1Type: 'sine', osc2Type: 'sine', addSecondPair: false, secondF1: 600, secondF2: 900, secondLevel: 0.2, secondDecay: 0.06, stickLevel: 0.2, stickDecay: 0.02, stickFreq: 3500, stickQ: 1.5 }
+      };
+
+      let ctx = null;
+      let master = null;
+      const soundParams = {};
+      let activeId = 'kick';
+
+      SOUNDS.forEach(s => {
+        soundParams[s.id] = { ...DEFAULTS[s.id] };
+      });
+
+      function getCtx() {
+        if (!ctx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          ctx = new Ctx();
+          master = ctx.createGain();
+          master.gain.value = 0.42;
+          master.connect(ctx.destination);
+        }
+        return ctx;
+      }
+
+      function randomInRange(lo, hi, round) {
+        const r = lo + Math.random() * (hi - lo);
+        return round ? Math.round(r) : parseFloat(r.toFixed(3));
+      }
+
+      function randomizeSound(id) {
+        const ranges = RANGES[id];
+        const roundKeys = ROUND_KEYS[id] || [];
+        const params = { ...soundParams[id] };
+        Object.keys(ranges).forEach(key => {
+          const [lo, hi] = ranges[key];
+          params[key] = randomInRange(lo, hi, roundKeys.includes(key));
+        });
+        if (id === 'snare' && Math.random() > 0.5) params.noiseFilterType = ['highpass', 'bandpass'][Math.floor(Math.random() * 2)];
+        if (id === 'clap') params.addTone = Math.random() > 0.5;
+        if (id === 'hat') {
+          if (Math.random() > 0.5) params.noiseType = ['white', 'pink'][Math.floor(Math.random() * 2)];
+          if (Math.random() > 0.5) params.filterType = ['highpass', 'bandpass'][Math.floor(Math.random() * 2)];
+          if (Math.random() > 0.5) params.addOscillators = Math.random() > 0.5;
+          if (Math.random() > 0.5) params.hatOpen = Math.random() > 0.5;
+        }
+        if (id === 'tom' && Math.random() > 0.5) params.bodyOscType = ['sine', 'triangle'][Math.floor(Math.random() * 2)];
+        if (id === 'ride') params.addOscillators = Math.random() > 0.5;
+        if (id === 'cowbell') {
+          if (Math.random() > 0.5) params.osc1Type = ['sine', 'triangle', 'square'][Math.floor(Math.random() * 3)];
+          if (Math.random() > 0.5) params.osc2Type = ['sine', 'triangle', 'sawtooth', 'square'][Math.floor(Math.random() * 4)];
+          if (Math.random() > 0.5) params.addSecondPair = Math.random() > 0.5;
+        }
+        soundParams[id] = params;
+        return params;
+      }
+
+      function playSound(id) {
+        getCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const s = SOUNDS.find(x => x.id === id);
+        const params = soundParams[id];
+        if (!s || !params) return;
+        if (id === 'hat') {
+          const isOpen = params.hatOpen === true;
+          window.playHatTest(ctx, master, params, ctx.currentTime, isOpen);
+        } else {
+          s.play(ctx, master, params, ctx.currentTime);
+        }
+      }
+
+      function rollAndPlay(id) {
+        randomizeSound(id);
+        playSound(id);
+      }
+
+      function showSettingsPopup(id) {
+        const name = SOUNDS.find(s => s.id === id).name;
+        document.getElementById('popupTitle').textContent = name + ' — settings';
+        document.getElementById('popupContent').textContent = JSON.stringify(soundParams[id], null, 2);
+        document.getElementById('popupOverlay').classList.add('open');
+      }
+
+      function renderTabs() {
+        const container = document.getElementById('tabs');
+        container.innerHTML = '';
+        SOUNDS.forEach(s => {
+          const tab = document.createElement('button');
+          tab.className = 'tab' + (s.id === activeId ? ' active' : '');
+          tab.textContent = s.name;
+          tab.type = 'button';
+          tab.addEventListener('click', () => {
+            activeId = s.id;
+            document.getElementById('soundLabel').textContent = s.name;
+            container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+          });
+          container.appendChild(tab);
+        });
+      }
+
+      document.getElementById('soundLabel').textContent = SOUNDS[0].name;
+      document.getElementById('soundLabel').addEventListener('click', () => showSettingsPopup(activeId));
+      document.getElementById('diceBtn').addEventListener('click', () => {
+        rollAndPlay(activeId);
+      });
+      document.getElementById('popupClose').addEventListener('click', () => {
+        document.getElementById('popupOverlay').classList.remove('open');
+      });
+      document.getElementById('popupOverlay').addEventListener('click', (e) => {
+        if (e.target.id === 'popupOverlay') document.getElementById('popupOverlay').classList.remove('open');
+      });
+
+      renderTabs();
+    })();
+  </script>
+</body>
+</html>

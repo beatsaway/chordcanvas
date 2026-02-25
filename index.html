@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soundplayground</title>
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0a0f;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e8e8e8;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 480px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 3rem;
+            font-weight: 400;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .projects {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .project-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        
+        .project-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-1px);
+        }
+        
+        .project-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+            line-height: 1;
+            filter: grayscale(0.3);
+            transition: filter 0.25s;
+        }
+        
+        .project-card:hover .project-icon {
+            filter: grayscale(0);
+        }
+        
+        .project-info {
+            flex: 1;
+            text-align: left;
+        }
+        
+        .project-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+            letter-spacing: -0.2px;
+        }
+        
+        .project-description {
+            font-size: 0.8125rem;
+            color: rgba(255, 255, 255, 0.35);
+            line-height: 1.5;
+            font-weight: 400;
+        }
+        
+        .project-arrow {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+            transition: all 0.25s;
+            font-weight: 300;
+        }
+        
+        .project-card:hover .project-arrow {
+            transform: translateX(2px);
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.75rem;
+            }
+            
+            .subtitle {
+                font-size: 0.75rem;
+            }
+            
+            .project-card {
+                padding: 1.25rem;
+            }
+            
+            .project-icon {
+                font-size: 1.75rem;
+            }
+            
+            .project-title {
+                font-size: 0.9375rem;
+            }
+            
+            .project-description {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Soundplayground</h1>
+        <p class="subtitle">Interactive Audio</p>
+        
+        <div class="projects">
+            <a href="dice4beat/index.html" class="project-card">
+                <span class="project-icon">🎲</span>
+                <div class="project-info">
+                    <div class="project-title">Dice4Beat</div>
+                    <div class="project-description">Drum Machine</div>
+                </div>
+                <span class="project-arrow">→</span>
+            </a>
+            
+            <a href="yukipiano/index.html" class="project-card">
+                <span class="project-icon">❆</span>
+                <div class="project-info">
+                    <div class="project-title">Yuki Piano</div>
+                    <div class="project-description">Lightweight piano</div>
+                </div>
+                <span class="project-arrow">→</span>
+            </a>
+            <a href="p-midi/index.html" class="project-card">
+                <span class="project-icon">🎹</span>
+                <div class="project-info">
+                    <div class="project-title">P MIDI Piano</div>
+                    <div class="project-description">Full-featured</div>
+                </div>
+                <span class="project-arrow">→</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
+

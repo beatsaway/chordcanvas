@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dice4Beat</title>
+  <style>
+    :root {
+      --bg: #0f0e14;
+      --surface: #1a1922;
+      --border: #2d2a38;
+      --text: #e8e6ed;
+      --muted: #8b8798;
+      --accent: #14b8a6;
+      --accent-dim: rgba(20, 184, 166, 0.35);
+      --on: #b8f0b8;
+      --on-dim: rgba(184, 240, 184, 0.5);
+      --grid16: rgba(20, 184, 166, 0.35);
+      --grid36: rgba(184, 240, 184, 0.4);
+      --beat: rgba(255,255,255,0.06);
+      --radius: 8px;
+      --font: 'DM Sans', system-ui, sans-serif;
+      --grid-label-width: 72px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app {
+      max-width: min(100%, 1600px);
+      margin: 0 auto;
+      padding: 8px 16px 40px;
+      width: 100%;
+    }
+    .app-header {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 2px;
+      margin-bottom: 6px;
+      padding: 2px 0;
+      min-height: 24px;
+    }
+    .app-header h1 { font-size: 0.9rem; font-weight: 600; margin: 0 10px 0 0; cursor: pointer; user-select: none; }
+    .app-header h1:hover { opacity: 0.9; }
+    .menu-bar { display: flex; align-items: center; gap: 0; }
+    .menu-bar-file-wrap,
+    .menu-bar-edit-wrap { position: relative; }
+    .menu-bar-item {
+      padding: 2px 8px;
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      position: relative;
+    }
+    .menu-bar-item:hover { background: var(--border); color: var(--text); }
+    .menu-bar-item[aria-expanded="true"] { background: var(--border); }
+    .menu-bar-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 2px;
+      min-width: 160px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 100;
+      padding: 4px 0;
+      display: none;
+    }
+    .menu-bar-file-wrap .menu-bar-dropdown,
+    .menu-bar-edit-wrap .menu-bar-dropdown { display: none; }
+    .menu-bar-file-wrap .menu-bar-item[aria-expanded="true"] ~ .menu-bar-dropdown,
+    .menu-bar-edit-wrap .menu-bar-item[aria-expanded="true"] ~ .menu-bar-dropdown,
+    .menu-bar-dropdown:focus-within { display: block; }
+    .menu-bar-dropdown button,
+    .menu-bar-dropdown a {
+      display: block;
+      width: 100%;
+      padding: 6px 12px;
+      text-align: left;
+      font-size: 0.8rem;
+      color: var(--text);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .menu-bar-dropdown button:hover,
+    .menu-bar-dropdown a:hover { background: var(--border); }
+    .menu-bar-transport { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+    .menu-bar-transport .btn { padding: 3px 8px; font-size: 0.8rem; }
+    .controls-panel--hidden { display: none !important; }
+    .subtitle { color: var(--muted); margin: 0 0 24px 0; font-size: 0.9rem; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    .control-group label { color: var(--muted); white-space: nowrap; }
+    .control-group .muted { color: var(--muted); font-size: 0.85rem; }
+    input[type="number"] {
+      width: 64px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font: inherit;
+    }
+    input[type="range"] { width: 100px; accent-color: var(--accent); }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-play { background: var(--accent); color: white; }
+    .btn-play:hover { background: #2dd4bf; }
+    .btn-play.playing { background: #e04; }
+    .btn-stop { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-stop:hover { background: var(--border); }
+    .btn-clear { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-clear:hover { color: var(--text); }
+    .btn-dice {
+      background: var(--surface);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      font-size: 1.1rem;
+    }
+    .btn-dice:hover { background: var(--accent-dim); color: var(--text); }
+    select.preset-select {
+      min-width: 200px;
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font: inherit;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .checkbox-label input { accent-color: var(--accent); }
+    .download-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .download-modal[aria-hidden="true"] { display: none !important; }
+    .download-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .download-modal-card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      min-width: 200px;
+    }
+    .download-modal-title {
+      margin: 0 0 14px 0;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    .voice-sound-modal-emojis {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      justify-content: center;
+    }
+    .voice-sound-modal-emojis .voice-variant-emoji {
+      font-size: 1.8rem;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .voice-sound-modal-emojis .voice-variant-emoji:hover {
+      opacity: 0.85;
+    }
+    .voice-sound-modal-emojis .voice-variant-emoji.selected {
+      box-shadow: 0 0 0 1px var(--accent);
+      border-radius: 6px;
+    }
+    .download-modal-actions { display: flex; gap: 10px; }
+    .status {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .status.preload { color: var(--accent); }
+    .status.playing { color: var(--on); }
+    #hatSpeed { min-width: 100px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; }
+    .grid-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 8px;
+      width: 100%;
+    }
+    /* Two rows per voice: 4×4 (16 small steps) and 12×3 (36 small steps). Same bar width, no gap. */
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(var(--grid-label-width), var(--grid-label-width)) repeat(var(--bars), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--grid-rows), auto);
+      gap: 0;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .grid .row-label {
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .grid .row-label.row-label-voice {
+      font-size: 1.35rem;
+      white-space: nowrap;
+      padding: 0 4px;
+    }
+    .grid .row-label.row-label-voice:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+    .grid .row-label.row-label-voice .voice-emoji {
+      display: inline-block;
+    }
+    .grid .row-label.row-label-voice-merged {
+      align-items: center;
+      justify-content: center;
+    }
+    .grid .row-label.row-label-voice.randomized .voice-emoji {
+      /* hue set per-click via inline style (cycles 60deg, 120deg, … 300deg) */
+    }
+    .grid .row-label.row-label-voice.randomizing .voice-emoji {
+      filter: hue-rotate(200deg);
+      color: var(--accent);
+    }
+    .grid .row-label.row-label-voice.randomizing {
+      color: var(--accent);
+      pointer-events: none;
+    }
+    .grid .row-label.row-triplet { border-left: 1px solid var(--border); justify-content: flex-end; }
+    .grid .row-label.row-header { font-size: 11px; background: #08070c; }
+    .grid .row-label.row-header-nav { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px; }
+    .grid .header-nav-span {
+      color: var(--muted);
+      font-size: 1rem;
+      padding: 2px 6px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .grid .header-nav-span:hover { color: var(--text); }
+    .grid .header-nav-span.header-nav-disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+    .grid .header-nav-lock { color: var(--muted); font-size: 1rem; padding: 2px 4px; line-height: 1; cursor: pointer; }
+    .grid .header-nav-lock:hover { color: var(--text); }
+    .grid .header-nav-lock.header-nav-lock-unlocked { opacity: 0.55; }
+    .grid .header-nav-lock.header-nav-lock-unlocked:hover { opacity: 0.85; }
+    /* Bar cell: 32 (8×4) or 36 (12×3) small steps, same bar width */
+    .bar-row-cell {
+      min-width: 0;
+      display: grid;
+      gap: 0;
+    }
+    .bar-row-cell.grid-straight { grid-template-columns: repeat(32, 1fr); }
+    .bar-row-cell.grid-36 { grid-template-columns: repeat(36, 1fr); }
+    .bar-row-cell .cell {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      min-height: 14px;
+      min-width: 4px;
+      cursor: pointer;
+      transition: background 0.08s;
+    }
+    .bar-row-cell .cell:last-child { border-right: none; }
+    /* 8×4: every 8th small step = beat */
+    .bar-row-cell.grid-straight .cell:nth-child(8n) { border-right-color: var(--grid16); background: var(--beat); }
+    /* 12×3: every 3rd small step = 12-step boundary */
+    .bar-row-cell.grid-36 .cell:nth-child(3n) { border-right-color: var(--grid36); background: var(--beat); }
+    .bar-row-cell .cell.on {
+      background: var(--accent-dim);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .bar-row-cell .cell.on:hover { background: rgba(124, 92, 255, 0.5); }
+    .bar-row-cell .cell:not(.on):hover { background: rgba(255,255,255,0.06); }
+    .bar-row-cell .cell.playhead { background: rgba(20, 184, 166, 0.25); box-shadow: inset 0 0 0 1px var(--accent); }
+    .bar-row-cell .cell.playhead.on { background: rgba(124, 92, 255, 0.45); }
+    .grid .bar-row-cell.row-header .cell { background: #08070c; min-height: 10px; font-size: 10px; padding: 2px 0; text-align: center; cursor: default; }
+    .grid .bar-row-cell.row-header-beats .beat-cell { background: #0a0910; border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 4px; }
+    .grid .bar-row-cell.row-header-beats .beat-cell:last-child { border-right: none; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-dice { cursor: pointer; opacity: 0.85; font-size: 0.9em; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-dice:hover { opacity: 1; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-num { cursor: default; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-play { cursor: pointer; opacity: 0.8; font-size: 0.85em; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-play:hover { opacity: 1; color: var(--on); }
+    .grid .bar-row-cell.row-header-beats .beat-cell-clickable { cursor: default; }
+    .grid .bar-row-cell.row-header-beats .beat-cell-clickable:hover { background: #0d0c12; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1 id="appTitle" title="Click to show or hide controls">Dice4Beat</h1>
+      <nav class="menu-bar" aria-label="Main menu">
+        <div class="menu-bar-file-wrap">
+          <button type="button" class="menu-bar-item" id="menuFile" aria-haspopup="true" aria-expanded="false">File</button>
+          <div class="menu-bar-dropdown" id="menuFileDropdown">
+            <button type="button" id="menuFileDownloadMidi">Download MIDI</button>
+            <button type="button" id="menuFileDownloadWav">Download WAV</button>
+            <button type="button" id="menuFileDownloadJson">Download JSON</button>
+            <button type="button" id="menuFileLoad">Load JSON</button>
+          </div>
+        </div>
+        <div class="menu-bar-edit-wrap">
+          <button type="button" class="menu-bar-item" id="menuEdit" aria-haspopup="true" aria-expanded="false">Edit</button>
+          <div class="menu-bar-dropdown" id="menuEditDropdown">
+            <button type="button" id="menuEditRandomAll">🎲 Random all 🌟</button>
+            <button type="button" id="menuEditRandomSound">🎲 Random sound 👂</button>
+            <button type="button" id="menuEditRandomBeat">🎲 Random beat 🏃</button>
+          </div>
+        </div>
+      </nav>
+      <div class="menu-bar-transport">
+        <button type="button" class="btn btn-play" id="btnPlay" aria-label="Play">Play</button>
+      </div>
+      <input type="file" id="loadCompositionInput" accept=".json,application/json" hidden>
+    </header>
+
+    <div id="controlsPanel" class="controls controls-panel controls-panel--hidden">
+      <div class="control-group">
+        <label for="masterVolume">Master volume</label>
+        <input type="range" id="masterVolume" min="0" max="100" value="100" step="1" aria-label="Master volume">
+        <span id="masterVolumeVal">100%</span>
+      </div>
+      <div class="control-group">
+        <label for="reverb">Reverb</label>
+        <input type="range" id="reverb" min="0" max="100" value="50" step="1" aria-label="Reverb amount">
+        <span id="reverbVal">50%</span>
+      </div>
+      <div class="control-group" title="Reverb tail length: from BPM/240 to BPM/60 seconds">
+        <label for="reverbDuration">Reverb duration</label>
+        <input type="range" id="reverbDuration" min="0" max="100" value="50" step="1" aria-label="Reverb duration">
+        <span id="reverbDurationVal">1.0 s</span>
+      </div>
+      <div class="control-group" title="Stereo width by dipping mid (less dip below 267 Hz)">
+        <label for="stereo">Stereo</label>
+        <input type="range" id="stereo" min="0" max="100" value="0" step="1" aria-label="Stereo width">
+        <span id="stereoVal">0%</span>
+      </div>
+      <div class="control-group">
+        <label for="presetSelect">Preset</label>
+        <select id="presetSelect" class="preset-select" aria-label="Choose drum preset">
+          <option value="">Empty</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="bpm">BPM</label>
+        <input type="number" id="bpm" min="60" max="200" value="120">
+      </div>
+      <div class="control-group">
+        <label for="bars">Bars</label>
+        <input type="number" id="bars" min="1" max="16" value="2">
+      </div>
+      <div class="control-group" title="8 steps×4 small = 32, 12 steps×3 small = 36 per bar">
+        <span class="muted">Grid: 8×4 + 12×3</span>
+      </div>
+      <div class="control-group">
+        <label for="hatSpeed">Hat speed</label>
+        <select id="hatSpeed" aria-label="Hat subdivision">
+          <option value="16" selected>16ths</option>
+          <option value="32">32nds</option>
+          <option value="triplet">Triplets</option>
+        </select>
+      </div>
+      <div class="control-group" title="When a preset is loaded: pseudo-random % chance to fill empty 8×4 hat cells (you see the teal on the grid)">
+        <label for="hat8x4Fill">Hat (8×4) fill</label>
+        <input type="range" id="hat8x4Fill" min="0" max="100" value="10" step="0.25" aria-label="Hat 8×4 fill empty cells when preset loads">
+        <span id="hat8x4FillVal">10%</span>
+      </div>
+      <div class="control-group" title="Pseudo-random % of 8×4 hat steps skipped (before split)">
+        <label for="hat8x4Skip">Hat (8×4) skip</label>
+        <input type="range" id="hat8x4Skip" min="0" max="100" value="10" step="0.25" aria-label="Hat 8×4 skip percent">
+        <span id="hat8x4SkipVal">10%</span>
+      </div>
+      <div class="control-group" title="Pseudo-random % of 8×4 hat steps played as 2 hits (half duration each)">
+        <label for="hat4x4Split">Hat (8×4) split</label>
+        <input type="range" id="hat4x4Split" min="0" max="100" value="10" step="0.25" aria-label="Hat 8×4 split percent">
+        <span id="hat4x4SplitVal">10%</span>
+      </div>
+      <div class="control-group" title="When a preset is loaded: if the next 8×4 cell after a snare is empty, pseudo-random % chance to fill it (see teal on grid)">
+        <label for="snare8x4Fill">Snare (8×4) fill</label>
+        <input type="range" id="snare8x4Fill" min="0" max="100" value="10" step="0.25" aria-label="Snare 8×4 fill next empty when preset loads">
+        <span id="snare8x4FillVal">10%</span>
+      </div>
+      <div class="control-group" title="Pseudo-random % of 12×3 hat steps skipped">
+        <label for="hat12x3Skip">Hat (12×3) skip</label>
+        <input type="range" id="hat12x3Skip" min="0" max="100" value="10" step="0.25" aria-label="Hat 12×3 skip percent">
+        <span id="hat12x3SkipVal">10%</span>
+      </div>
+      <div class="control-group">
+        <label for="variation">Variation</label>
+        <input type="range" id="variation" min="0" max="100" value="50" step="0.25">
+        <span id="variationVal">50%</span>
+      </div>
+      <div class="control-group">
+        <label for="swing8th">8th swing</label>
+        <input type="range" id="swing8th" min="0" max="100" value="0" step="0.25">
+        <span id="swing8thVal">0%</span>
+      </div>
+      <div class="control-group">
+        <label for="swing16th">16th swing</label>
+        <input type="range" id="swing16th" min="0" max="100" value="0" step="0.25">
+        <span id="swing16thVal">0%</span>
+      </div>
+      <div class="control-group">
+        <span class="status" id="status">Draw pattern or pick preset, then Play</span>
+      </div>
+    </div>
+
+    <div id="downloadOptionsModal" class="download-modal" aria-hidden="true">
+      <div class="download-modal-backdrop"></div>
+      <div class="download-modal-card">
+        <p class="download-modal-title">Download loop as</p>
+        <div class="download-modal-actions">
+          <button type="button" class="btn" id="downloadMidiBtn">MIDI</button>
+          <button type="button" class="btn" id="downloadWavBtn">WAV</button>
+          <button type="button" class="btn" id="downloadJsonBtn">JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="voiceSoundModal" class="download-modal" aria-hidden="true">
+      <div class="download-modal-backdrop" id="voiceSoundModalBackdrop"></div>
+      <div class="download-modal-card voice-sound-modal-card">
+        <div class="voice-sound-modal-emojis" id="voiceSoundModalEmojis" title="Click an emoji to listen or change that variation"></div>
+        <div class="control-group" style="margin-bottom: 12px;">
+          <label for="voiceSoundVersions">Variations</label>
+          <input type="range" id="voiceSoundVersions" min="1" max="4" value="1">
+          <span id="voiceSoundVersionsVal">1</span>
+        </div>
+        <div class="download-modal-actions">
+          <button type="button" class="btn btn-dice" id="voiceSoundRandomiseBtn" title="Randomise selected variation(s), or all if none selected">🎲👂</button>
+          <button type="button" class="btn btn-stop" id="voiceSoundCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/jsmidgen@0.1.8/lib/jsmidgen.js" crossorigin="anonymous"></script>
+  <script src="drumpresets.js"></script>
+  <script src="maker/kick-synth.js"></script>
+  <script src="maker/snare-synth.js"></script>
+  <script src="maker/clap-synth.js"></script>
+  <script src="maker/hat-synth.js"></script>
+  <script src="maker/ride-synth.js"></script>
+  <script src="maker/cowbell-synth.js"></script>
+  <script src="maker/tom-synth.js"></script>
+  <script src="drum-maker.js"></script>
+</body>
+</html>
