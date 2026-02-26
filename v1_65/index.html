@@ -356,6 +356,99 @@
             padding: 6px 12px;
             font-size: 13px;
         }
+        .add-chord-card {
+            max-width: 360px;
+        }
+        .add-chord-step {
+            margin-bottom: 14px;
+        }
+        .add-chord-step:last-child {
+            margin-bottom: 0;
+        }
+        .add-chord-step-hint {
+            font-size: 12px;
+            color: #a1a1aa;
+            margin: 0 0 8px;
+            line-height: 1.35;
+        }
+        .add-chord-root-btn.selected,
+        .add-chord-type-list .add-chord-type-btn.selected {
+            background: #3f3f46;
+            border-color: #71717a;
+            color: #f4f4f5;
+        }
+        .add-chord-confirm-btn {
+            margin-top: 12px;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        .add-chord-root-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .add-chord-root-btn {
+            min-width: 40px;
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+        .add-chord-spelling-row {
+            margin-bottom: 10px;
+        }
+        .add-chord-spelling-label {
+            font-size: 12px;
+            color: #a1a1aa;
+            margin-right: 8px;
+        }
+        .add-chord-spelling-select {
+            padding: 6px 10px;
+            font-size: 13px;
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            border-radius: 6px;
+            color: #e4e4e7;
+        }
+        .add-chord-type-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .add-chord-type-list.add-chord-preview-items .add-chord-type-btn {
+            border-radius: 999px;
+            border: 1px solid #3f3f46;
+            background: #27272a;
+            color: #e4e4e7;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .add-chord-type-list.add-chord-preview-items .add-chord-type-btn:hover {
+            background: #3f3f46;
+        }
+        .add-chord-type-btn {
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        .add-chord-preview-name {
+            font-size: 18px;
+            font-family: ui-monospace, monospace;
+            color: #f4f4f5;
+            margin: 0 0 12px;
+        }
+        .add-chord-selected-name {
+            font-size: 16px;
+            font-family: ui-monospace, monospace;
+            color: #e4e4e7;
+            margin: 0 0 10px;
+        }
+        .add-chord-preview-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
         .preset-list {
             display: grid;
             gap: 6px;
@@ -1124,10 +1217,34 @@
     <div id="addOptionsModal" class="options-modal" aria-hidden="true">
         <div class="options-card">
             <div class="options-actions">
-                <button id="addPresetsBtn" type="button">Use Chord Presets</button>
-                <button id="addRandomByKeyBtn" type="button">Random by key</button>
-                <button id="addPanelBtn" type="button">Open New Sequence</button>
+                <button id="addChordBtn" type="button">One chord</button>
+                <button id="addPresetsBtn" type="button">Many Chords</button>
+                <button id="addRandomByKeyBtn" type="button">Random Chords</button>
+                <button id="addPanelBtn" type="button">Next Sequence</button>
                 <button id="duplicatePanelBtn" type="button">Duplicate Sequence</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addChordModal" class="options-modal" aria-hidden="true">
+        <div class="options-card add-chord-card">
+            <div id="addChordStep1" class="add-chord-step">
+                <p class="add-chord-step-hint">Choose a <select id="addChordSpellingSelect" class="add-chord-spelling-select">
+                    <option value="">Natural</option>
+                    <option value="#">Sharp</option>
+                    <option value="b">Flat</option>
+                </select> root note.</p>
+                <div class="add-chord-root-btns" id="addChordRootBtns"></div>
+                <button type="button" id="addChordConfirm1" class="add-chord-confirm-btn">Confirm</button>
+            </div>
+            <div id="addChordStep2" class="add-chord-step" hidden>
+                
+                <p id="addChordSelectedName" class="add-chord-selected-name" aria-live="polite">Chord: —</p>
+                <div id="addChordTypeList" class="add-chord-type-list add-chord-preview-items"></div>
+                <div class="add-chord-preview-actions">
+                    <button type="button" id="addChordKeepBtn">Confirm</button>
+                    <button type="button" id="addChordCancelBtn" class="options-cancel">Cancel</button>
+                </div>
             </div>
         </div>
     </div>

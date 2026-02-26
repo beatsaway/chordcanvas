@@ -81,6 +81,17 @@ const chordTypesModal = document.getElementById('chordTypesModal');
 const chordTypesList = document.getElementById('chordTypesList');
 const quickChordTypesBtn = document.getElementById('quickChordTypesBtn');
 const addOptionsModal = document.getElementById('addOptionsModal');
+const addChordBtn = document.getElementById('addChordBtn');
+const addChordModal = document.getElementById('addChordModal');
+const addChordStep1 = document.getElementById('addChordStep1');
+const addChordStep2 = document.getElementById('addChordStep2');
+const addChordRootBtns = document.getElementById('addChordRootBtns');
+const addChordTypeList = document.getElementById('addChordTypeList');
+const addChordPlayBtn = document.getElementById('addChordPlayBtn');
+const addChordKeepBtn = document.getElementById('addChordKeepBtn');
+const addChordCancelBtn = document.getElementById('addChordCancelBtn');
+const addChordConfirm1 = document.getElementById('addChordConfirm1');
+const addChordSelectedName = document.getElementById('addChordSelectedName');
 const addPresetsBtn = document.getElementById('addPresetsBtn');
 const addRandomByKeyBtn = document.getElementById('addRandomByKeyBtn');
 const addPanelBtn = document.getElementById('addPanelBtn');
@@ -493,7 +504,7 @@ function updateChordPreview(group) {
     if (group.chordSequence.length === 0) {
         const empty = document.createElement('span');
         empty.className = 'chord-preview-empty';
-        empty.textContent = 'No valid chords yet.';
+        empty.textContent = 'Empty Sequence.';
         group.chordPreview.appendChild(empty);
     }
 
@@ -2950,6 +2961,151 @@ if (duplicatePanelBtn) {
         clonePanelGroup();
     });
 }
+
+let addChordState = { accidental: '', rootNote: '', chordType: '', chord: null };
+
+const ADD_CHORD_ROOT_NATURAL = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const ADD_CHORD_ROOT_SHARP = ['C#', 'D#', 'F#', 'G#', 'A#'];
+const ADD_CHORD_ROOT_FLAT = ['Db', 'Eb', 'Gb', 'Ab', 'Bb'];
+
+function playAddChordFeedbackNote(noteName) {
+    const group = getActiveGroup();
+    if (!group) return;
+    const chord = { rootNote: noteName, chordType: 'major-triad', original: noteName };
+    playChordOnce(group, chord, 0);
+}
+
+function getAddChordRootList() {
+    const acc = addChordState.accidental ?? '';
+    if (acc === '#') return ADD_CHORD_ROOT_SHARP;
+    if (acc === 'b') return ADD_CHORD_ROOT_FLAT;
+    return ADD_CHORD_ROOT_NATURAL;
+}
+
+function populateAddChordRootBtns() {
+    if (!addChordRootBtns) return;
+    addChordRootBtns.innerHTML = '';
+    const list = getAddChordRootList();
+    list.forEach((noteName) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'add-chord-root-btn';
+        btn.textContent = noteName;
+        btn.dataset.note = noteName;
+        addChordRootBtns.appendChild(btn);
+    });
+}
+
+const addChordSpellingSelect = document.getElementById('addChordSpellingSelect');
+
+function openAddChordModal() {
+    if (!addChordModal || !addChordRootBtns || !engine) return;
+    closeModal(addOptionsModal);
+    addChordState = { accidental: '', rootNote: '', chordType: '', chord: null };
+    addChordStep1?.removeAttribute('hidden');
+    addChordStep2?.setAttribute('hidden', '');
+    if (addChordSpellingSelect) addChordSpellingSelect.value = '';
+    addChordState.accidental = '';
+    populateAddChordRootBtns();
+    addChordModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeAddChordModal() {
+    if (addChordModal) addChordModal.setAttribute('aria-hidden', 'true');
+}
+
+if (addChordBtn) {
+    addChordBtn.addEventListener('click', () => {
+        openAddChordModal();
+    });
+}
+if (addChordSpellingSelect) {
+    addChordSpellingSelect.addEventListener('change', () => {
+        addChordState.accidental = addChordSpellingSelect.value || '';
+        addChordState.rootNote = '';
+        populateAddChordRootBtns();
+    });
+}
+if (addChordRootBtns) {
+    addChordRootBtns.addEventListener('click', (event) => {
+        const btn = event.target.closest('.add-chord-root-btn');
+        if (!btn || !btn.dataset.note) return;
+        addChordState.rootNote = btn.dataset.note;
+        addChordRootBtns.querySelectorAll('.add-chord-root-btn').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        playAddChordFeedbackNote(btn.dataset.note);
+    });
+}
+if (addChordConfirm1) {
+    addChordConfirm1.addEventListener('click', () => {
+        if (!addChordState.rootNote) return;
+        addChordStep1?.setAttribute('hidden', '');
+        addChordStep2?.removeAttribute('hidden');
+        addChordState.chordType = '';
+        addChordState.chord = null;
+        if (addChordSelectedName) addChordSelectedName.textContent = 'Chord: ' + addChordState.rootNote;
+        if (addChordTypeList && engine?.chordTypeNames) {
+            addChordTypeList.innerHTML = '';
+            Object.entries(engine.chordTypeNames).forEach(([typeKey, suffix]) => {
+                const label = suffix ? addChordState.rootNote + suffix : addChordState.rootNote;
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'add-chord-type-btn';
+                b.textContent = label;
+                b.dataset.chordType = typeKey;
+                addChordTypeList.appendChild(b);
+            });
+        }
+    });
+}
+if (addChordTypeList) {
+    addChordTypeList.addEventListener('click', (event) => {
+        const btn = event.target.closest('.add-chord-type-btn');
+        if (!btn || !btn.dataset.chordType) return;
+        addChordState.chordType = btn.dataset.chordType;
+        addChordState.chord = {
+            rootNote: addChordState.rootNote,
+            chordType: addChordState.chordType,
+            original: engine.getChordDisplayName(addChordState.rootNote, addChordState.chordType)
+        };
+        addChordTypeList.querySelectorAll('.add-chord-type-btn').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        if (addChordSelectedName) addChordSelectedName.textContent = 'Chord: ' + addChordState.chord.original;
+        const group = getActiveGroup();
+        if (group && addChordState.chord) playChordOnce(group, addChordState.chord, 0);
+    });
+}
+if (addChordPlayBtn) {
+    addChordPlayBtn.addEventListener('click', () => {
+        const group = getActiveGroup();
+        if (group && addChordState.chord) playChordOnce(group, addChordState.chord, 0);
+    });
+}
+if (addChordKeepBtn) {
+    addChordKeepBtn.addEventListener('click', () => {
+        const group = getActiveGroup();
+        if (!group?.chordInput || !addChordState.chord) {
+            closeAddChordModal();
+            return;
+        }
+        const chordString = engine.getChordDisplayName(addChordState.rootNote, addChordState.chordType);
+        const current = (group.chordInput.value || '').trim();
+        group.chordInput.value = current ? current + ', ' + chordString : chordString;
+        autoResizeTextarea(group.chordInput);
+        updateChordSequenceFromInput(group, { playOnChange: false });
+        updateChordPreviewItemsSettings(group);
+        closeAddChordModal();
+    });
+}
+if (addChordCancelBtn) {
+    addChordCancelBtn.addEventListener('click', closeAddChordModal);
+}
+if (addChordModal) {
+    addChordModal.addEventListener('click', (event) => {
+        if (event.target === addChordModal) closeAddChordModal();
+    });
+}
+
 if (randomByKeyModal) {
     randomByKeyModal.addEventListener('click', (event) => {
         if (event.target === randomByKeyModal) {
