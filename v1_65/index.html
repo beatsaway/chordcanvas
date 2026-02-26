@@ -29,56 +29,49 @@
         }
         h1 {
             margin: 0 0 14px 0;
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 400;
             font-family: "Pacifico", cursive;
             cursor: pointer;
             touch-action: manipulation;
             color: #f4f4f5;
+            text-align: center;
         }
         .tabs {
             display: flex;
             gap: 0;
             flex-wrap: wrap;
             margin-bottom: 0;
-            border-bottom: 1px solid #3f3f46;
+            border-bottom: 1px solid #1e1e21;
         }
         .tabs button {
             background: #27272a;
-            color: #a1a1aa;
-            border: 1px solid #3f3f46;
-            border-bottom-color: #121214;
-            border-bottom: 0px;
+            color: #71717a;
+            border: none;
             border-radius: 6px 6px 0 0;
-            font-size: 9px;
-            padding: 5px;
+            font-size: 11px;
+            padding: 5px 7px;
         }
         .tabs button.active {
             background: #1e1e21;
-            color: #f4f4f5;
-            border: 1px solid #3f3f46;
-            border-bottom-color: #1e1e21;
+            color: #a5f3fc;
+            border: none;
             margin-bottom: -2px;
             box-shadow: inset 0 -2px 0 #1e1e21;
         }
         section {
-            border: 1px solid #3f3f46;
+            border: 0;
             border-radius: 0;
-            padding: 14px;
-            margin-bottom: 14px;
+            padding: 4px 12px;
+            margin-bottom: 12px;
             background-color: #1e1e21;
         }
 
         .panel-group.is-active section {
-            border-color: #22d3ee;
-            border-style: dotted;
+            border-color: #1e1e21;
+            border-style: solid;
         }
 
-        .panel-group.is-active .tabs button.active {
-            border-color: #22d3ee;
-            border-style: dotted;
-            border-bottom-color: #1e1e21;
-        }
         /* Inactive panel: show only chord preview (no textarea, no other tabs) */
         .panel-group:not(.is-active) .tabs {
             display: none !important;
@@ -107,10 +100,6 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            color: #111;
-        }
-        .play-btn .play-label {
-            color: #111;
         }
         .play-loop {
             border: 0;
@@ -118,10 +107,11 @@
             color: #121214;
             font: inherit;
             cursor: pointer;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 4px;
             width: auto;
             min-width: 0;
+            font-size: 12px;
         }
         .play-loop option {
             background: #1e1e21;
@@ -148,40 +138,45 @@
             position: relative;
             z-index: 1;
             width: min(520px, 100%);
-            border-radius: 12px;
+            border-radius: 0;
             padding: 0;
-            background: #1e1e21;
-            border: 1px solid #3f3f46;
+            background: transparent;
+            border: 0;
         }
         .modal-tabs {
             display: flex;
             gap: 0;
-            border-bottom: 1px solid #3f3f46;
             margin: 0;
+            background: transparent;
+            border: none;
         }
         .modal-tabs button {
             background: #27272a;
-            color: #a1a1aa;
-            border: 1px solid #3f3f46;
-            border-bottom: 0;
+            color: #71717a;
+            border: none;
             border-radius: 6px 6px 0 0;
-            padding: 8px 14px;
-            font-size: 14px;
+            padding: 5px 10px;
+            font-size: 12px;
         }
         .modal-tabs button.active {
             background: #1e1e21;
-            color: #f4f4f5;
-            border: 1px dotted #71717a;
-            border-bottom-color: #1e1e21;
+            color: #a5f3fc;
+            border: none;
             margin-bottom: -2px;
+            box-shadow: inset 0 -2px 0 #1e1e21;
         }
         .modal-panel {
             font-size: 15px;
-            border: 1px dotted #3f3f46;
-            border-top: 1px dotted #71717a;
+            border: 1px solid #3f3f46;
+            border-top: 1px solid #3f3f46;
+            border-radius: 0;
             padding: 14px;
             margin: 0;
             background: #1e1e21;
+        }
+        .modal-panel:not([hidden]) {
+            border-style: solid;
+            border-color: #1e1e21;
         }
         .modal-panel p {
             margin: 0 0 14px;
@@ -230,8 +225,8 @@
             flex-wrap: wrap;
         }
         #helpModal .help-controls button {
-            padding: 8px 14px;
-            font-size: 15px;
+            padding: 6px 11px;
+            font-size: 13px;
         }
         #contactModal {
             position: fixed;
@@ -353,8 +348,8 @@
             margin-top: 10px;
         }
         #chordTypesModal .help-controls button {
-            padding: 6px 12px;
-            font-size: 13px;
+            padding: 5px 10px;
+            font-size: 12px;
         }
         .add-chord-card {
             max-width: 360px;
@@ -379,8 +374,8 @@
         }
         .add-chord-confirm-btn {
             margin-top: 12px;
-            padding: 8px 16px;
-            font-size: 13px;
+            padding: 6px 12px;
+            font-size: 12px;
         }
         .add-chord-root-btns {
             display: flex;
@@ -388,9 +383,9 @@
             gap: 6px;
         }
         .add-chord-root-btn {
-            min-width: 40px;
-            padding: 8px 10px;
-            font-size: 14px;
+            min-width: 36px;
+            padding: 6px 8px;
+            font-size: 12px;
         }
         .add-chord-spelling-row {
             margin-bottom: 10px;
@@ -401,12 +396,11 @@
             margin-right: 8px;
         }
         .add-chord-spelling-select {
-            padding: 6px 10px;
-            font-size: 13px;
+            padding: 5px 8px;
+            font-size: 12px;
             background: #27272a;
-            border: 1px solid #3f3f46;
+            border: none;
             border-radius: 6px;
-            color: #e4e4e7;
         }
         .add-chord-type-list {
             display: flex;
@@ -417,19 +411,19 @@
         }
         .add-chord-type-list.add-chord-preview-items .add-chord-type-btn {
             border-radius: 999px;
-            border: 1px solid #3f3f46;
+            border: none;
             background: #27272a;
             color: #e4e4e7;
-            padding: 6px 12px;
-            font-size: 13px;
+            padding: 5px 10px;
+            font-size: 12px;
             cursor: pointer;
         }
         .add-chord-type-list.add-chord-preview-items .add-chord-type-btn:hover {
             background: #3f3f46;
         }
         .add-chord-type-btn {
-            padding: 6px 10px;
-            font-size: 12px;
+            padding: 5px 8px;
+            font-size: 11px;
         }
         .add-chord-preview-name {
             font-size: 18px;
@@ -515,9 +509,13 @@
             font-size: 18px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
             resize: vertical;
-            background: #27272a;
-            color: #e4e4e7;
+            background: #a5f3fc;
+            color: #000;
             border-radius: 4px;
+        }
+        textarea:hover {
+            color: #1e1e21;
+            background: #fff;
         }
         .bpm-row {
             display: flex;
@@ -535,16 +533,16 @@
         }
         .bpm-step-btn {
             flex-shrink: 0;
-            width: 34px;
-            height: 34px;
+            width: 30px;
+            height: 30px;
             padding: 0;
-            font-size: 20px;
+            font-size: 18px;
             line-height: 1;
             font-weight: 600;
             border-radius: 6px;
-            border: 1px solid #3f3f46;
-            background: #27272a;
-            color: #e4e4e7;
+            border: none;
+            background: #1e1e21;
+            color: #71717a;
             cursor: pointer;
         }
         .bpm-step-btn:hover {
@@ -557,33 +555,40 @@
             flex-wrap: wrap;
             margin-top: 12px;
         }
+        
         button {
-            border: 1px solid #52525b;
-            background: #e4e4e7;
-            color: #121214;
-            padding: 8px 14px;
+            border: none;
+            background: #1e1e21;
+            color: #71717a;
+            padding: 6px 11px;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
-            font-size: 15px;
+            font-size: 13px;
+        }
+        button:hover {
+            color: #fff;
         }
         input[type="number"] {
             width: 90px;
-            padding: 8px;
-            font-size: 15px;
+            padding: 6px;
+            font-size: 13px;
             border: 1px solid #3f3f46;
             border-radius: 6px;
             background: #27272a;
             color: #e4e4e7;
         }
         select {
-            padding: 6px 10px;
-            font-size: 15px;
-            border: 1px solid #3f3f46;
+            padding: 5px 8px;
+            font-size: 13px;
+            border: none;
             border-radius: 6px;
             background: #27272a;
-            color: #e4e4e7;
+            color: #71717a;
             line-height: 1.3;
+        }
+        select:hover {
+            color: #fff;
         }
         #chordPreview {
             margin-top: 8px;
@@ -708,12 +713,11 @@
             color: #a1a1aa;
         }
         .play-options-select {
-            font-size: 15px;
-            padding: 8px 12px;
+            font-size: 13px;
+            padding: 6px 10px;
             border-radius: 6px;
-            border: 1px solid #3f3f46;
+            border: none;
             background: #27272a;
-            color: #e4e4e7;
             min-width: 0;
         }
         .options-modal {
@@ -748,14 +752,6 @@
             display: grid;
             gap: 8px;
         }
-        .options-actions button {
-            background: #e4e4e7;
-            color: #121214;
-            border: 1px solid #52525b;
-            padding: 8px 14px;
-            font-size: 15px;
-            border-radius: 6px;
-        }
         .synth-info-card {
             width: min(380px, 100%);
         }
@@ -780,9 +776,9 @@
             overflow: auto;
         }
         .options-cancel {
-            background: #27272a;
-            color: #e4e4e7;
-            border: 1px solid #3f3f46;
+            background: #1e1e21;
+            color: #71717a;
+            border: none;
         }
         .treble-notes-card {
             width: min(420px, 100%);
@@ -799,11 +795,11 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 4px 8px;
+            padding: 3px 6px;
             background: #27272a;
             border: 1px solid #3f3f46;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
             color: #e4e4e7;
         }
         .treble-note-pill button {
@@ -812,7 +808,7 @@
             color: #a1a1aa;
             cursor: pointer;
             padding: 0 2px;
-            font-size: 14px;
+            font-size: 12px;
             line-height: 1;
         }
         .treble-note-pill button:hover {
@@ -825,11 +821,11 @@
             flex-wrap: wrap;
         }
         .treble-add-note-btn {
-            background: #27272a;
-            color: #e4e4e7;
-            border: 1px solid #3f3f46;
-            padding: 6px 12px;
-            font-size: 14px;
+            background: #1e1e21;
+            color: #71717a;
+            border: none;
+            padding: 5px 10px;
+            font-size: 12px;
             border-radius: 6px;
             cursor: pointer;
         }
@@ -839,8 +835,8 @@
         .treble-notes-input {
             flex: 1;
             min-width: 100px;
-            padding: 6px 10px;
-            font-size: 14px;
+            padding: 5px 8px;
+            font-size: 12px;
             border: 1px solid #3f3f46;
             border-radius: 6px;
             background: #27272a;
@@ -853,11 +849,11 @@
             padding: 8px 0;
         }
         .treble-recommendations button {
-            background: #27272a;
-            color: #e4e4e7;
-            border: 1px dashed #3f3f46;
-            padding: 4px 10px;
-            font-size: 13px;
+            background: #1e1e21;
+            color: #71717a;
+            border: none;
+            padding: 3px 8px;
+            font-size: 12px;
             border-radius: 6px;
             cursor: pointer;
         }
@@ -870,14 +866,26 @@
             margin-top: 4px;
         }
         .chord-add-btn {
-            background: #e4e4e7;
-            color: #121214;
-            border: 1px solid #52525b;
+            background: #a5f3fc;
+            color: #0c4a6e;
+            border: none;
             border-radius: 6px;
-            padding: 8px 14px;
-            font-size: 15px;
+            padding: 6px 11px;
+            font-size: 13px;
             font-weight: 500;
             cursor: pointer;
+        }
+        .chord-add-btn:hover {
+            color: #fff;
+            background: #1e1e21;
+        }
+        .panel-group:not(.is-active) .chord-add-btn {
+            background: #e4e4e7;
+            color: #121214;
+        }
+        .panel-group:not(.is-active) .chord-add-btn:hover {
+            color: #fff;
+            background: #1e1e21;
         }
         input[type="range"] {
             accent-color: #71717a;
@@ -904,7 +912,7 @@
             </section>
 
             <section id="panel-rhythm" hidden>
-                <div>
+                <div>    
                     <label for="bassRhythmSelect">Bass</label>
                     <select id="bassRhythmSelect" data-role="bassRhythmSelect"></select>
                     <label for="highRhythmSelect">Treble </label>
@@ -1189,9 +1197,7 @@
             <button id="previewToggle" class="play-btn" type="button">
                 <span class="play-label">Play</span>
             </button>
-            <span id="playOptionsTrigger" class="play-options-trigger" role="button" tabindex="0" title="Play options: loop and synth/midi">⚙️</span>
             <button id="downloadBtn" type="button">Download</button>
-            <button id="quickMenuBtn" type="button">?</button>
         </div>
     </main>
 
@@ -1200,16 +1206,6 @@
             <div class="options-actions">
                 <button id="downloadMidiBtn" type="button">MIDI</button>
                 <button id="downloadWavBtn" type="button">WAV</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="helpOptionsModal" class="options-modal" aria-hidden="true">
-        <div class="options-card">
-            <div class="options-actions">
-                <button id="quickGuideBtn" type="button">Tutorial</button>
-                <button id="quickChordTypesBtn" type="button">Chord types</button>
-                <button id="quickHelpBtn" type="button">Contact</button>
             </div>
         </div>
     </div>
@@ -1343,31 +1339,17 @@
         </div>
     </div>
 
-    <div id="playOptionsModal" class="options-modal" aria-hidden="true">
-        <div class="options-card">
-            <label for="playOptionsLoopSelect" class="options-desc">Loop</label>
-            <select id="playOptionsLoopSelect" class="play-options-select">
-                <option value="all">ALL sequences</option>
-                <option value="this">THIS sequence only</option>
-            </select>
-            <label for="playOptionsPlaybackSelect" class="options-desc">Playback</label>
-            <select id="playOptionsPlaybackSelect" class="play-options-select">
-                <option value="synth">Synth (quality)</option>
-                <option value="midi">MIDI (CPU friendly)</option>
-            </select>
-        </div>
-    </div>
-
     <div class="modal" data-role="info-modal" hidden>
         <div class="modal-backdrop" data-role="modal-close"></div>
         <div class="modal-card" role="dialog" aria-modal="true">
             <nav class="modal-tabs" data-role="info-tabs">
                 <button type="button" class="active" data-role="info-tab" data-panel="about">About</button>
                 <button type="button" data-role="info-tab" data-panel="audio">Audio</button>
+                <button type="button" data-role="info-tab" data-panel="play">Play</button>
+                <button type="button" data-role="info-tab" data-panel="help">Help</button>
             </nav>
             <section class="modal-panel" data-panel="about">
-                <p><strong>Chord Canvas Version 1.63</strong></p>
-                <p>
+                <p><strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65</strong>
                     developed by
                     <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>
                 </p>
@@ -1377,7 +1359,6 @@
                         buy him a coffee🤗☕
                     </a>
                 </p>
-                <a class="modal-link" href="../index.html">Back to Home</a>
             </section>
             <section class="modal-panel" data-panel="audio" hidden>
                 <div class="control-row">
@@ -1391,6 +1372,28 @@
                 <div class="control-row">
                     <label for="highVolumeSlider">Treble playback</label>
                     <input id="highVolumeSlider" type="range" min="0" max="100" value="100">
+                </div>
+            </section>
+            <section class="modal-panel" data-panel="play" hidden>
+                <div class="control-row">
+                    <label for="playOptionsLoopSelect">Loop</label>
+                    <select id="playOptionsLoopSelect" class="play-options-select">
+                        <option value="all">ALL sequences</option>
+                        <option value="this">THIS sequence only</option>
+                    </select>
+                </div>
+                <div class="control-row">
+                    <label for="playOptionsPlaybackSelect">Playback</label>
+                    <select id="playOptionsPlaybackSelect" class="play-options-select">
+                        <option value="synth">Synth (quality)</option>
+                        <option value="midi">MIDI (CPU friendly)</option>
+                    </select>
+                </div>
+            </section>
+            <section class="modal-panel" data-panel="help" hidden>
+                <div class="options-actions">
+                    <button id="quickGuideBtn" type="button">Tutorial</button>
+                    <button id="quickHelpBtn" type="button">Contact</button>
                 </div>
             </section>
         </div>

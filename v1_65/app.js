@@ -2456,10 +2456,6 @@ const helpSteps = [
         selector: '#previewToggle'
     },
     {
-        text: "Tap ⚙️ to set loop (ALL / this sequence) and playback (Synth / MIDI) with the dropdowns.",
-        selector: '#playOptionsTrigger'
-    },
-    {
         text: "Tap Download to choose MIDI or WAV.",
         selector: '#downloadBtn'
     },
@@ -2508,9 +2504,6 @@ function openHelp() {
 
 function closeHelp() {
     if (!helpModal) return;
-    if (quickMenuBtn && typeof quickMenuBtn.focus === 'function') {
-        quickMenuBtn.focus();
-    }
     helpModal.setAttribute('aria-hidden', 'true');
     clearHelpHighlight();
 }
@@ -2523,28 +2516,6 @@ previewToggle.addEventListener('click', () => {
         startPreview().catch(() => {});
     }
 });
-
-if (playOptionsTrigger && playOptionsModal) {
-    playOptionsTrigger.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (playOptionsLoopSelect) playOptionsLoopSelect.value = loopMode;
-        if (playOptionsPlaybackSelect) playOptionsPlaybackSelect.value = isSynthMode ? 'synth' : 'midi';
-        openModal(playOptionsModal);
-    });
-    playOptionsTrigger.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            if (playOptionsLoopSelect) playOptionsLoopSelect.value = loopMode;
-            if (playOptionsPlaybackSelect) playOptionsPlaybackSelect.value = isSynthMode ? 'synth' : 'midi';
-            openModal(playOptionsModal);
-        }
-    });
-    playOptionsModal.addEventListener('click', (event) => {
-        if (event.target === playOptionsModal) {
-            closeModal(playOptionsModal);
-        }
-    });
-}
 
 if (playOptionsLoopSelect) {
     playOptionsLoopSelect.addEventListener('change', () => {
@@ -2808,17 +2779,6 @@ if (downloadWavBtn) {
 
 
 
-if (quickMenuBtn && helpOptionsModal) {
-    quickMenuBtn.addEventListener('click', () => {
-        openModal(helpOptionsModal);
-    });
-    helpOptionsModal.addEventListener('click', (event) => {
-        if (event.target === helpOptionsModal) {
-            closeModal(helpOptionsModal);
-        }
-    });
-}
-
 if (trebleNotesModal) {
     trebleNotesModal.addEventListener('click', (event) => {
         if (event.target === trebleNotesModal) closeTrebleModal();
@@ -2856,7 +2816,7 @@ if (trebleNotesInput) {
 
 if (quickGuideBtn && helpModal && helpText && helpPrev && helpNext && helpClose) {
     quickGuideBtn.addEventListener('click', () => {
-        closeModal(helpOptionsModal);
+        if (infoModal) infoModal.hidden = true;
         openHelp();
     });
     helpPrev.addEventListener('click', () => {
@@ -2879,12 +2839,6 @@ if (quickGuideBtn && helpModal && helpText && helpPrev && helpNext && helpClose)
     });
 }
 
-if (quickChordTypesBtn && chordTypesModal && chordTypesList) {
-    quickChordTypesBtn.addEventListener('click', () => {
-        closeModal(helpOptionsModal);
-        openChordTypes();
-    });
-}
 if (chordTypesModal) {
     chordTypesModal.addEventListener('click', (event) => {
         if (event.target === chordTypesModal) closeChordTypes();
@@ -2892,7 +2846,7 @@ if (chordTypesModal) {
 }
 if (quickHelpBtn && contactModal && contactClose) {
     quickHelpBtn.addEventListener('click', () => {
-        closeModal(helpOptionsModal);
+        if (infoModal) infoModal.hidden = true;
         openContact();
     });
     contactClose.addEventListener('click', closeContact);
