@@ -1289,7 +1289,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
 
     const useSynth = isSynthEnabled();
     if (useSynth) {
-        await ensureSynthReady();
+        if (!fromLoop) await ensureSynthReady();
     } else {
         await player.ensureReady();
     }
@@ -1298,7 +1298,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     updatePreviewToggleLabel();
 
     const now = getPreviewNowSeconds();
-    const uiStartTime = now + 0.05 + (useSynth ? SYNTH_PRELOAD_SECONDS : 0);
+    const preloadSecondsThisRun = useSynth && !fromLoop ? SYNTH_PRELOAD_SECONDS : 0;
+    const uiStartTime = now + 0.05 + preloadSecondsThisRun;
     const audioStartTime = useSynth ? 0 : now + 0.05;
     const loopStartTime = audioStartTime;
     const synthSegments = useSynth ? [] : null;
@@ -1456,7 +1457,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
 
         const segmentDuration = Math.max(0, segment.chordSequence.length - chordStartIndex) * barSeconds;
         if (useSynth && (segmentBassEvents?.length || segmentTrebleEvents?.length)) {
-            const segmentStartDelaySeconds = Math.max(0, (uiCursor - now) - SYNTH_PRELOAD_SECONDS);
+            const segmentStartDelaySeconds = Math.max(0, (uiCursor - now) - preloadSecondsThisRun);
             synthSegments.push({
                 group: segment.group,
                 bassEvents: segmentBassEvents,
@@ -1473,38 +1474,45 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     const totalDurationSeconds = Math.max(0, audioCursor - loopStartTime);
     if (useSynth && synthSegments && synthSegments.length) {
         synthSegments.forEach((segment) => {
-            if (segment.bassEvents && segment.bassEvents.length) {
-                scheduleSynthPlay(() => {
-                    if (!isSequencePreviewing) return;
-                    const engine = getSynthEngine('bass');
-                    if (!engine) return;
-                    applySynthSettingsFromGroup(segment.group, 'bass');
-                    engine.play(
+            if (!(segment.bassEvents?.length || segment.trebleEvents?.length)) return;
+            scheduleSynthPlay(async () => {
+                if (!isSequencePreviewing) return;
+                applySynthSettingsFromGroup(segment.group, 'bass');
+                applySynthSettingsFromGroup(segment.group, 'treble');
+                const bassEngine = getSynthEngine('bass');
+                const trebleEngine = getSynthEngine('treble');
+                await Promise.all([
+                    bassEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve(),
+                    trebleEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve()
+                ]);
+                if (!isSequencePreviewing) return;
+                const preloadSecs = fromLoop ? 0 : SYNTH_PRELOAD_SECONDS;
+                if (segment.bassEvents?.length && bassEngine) {
+                    bassEngine.play(
                         { events: segment.bassEvents, durationSeconds: segment.durationSeconds, bpm: segment.bpm },
                         null,
                         null,
-                        { overlap: true, preloadSeconds: SYNTH_PRELOAD_SECONDS }
+                        { overlap: true, preloadSeconds: preloadSecs }
                     );
-                }, segment.startDelaySeconds * 1000);
-            }
-            if (segment.trebleEvents && segment.trebleEvents.length) {
-                scheduleSynthPlay(() => {
-                    if (!isSequencePreviewing) return;
-                    const engine = getSynthEngine('treble');
-                    if (!engine) return;
-                    applySynthSettingsFromGroup(segment.group, 'treble');
-                    engine.play(
+                }
+                if (segment.trebleEvents?.length && trebleEngine) {
+                    trebleEngine.play(
                         { events: segment.trebleEvents, durationSeconds: segment.durationSeconds, bpm: segment.bpm },
                         null,
                         null,
-                        { overlap: true, preloadSeconds: SYNTH_PRELOAD_SECONDS }
+                        { overlap: true, preloadSeconds: preloadSecs }
                     );
-                }, segment.startDelaySeconds * 1000);
-            }
+                }
+            }, segment.startDelaySeconds * 1000);
         });
     }
 
-    const loopDurationMs = Math.max(0, totalDurationSeconds * 1000);
+    // When synth ran with 0.25s preload on first run, the first chord sounded 0.25s late; so the run
+    // actually ends 0.25s after (now + totalDurationSeconds). Add that so loopback's first chord is on beat.
+    const loopDurationMs = Math.max(
+        0,
+        totalDurationSeconds * 1000 + (useSynth && !fromLoop ? SYNTH_PRELOAD_SECONDS * 1000 : 0)
+    );
     schedulePreviewTimer(() => {
         if (isSequencePreviewing) {
             clearAllHighlights();

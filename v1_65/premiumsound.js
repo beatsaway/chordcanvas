@@ -221,6 +221,18 @@
       const registry = getInstrumentRegistry();
       currentPreset = registry[name] ? name : DEFAULT_PRESET_NAME;
     }
+
+    function ensureCurrentPresetLoaded() {
+      ensureAudioGraph();
+      if (!audioCtx) return Promise.resolve();
+      const baseUrl = (typeof document !== "undefined" && document.baseURI) ? document.baseURI : (typeof window !== "undefined" && window.location && window.location.href) ? window.location.href : "";
+      const isGslPreset = typeof window !== "undefined" && window.InstrumentSampleHandler && window.InstrumentSampleHandler.isGslPreset && window.InstrumentSampleHandler.isGslPreset(currentPreset);
+      const preset0 = resolvePreset(currentPreset, { note: 60, velocity: 127, velocityNormalized: 1, durationSeconds: 0, bpm: 0 });
+      const isSamplePreset = (isGslPreset || (preset0.type === "sample" && preset0.zones)) && typeof window !== "undefined" && window.InstrumentSampleHandler;
+      return isSamplePreset
+        ? window.InstrumentSampleHandler.ensurePresetLoaded(audioCtx, currentPreset, baseUrl)
+        : Promise.resolve();
+    }
   
     function stop({ suspend = true } = {}) {
       scheduledNodes.forEach((node) => {
@@ -930,6 +942,7 @@
       ensureAudioGraph,
       prepare,
       setPreset,
+      ensureCurrentPresetLoaded,
       setEffects,
       setMasterVolume,
       play,
