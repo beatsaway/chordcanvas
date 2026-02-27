@@ -1289,7 +1289,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
 
     const useSynth = isSynthEnabled();
     if (useSynth) {
-        if (!fromLoop) await ensureSynthReady();
+        await ensureSynthReady();
     } else {
         await player.ensureReady();
     }
@@ -1298,7 +1298,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     updatePreviewToggleLabel();
 
     const now = getPreviewNowSeconds();
-    const preloadSecondsThisRun = useSynth && !fromLoop ? SYNTH_PRELOAD_SECONDS : 0;
+    const preloadSecondsThisRun = useSynth ? SYNTH_PRELOAD_SECONDS : 0;
     const uiStartTime = now + 0.05 + preloadSecondsThisRun;
     const audioStartTime = useSynth ? 0 : now + 0.05;
     const loopStartTime = audioStartTime;
@@ -1486,7 +1486,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                     trebleEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve()
                 ]);
                 if (!isSequencePreviewing) return;
-                const preloadSecs = fromLoop ? 0 : SYNTH_PRELOAD_SECONDS;
+                const preloadSecs = SYNTH_PRELOAD_SECONDS;
                 if (segment.bassEvents?.length && bassEngine) {
                     bassEngine.play(
                         { events: segment.bassEvents, durationSeconds: segment.durationSeconds, bpm: segment.bpm },
@@ -1507,12 +1507,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
         });
     }
 
-    // When synth ran with 0.25s preload on first run, the first chord sounded 0.25s late; so the run
-    // actually ends 0.25s after (now + totalDurationSeconds). Add that so loopback's first chord is on beat.
-    const loopDurationMs = Math.max(
-        0,
-        totalDurationSeconds * 1000 + (useSynth && !fromLoop ? SYNTH_PRELOAD_SECONDS * 1000 : 0)
-    );
+    // Always use 0.25s preload (including on loopback) for consistent behaviour and reliable mobile playback.
+    const loopDurationMs = Math.max(0, totalDurationSeconds * 1000);
     schedulePreviewTimer(() => {
         if (isSequencePreviewing) {
             clearAllHighlights();
