@@ -103,6 +103,9 @@ const randomByKeyCancelBtn = document.getElementById('randomByKeyCancelBtn');
 const randomByKeyPreview = document.getElementById('randomByKeyPreview');
 const randomByKeyStyleIntro = document.getElementById('randomByKeyStyleIntro');
 const randomByKeyPlayBtn = document.getElementById('randomByKeyPlayBtn');
+const chordItemOptionsModal = document.getElementById('chordItemOptionsModal');
+const chordItemChangeTypeBtn = document.getElementById('chordItemChangeTypeBtn');
+const chordItemCustomiseTrebleBtn = document.getElementById('chordItemCustomiseTrebleBtn');
 const downloadOptionsModal = document.getElementById('downloadOptionsModal');
 const helpOptionsModal = document.getElementById('helpOptionsModal');
 const trebleNotesModal = document.getElementById('trebleNotesModal');
@@ -270,14 +273,14 @@ class ChordPreviewItem {
         });
         this.element.addEventListener('contextmenu', (event) => {
             event.preventDefault();
-            openTrebleModal({ group: this.group, chord: this.chord, index: this.index });
+            openChordItemOptionsModal({ group: this.group, chord: this.chord, index: this.index });
         });
         this.element.addEventListener('touchstart', (event) => {
             if (this._longPressTimer) return;
             this._longPressTimer = setTimeout(() => {
                 this._longPressTimer = null;
                 this._longPressHandled = true;
-                openTrebleModal({ group: this.group, chord: this.chord, index: this.index });
+                openChordItemOptionsModal({ group: this.group, chord: this.chord, index: this.index });
             }, 550);
         }, { passive: true });
         this.element.addEventListener('touchend', () => {
@@ -298,7 +301,7 @@ class ChordPreviewItem {
             this._longPressTimer = setTimeout(() => {
                 this._longPressTimer = null;
                 this._longPressHandled = true;
-                openTrebleModal({ group: this.group, chord: this.chord, index: this.index });
+                openChordItemOptionsModal({ group: this.group, chord: this.chord, index: this.index });
             }, 550);
         });
         this.element.addEventListener('mouseup', () => {
@@ -2809,12 +2812,25 @@ if (synthInfoModal) {
     });
 }
 
+let chordItemOptionsContext = null;
+
+function openChordItemOptionsModal({ group, chord, index }) {
+    if (!chordItemOptionsModal || !group || !chord) return;
+    chordItemOptionsContext = { group, chord, index };
+    chordItemOptionsModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeChordItemOptionsModal() {
+    chordItemOptionsContext = null;
+    if (chordItemOptionsModal) chordItemOptionsModal.setAttribute('aria-hidden', 'true');
+}
+
 function openTrebleModal({ group, chord, index }) {
     if (!trebleNotesModal || !group || !chord) return;
     const resolved = getResolvedChordNotes(chord);
     trebleModalState = { group, chord, index, currentTreble: [...resolved.high] };
     if (trebleNotesModalTitle) {
-        trebleNotesModalTitle.textContent = `Customise treble — ${engine.getChordDisplayName(chord.rootNote, chord.chordType)}`;
+        trebleNotesModalTitle.textContent = 'Customise treble';
     }
     if (trebleNotesInput) {
         trebleNotesInput.value = '';
@@ -3110,7 +3126,7 @@ if (duplicatePanelBtn) {
     });
 }
 
-let addChordState = { accidental: '', rootNote: '', chordType: '', chord: null };
+let addChordState = { mode: 'add', accidental: '', rootNote: '', chordType: '', chord: null, editGroup: null, editIndex: -1 };
 
 const ADD_CHORD_ROOT_NATURAL = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const ADD_CHORD_ROOT_SHARP = ['C#', 'D#', 'F#', 'G#', 'A#'];
@@ -3149,12 +3165,44 @@ const addChordSpellingSelect = document.getElementById('addChordSpellingSelect')
 function openAddChordModal() {
     if (!addChordModal || !addChordRootBtns || !engine) return;
     closeModal(addOptionsModal);
-    addChordState = { accidental: '', rootNote: '', chordType: '', chord: null };
+    addChordState = { mode: 'add', accidental: '', rootNote: '', chordType: '', chord: null, editGroup: null, editIndex: -1 };
     addChordStep1?.removeAttribute('hidden');
     addChordStep2?.setAttribute('hidden', '');
     if (addChordSpellingSelect) addChordSpellingSelect.value = '';
     addChordState.accidental = '';
     populateAddChordRootBtns();
+    addChordModal.setAttribute('aria-hidden', 'false');
+}
+
+function openEditChordTypeModal({ group, chord, index }) {
+    if (!addChordModal || !addChordTypeList || !engine) return;
+    addChordState.mode = 'edit';
+    addChordState.editGroup = group;
+    addChordState.editIndex = index;
+    addChordState.rootNote = chord.rootNote;
+    addChordState.chordType = chord.chordType;
+    addChordState.chord = {
+        rootNote: chord.rootNote,
+        chordType: chord.chordType,
+        original: engine.getChordDisplayName(chord.rootNote, chord.chordType)
+    };
+    addChordState.accidental = (chord.rootNote || '').includes('#') ? '#' : (chord.rootNote || '').includes('b') ? 'b' : '';
+    addChordStep1?.setAttribute('hidden', '');
+    addChordStep2?.removeAttribute('hidden');
+    if (addChordSelectedName) addChordSelectedName.textContent = 'Chord: ' + addChordState.chord.original;
+    if (addChordTypeList && engine.chordTypeNames) {
+        addChordTypeList.innerHTML = '';
+        Object.entries(engine.chordTypeNames).forEach(([typeKey, suffix]) => {
+            const label = suffix ? addChordState.rootNote + suffix : addChordState.rootNote;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'add-chord-type-btn';
+            b.textContent = label;
+            b.dataset.chordType = typeKey;
+            if (typeKey === addChordState.chordType) b.classList.add('selected');
+            addChordTypeList.appendChild(b);
+        });
+    }
     addChordModal.setAttribute('aria-hidden', 'false');
 }
 
@@ -3231,6 +3279,26 @@ if (addChordPlayBtn) {
 }
 if (addChordKeepBtn) {
     addChordKeepBtn.addEventListener('click', () => {
+        if (addChordState.mode === 'edit') {
+            const group = addChordState.editGroup;
+            const index = addChordState.editIndex;
+            const newChord = addChordState.chord;
+            if (!group?.chordSequence || index < 0 || index >= group.chordSequence.length || !newChord) {
+                closeAddChordModal();
+                addChordState.mode = 'add';
+                return;
+            }
+            const existing = group.chordSequence[index];
+            if (Array.isArray(existing.trebleNotes)) newChord.trebleNotes = existing.trebleNotes;
+            group.chordSequence[index] = newChord;
+            group.chordInput.value = group.chordSequence.map((c) => engine.getChordDisplayName(c.rootNote, c.chordType)).join(', ');
+            autoResizeTextarea(group.chordInput);
+            updateChordPreviewItemsSettings(group);
+            closeAddChordModal();
+            addChordState.mode = 'add';
+            openTrebleModal({ group, chord: newChord, index });
+            return;
+        }
         const group = getActiveGroup();
         if (!group?.chordInput || !addChordState.chord) {
             closeAddChordModal();
@@ -3251,6 +3319,28 @@ if (addChordCancelBtn) {
 if (addChordModal) {
     addChordModal.addEventListener('click', (event) => {
         if (event.target === addChordModal) closeAddChordModal();
+    });
+}
+
+if (chordItemChangeTypeBtn) {
+    chordItemChangeTypeBtn.addEventListener('click', () => {
+        if (!chordItemOptionsContext) return;
+        const { group, chord, index } = chordItemOptionsContext;
+        closeChordItemOptionsModal();
+        openEditChordTypeModal({ group, chord, index });
+    });
+}
+if (chordItemCustomiseTrebleBtn) {
+    chordItemCustomiseTrebleBtn.addEventListener('click', () => {
+        if (!chordItemOptionsContext) return;
+        const { group, chord, index } = chordItemOptionsContext;
+        closeChordItemOptionsModal();
+        openTrebleModal({ group, chord, index });
+    });
+}
+if (chordItemOptionsModal) {
+    chordItemOptionsModal.addEventListener('click', (event) => {
+        if (event.target === chordItemOptionsModal) closeChordItemOptionsModal();
     });
 }
 

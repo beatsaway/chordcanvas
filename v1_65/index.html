@@ -1312,10 +1312,18 @@
         </div>
     </div>
 
+    <div id="chordItemOptionsModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="options-actions">
+                <button id="chordItemChangeTypeBtn" type="button">Change chord type</button>
+                <button id="chordItemCustomiseTrebleBtn" type="button">Customise treble notes</button>
+            </div>
+        </div>
+    </div>
+
     <div id="trebleNotesModal" class="options-modal" aria-hidden="true">
         <div class="options-card treble-notes-card">
-            <h3 id="trebleNotesModalTitle">Customise treble — Cmaj7</h3>
-            <p class="options-desc">Treble notes play in the high part. Add notes with + or type below (e.g. C5). Notes must not be lower than the chord's bass.</p>
+            <h3 id="trebleNotesModalTitle">Customise treble</h3>
             <div class="treble-notes-list" id="trebleNotesList"></div>
             <div class="treble-notes-add-row">
                 <input type="text" id="trebleNotesInput" placeholder="e.g. G4, Bb5" class="treble-notes-input" />
