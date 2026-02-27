@@ -746,6 +746,31 @@ function buildSynthRenderSegments(segments, part) {
     }).filter((segment) => segment.events.length > 0);
 }
 
+const WAV_EXPORT_TARGET_PEAK = 0.99;
+
+function normalizeBufferToPeak(buffer, targetPeak = WAV_EXPORT_TARGET_PEAK) {
+    const numChannels = buffer.numberOfChannels;
+    const numFrames = buffer.length;
+    let peak = 0;
+    for (let c = 0; c < numChannels; c += 1) {
+        const data = buffer.getChannelData(c);
+        for (let i = 0; i < numFrames; i += 1) {
+            const abs = Math.abs(data[i]);
+            if (abs > peak) peak = abs;
+        }
+    }
+    if (peak <= 0) return;
+    const gain = targetPeak / peak;
+    if (Math.abs(gain - 1) < 1e-6) return;
+    for (let c = 0; c < numChannels; c += 1) {
+        const data = buffer.getChannelData(c);
+        for (let i = 0; i < numFrames; i += 1) {
+            const s = data[i] * gain;
+            data[i] = Math.max(-1, Math.min(1, s));
+        }
+    }
+}
+
 function encodeWavFromBuffer(buffer) {
     const numChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
@@ -876,7 +901,10 @@ function mixBuffersToWav(buffers, sampleRate = 44100) {
         source.connect(offlineCtx.destination);
         source.start(0);
     });
-    return offlineCtx.startRendering().then((mixedBuffer) => encodeWavFromBuffer(mixedBuffer));
+    return offlineCtx.startRendering().then((mixedBuffer) => {
+        normalizeBufferToPeak(mixedBuffer);
+        return encodeWavFromBuffer(mixedBuffer);
+    });
 }
 
 function mixBuffersToWavWithProgress(buffers, sampleRate, onProgress) {
@@ -893,9 +921,10 @@ function mixBuffersToWavWithProgress(buffers, sampleRate, onProgress) {
         source.connect(offlineCtx.destination);
         source.start(0);
     });
-    return offlineCtx.startRendering().then((mixedBuffer) =>
-        encodeWavFromBufferAsync(mixedBuffer, onProgress)
-    );
+    return offlineCtx.startRendering().then((mixedBuffer) => {
+        normalizeBufferToPeak(mixedBuffer);
+        return encodeWavFromBufferAsync(mixedBuffer, onProgress);
+    });
 }
 
 function getBpmValue(group) {
