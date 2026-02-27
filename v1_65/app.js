@@ -15,8 +15,6 @@ const DEFAULT_BPM = 120;
 const MIN_BPM = 33;
 const MAX_BPM = 888;
 const CHORD_BAR_BEATS = 4;
-const SYNTH_PRELOAD_SECONDS = 0.25;
-const PRELOAD_SEGMENT_COUNT = 3;
 const VOLUME_MOD_MIN = 0.05;
 const VOLUME_MOD_MAX = 1.3;
 const VOLUME_MOD_CURVE = 2.0;
@@ -37,15 +35,7 @@ let previewTimers = [];
 let previewTimeline = [];
 let resyncTimerId = null;
 let isSynthMode = true;
-let isSynthPreloading = false;
 let synthPlayTimers = [];
-let previewBakedBass = [];
-let previewBakedTreble = [];
-let previewBakedSegments = [];
-let previewPreloadPromises = {};
-let previewBakedPlayStartTime = 0;
-let bakedHighlightRafId = 0;
-let bakedHighlightSegmentEndTime = 0;
 
 const DEFAULT_BASS_DURATION = 30;
 const DEFAULT_HIGH_DURATION = 30;
@@ -485,22 +475,6 @@ function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern
             events.push({ type: 'volume', timeSeconds: rampStart, value: rampStartLevel, track: trackLabel });
             events.push({ type: 'volume', timeSeconds: barEnd, value: startLevel, track: trackLabel });
         }
-    }
-}
-
-async function ensureSynthReady() {
-    if (!isSynthEnabled()) return;
-    if (isSynthPreloading) return;
-    isSynthPreloading = true;
-    updatePreviewToggleLabel();
-    try {
-        const engines = [getSynthEngine('bass'), getSynthEngine('treble')].filter(Boolean);
-        await Promise.all(
-            engines.map((engine) => engine.prepare({ warmupSeconds: SYNTH_PRELOAD_SECONDS }))
-        );
-    } finally {
-        isSynthPreloading = false;
-        updatePreviewToggleLabel();
     }
 }
 
@@ -1296,199 +1270,199 @@ function getPreviewSegments() {
     return collectSegments();
 }
 
+const LOOP_CHAIN_PREBAKE_COUNT = 8;
 const BAKED_SAMPLE_RATE = 44100;
-// Baked buffers are rendered with 0.12s lead-in (premiumsound scheduleEvents), so first chord is heard at segmentStart + 0.12.
-const BAKED_RENDER_LEAD_IN_SECONDS = 0.12;
 
-function bakeSegmentAsync(i) {
-    if (previewPreloadPromises[i] !== undefined) return previewPreloadPromises[i];
-    const seg = previewBakedSegments[i];
-    if (!seg || (!seg.bassEvents?.length && !seg.trebleEvents?.length)) {
-        previewPreloadPromises[i] = Promise.resolve();
-        return previewPreloadPromises[i];
-    }
-    const bassSeg = toBassRenderSegment(seg);
-    const trebleSeg = toTrebleRenderSegment(seg);
-    const bassEngine = getSynthEngine('bass');
-    const trebleEngine = getSynthEngine('treble');
-    let resolvePreload;
-    previewPreloadPromises[i] = new Promise((r) => { resolvePreload = r; });
-    Promise.all([
-        bassSeg && bassEngine ? bassEngine.renderBuffer([bassSeg], { sampleRate: BAKED_SAMPLE_RATE }) : null,
-        trebleSeg && trebleEngine ? trebleEngine.renderBuffer([trebleSeg], { sampleRate: BAKED_SAMPLE_RATE }) : null
-    ]).then(([bassBuf, trebleBuf]) => {
-        if (bassBuf) previewBakedBass[i] = bassBuf;
-        if (trebleBuf) previewBakedTreble[i] = trebleBuf;
-        resolvePreload();
-    }).catch(() => { resolvePreload(); });
-    return previewPreloadPromises[i];
-}
-
-function stopBakedHighlightLoop() {
-    if (bakedHighlightRafId) {
-        cancelAnimationFrame(bakedHighlightRafId);
-        bakedHighlightRafId = 0;
-    }
-}
-
-function runBakedHighlightLoop(seg, segmentStartTimeAudio) {
-    if (!seg?.group || !seg.chordCount || seg.chordCount <= 0) return;
-    const barSeconds = seg.durationSeconds / seg.chordCount;
-    const baseIndex = seg.chordStartIndex ?? 0;
-    const startWithLeadIn = segmentStartTimeAudio + BAKED_RENDER_LEAD_IN_SECONDS;
-    bakedHighlightSegmentEndTime = segmentStartTimeAudio + seg.durationSeconds;
-    const group = seg.group;
-    const getTime = () => {
-        const engine = getSynthEngine('bass') || getSynthEngine('treble');
-        return engine?.getCurrentTime?.() ?? performance.now() / 1000;
-    };
-    let lastK = -1;
-    const tick = () => {
-        if (!isSequencePreviewing || !group) return;
-        const t = getTime();
-        if (t >= bakedHighlightSegmentEndTime) {
-            stopBakedHighlightLoop();
-            return;
-        }
-        const k = Math.min(
-            seg.chordCount - 1,
-            Math.max(0, Math.floor((t - startWithLeadIn) / barSeconds))
-        );
-        if (k !== lastK && k >= 0) {
-            lastK = k;
-            clearAllHighlights();
-            setChordPreviewPlaying(group, baseIndex + k);
-        }
-        bakedHighlightRafId = requestAnimationFrame(tick);
-    };
-    stopBakedHighlightLoop();
-    bakedHighlightRafId = requestAnimationFrame(tick);
-}
-
-function playBakedSegment(i, startTime) {
-    if (!isSequencePreviewing || !previewBakedSegments[i]) return;
-    const seg = previewBakedSegments[i];
-    const bassEngine = getSynthEngine('bass');
-    const trebleEngine = getSynthEngine('treble');
-    const bassBuf = previewBakedBass[i];
-    const trebleBuf = previewBakedTreble[i];
-    const audioNow = (bassEngine?.getCurrentTime?.() ?? trebleEngine?.getCurrentTime?.()) ?? performance.now() / 1000;
-    const t = (bassEngine?.getCurrentTime != null || trebleEngine?.getCurrentTime != null)
-        ? audioNow + 0.02
-        : (startTime ?? performance.now() / 1000 + 0.02);
-    runBakedHighlightLoop(seg, t);
-    const pending = (bassBuf && bassEngine ? 1 : 0) + (trebleBuf && trebleEngine ? 1 : 0);
-    let doneCount = 0;
-    const onOneDone = () => {
-        doneCount += 1;
-        if (doneCount >= pending) scheduleNextBakedSegment(i);
-    };
-    if (bassBuf && bassEngine) {
-        bassEngine.playBuffer(bassBuf, null, pending === 1 ? () => scheduleNextBakedSegment(i) : onOneDone, { overlap: true, startTime: t });
-    }
-    if (trebleBuf && trebleEngine) {
-        trebleEngine.playBuffer(trebleBuf, null, pending === 1 ? () => scheduleNextBakedSegment(i) : onOneDone, { overlap: true, startTime: t });
-    }
-    if (!bassBuf && !trebleBuf) {
-        playSegmentLive(i, t);
-    }
-}
-
-function playSegmentLive(i, startTime) {
-    if (!isSequencePreviewing) return;
-    const seg = previewBakedSegments[i];
-    if (!seg) return;
-    applySynthSettingsFromGroup(seg.group, 'bass');
-    applySynthSettingsFromGroup(seg.group, 'treble');
-    const bassEngine = getSynthEngine('bass');
-    const trebleEngine = getSynthEngine('treble');
-    Promise.all([
-        bassEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve(),
-        trebleEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve()
-    ]).then(() => {
-        if (!isSequencePreviewing) return;
-        const audioNow = (bassEngine?.getCurrentTime?.() ?? trebleEngine?.getCurrentTime?.()) ?? performance.now() / 1000;
-        runBakedHighlightLoop(seg, audioNow);
-        if (seg.bassEvents?.length && bassEngine) {
-            bassEngine.play(
-                { events: seg.bassEvents, durationSeconds: seg.durationSeconds, bpm: seg.bpm },
-                null, null,
-                { overlap: true, preloadSeconds: 0 }
-            );
-        }
-        if (seg.trebleEvents?.length && trebleEngine) {
-            trebleEngine.play(
-                { events: seg.trebleEvents, durationSeconds: seg.durationSeconds, bpm: seg.bpm },
-                null, null,
-                { overlap: true, preloadSeconds: 0 }
-            );
-        }
-        schedulePreviewTimer(() => scheduleNextBakedSegment(i), (seg.durationSeconds || 0) * 1000);
-    });
-}
-
-function scheduleNextBakedSegment(i) {
-    if (!isSequencePreviewing) return;
-    const L = previewBakedSegments.length;
-    const next = i + 1;
-    if (next >= L) {
-        scheduleBakedLoop();
-        return;
-    }
-    const seg = previewBakedSegments[next];
-    const startTime = performance.now() / 1000 + 0.02;
-    if (previewBakedBass[next] || previewBakedTreble[next]) {
-        playBakedSegment(next, startTime);
-    } else {
-        const p = previewPreloadPromises[next];
-        if (p) {
-            p.then(() => {
-                if (isSequencePreviewing) playBakedSegment(next, performance.now() / 1000 + 0.02);
+/** Flat list of chords in playback order for current loop mode (loop all or loop this). */
+function buildLoopChain() {
+    const segments = getPreviewSegments();
+    const chain = [];
+    segments.forEach((segment, segmentIndex) => {
+        if (!segment?.chordSequence?.length) return;
+        const barSeconds = (60 / segment.bpm) * CHORD_BAR_BEATS;
+        segment.chordSequence.forEach((chord, chordIndex) => {
+            chain.push({
+                segment,
+                segmentIndex,
+                chordIndex,
+                group: segment.group,
+                chord,
+                barSeconds
             });
-        } else {
-            playSegmentLive(next, startTime);
-        }
-    }
-    startBakedPreload(next + PRELOAD_SEGMENT_COUNT);
-}
-
-function startBakedPreload(nextIndex) {
-    const L = previewBakedSegments.length;
-    if (L === 0) return;
-    const indices = nextIndex >= L
-        ? [0, 1, 2].filter((j) => j < L)
-        : [nextIndex];
-    indices.forEach((i) => {
-        const seg = previewBakedSegments[i];
-        if (!seg?.bassEvents?.length && !seg?.trebleEvents?.length) return;
-        if (previewPreloadPromises[i] !== undefined) return;
-        bakeSegmentAsync(i);
+        });
     });
+    return chain;
 }
 
-function scheduleBakedLoop() {
+/** Build one-chord render segments (bass + treble) for the engine. */
+function buildSingleChordRenderSegments(segment, chordIndex) {
+    const barSeconds = (60 / segment.bpm) * CHORD_BAR_BEATS;
+    const bassCycleSeconds = segment.bassDurationMultiplier / segment.bpm;
+    const highCycleSeconds = segment.highDurationMultiplier / segment.bpm;
+    const chordStart = 0;
+    const chordEnd = barSeconds;
+    const delayState = { counter: 0 };
+    const skipState = buildSkipStateFromPattern(segment.skipPattern);
+    const chordNotes = getResolvedChordNotes(segment.chordSequence[chordIndex]);
+    const highNotes = getHighNotesForPattern(chordNotes, segment.doubleHighEnabled);
+    const velocityVolumeModPattern = 'none';
+
+    const bassEvents = [];
+    const trebleEvents = [];
+    const bassSemitone = getSynthSemitone(segment.group, 'bass');
+    const trebleSemitone = getSynthSemitone(segment.group, 'treble');
+    const bassNotesAdjusted = chordNotes.bass.map((n) => n + bassSemitone);
+    const highNotesAdjusted = highNotes.map((n) => n + trebleSemitone);
+
+    schedulePreviewNotes(
+        bassNotesAdjusted,
+        chordStart,
+        chordEnd,
+        bassCycleSeconds,
+        barSeconds,
+        0.4 * segment.bassPlaybackVolume,
+        { applySkip: false, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+        bassEvents
+    );
+    if (segment.patternMode === 'normal') {
+        schedulePreviewNotes(
+            highNotesAdjusted,
+            chordStart,
+            chordEnd,
+            highCycleSeconds,
+            barSeconds,
+            0.24 * segment.highPlaybackVolume,
+            { applySkip: true, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+            trebleEvents
+        );
+    } else {
+        schedulePreviewArpeggio(
+            highNotesAdjusted,
+            chordStart,
+            chordEnd,
+            highCycleSeconds,
+            barSeconds,
+            0.24 * segment.highPlaybackVolume,
+            segment.patternMode,
+            { applySkip: true, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+            trebleEvents
+        );
+    }
+    const fastestMultiplier = Math.min(...DURATION_MULTIPLIERS);
+    addSynthVolumeAutomation(
+        bassEvents,
+        barSeconds,
+        1,
+        getSynthVolumeModPattern(segment.group, 'bass'),
+        segment.group.synthBassOutputGain,
+        'bass',
+        { midiVolumeModPattern: segment.volumeModPattern, rhythmMultiplier: segment.bassDurationMultiplier, fastestMultiplier }
+    );
+    addSynthVolumeAutomation(
+        trebleEvents,
+        barSeconds,
+        1,
+        getSynthVolumeModPattern(segment.group, 'treble'),
+        segment.group.synthTrebleOutputGain,
+        'treble',
+        { midiVolumeModPattern: segment.volumeModPattern, rhythmMultiplier: segment.highDurationMultiplier, fastestMultiplier }
+    );
+
+    const bassRenderSegment = bassEvents.length ? {
+        events: bassEvents,
+        durationSeconds: barSeconds,
+        preset: segment.group.synthBassPreset,
+        effects: getSynthEffectsFromGroup(segment.group, 'bass'),
+        bpm: segment.bpm
+    } : null;
+    const trebleRenderSegment = trebleEvents.length ? {
+        events: trebleEvents,
+        durationSeconds: barSeconds,
+        preset: segment.group.synthTreblePreset,
+        effects: getSynthEffectsFromGroup(segment.group, 'treble'),
+        bpm: segment.bpm
+    } : null;
+    return { bassRenderSegment, trebleRenderSegment };
+}
+
+let loopChain = [];
+let chainBakedBuffers = {};
+let chainBakingPromises = {};
+let prebakeResumeThreshold = 1;
+let hasUserClickedForPrebake = false;
+
+function clearChainBakedCache() {
+    chainBakedBuffers = {};
+    chainBakingPromises = {};
+}
+
+function bakeChainChord(chainIndex) {
+    if (chainBakingPromises[chainIndex] !== undefined) return chainBakingPromises[chainIndex];
+    const item = loopChain[chainIndex];
+    if (!item) {
+        chainBakingPromises[chainIndex] = Promise.resolve();
+        return chainBakingPromises[chainIndex];
+    }
+    const { bassRenderSegment, trebleRenderSegment } = buildSingleChordRenderSegments(item.segment, item.chordIndex);
+    const bassEngine = getSynthEngine('bass');
+    const trebleEngine = getSynthEngine('treble');
+    let resolveBake;
+    chainBakingPromises[chainIndex] = new Promise((r) => { resolveBake = r; });
+    Promise.all([
+        bassRenderSegment && bassEngine ? bassEngine.renderBuffer([bassRenderSegment], { sampleRate: BAKED_SAMPLE_RATE }) : null,
+        trebleRenderSegment && trebleEngine ? trebleEngine.renderBuffer([trebleRenderSegment], { sampleRate: BAKED_SAMPLE_RATE }) : null
+    ]).then(([bassBuf, trebleBuf]) => {
+        chainBakedBuffers[chainIndex] = chainBakedBuffers[chainIndex] || {};
+        if (bassBuf) chainBakedBuffers[chainIndex].bass = bassBuf;
+        if (trebleBuf) chainBakedBuffers[chainIndex].treble = trebleBuf;
+        resolveBake();
+    }).catch(() => { resolveBake(); });
+    return chainBakingPromises[chainIndex];
+}
+
+function startPrebakeOnFirstClick() {
+    if (hasUserClickedForPrebake || !isSynthEnabled()) return;
+    hasUserClickedForPrebake = true;
+    ensureSynthContextReady().then(() => {
+        loopChain = buildLoopChain();
+        if (loopChain.length === 0) return;
+        const count = Math.min(LOOP_CHAIN_PREBAKE_COUNT, loopChain.length);
+        for (let i = 0; i < count; i += 1) bakeChainChord(i);
+    }).catch(() => {});
+}
+
+function isChainIndexBaked(chainIndex) {
+    return chainBakedBuffers[chainIndex] != null;
+}
+
+async function playBakedChainLoop(position) {
     if (!isSequencePreviewing) return;
+    const L = loopChain.length;
+    if (L === 0) return;
+    const N = Math.min(prebakeResumeThreshold, L);
+    const indicesToWait = [];
+    for (let k = 0; k < N; k += 1) indicesToWait.push((position + k) % L);
+    const alreadyReady = indicesToWait.every((i) => isChainIndexBaked(i));
+    if (!alreadyReady) {
+        await Promise.all(indicesToWait.map((i) => bakeChainChord(i)));
+        prebakeResumeThreshold = Math.min(8, prebakeResumeThreshold + 1);
+    }
+    for (let k = 1; k <= LOOP_CHAIN_PREBAKE_COUNT; k += 1) bakeChainChord((position + k) % L);
+    const item = loopChain[position];
+    const buffers = chainBakedBuffers[position];
     clearAllHighlights();
-    const L = previewBakedSegments.length;
-    const N = Math.min(PRELOAD_SEGMENT_COUNT, L);
-    for (let j = 0; j < N; j += 1) {
-        if (previewBakedBass[j] === undefined && previewBakedTreble[j] === undefined) {
-            bakeSegmentAsync(j);
-        }
+    setChordPreviewPlaying(item.group, item.chordIndex);
+    const bassEngine = getSynthEngine('bass');
+    const trebleEngine = getSynthEngine('treble');
+    if (buffers?.bass && bassEngine) {
+        bassEngine.playBuffer(buffers.bass, null, null, { overlap: true });
+    }
+    if (buffers?.treble && trebleEngine) {
+        trebleEngine.playBuffer(buffers.treble, null, null, { overlap: true });
     }
     schedulePreviewTimer(() => {
-        if (isSequencePreviewing) {
-            clearAllHighlights();
-            startBakedLoopIteration();
-        }
-    }, 50);
-}
-
-function startBakedLoopIteration() {
-    if (!isSequencePreviewing || !previewBakedSegments.length) return;
-    previewBakedPlayStartTime = performance.now() / 1000;
-    playBakedSegment(0, performance.now() / 1000 + 0.02);
-    startBakedPreload(PRELOAD_SEGMENT_COUNT);
+        if (isSequencePreviewing) playBakedChainLoop((position + 1) % L);
+    }, item.barSeconds * 1000);
 }
 
 async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSequence = false } = {}) {
@@ -1519,9 +1493,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     }
 
     const useSynth = isSynthEnabled();
-    const useBakedSynth = useSynth;
     if (useSynth) {
-        await (useBakedSynth ? ensureSynthContextReady() : ensureSynthReady());
+        await ensureSynthContextReady();
     } else {
         await player.ensureReady();
     }
@@ -1530,7 +1503,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     updatePreviewToggleLabel();
 
     const now = getPreviewNowSeconds();
-    const preloadSecondsThisRun = useSynth && !useBakedSynth ? SYNTH_PRELOAD_SECONDS : 0;
+    const preloadSecondsThisRun = 0;
     const uiStartTime = now + 0.05 + preloadSecondsThisRun;
     const audioStartTime = useSynth ? 0 : now + 0.05;
     const loopStartTime = audioStartTime;
@@ -1649,7 +1622,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                 );
             }
 
-            if (!useBakedSynth) {
+            if (useSynth) {
                 schedulePreviewTimer(() => {
                     if (isSequencePreviewing) {
                         clearAllHighlights();
@@ -1710,65 +1683,19 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
     });
 
     const totalDurationSeconds = Math.max(0, audioCursor - loopStartTime);
-    if (useSynth && synthSegments && synthSegments.length) {
-        if (useBakedSynth) {
-            if (!fromLoop) {
-                previewBakedBass = [];
-                previewBakedTreble = [];
-                previewPreloadPromises = {};
-            }
-            previewBakedSegments = synthSegments;
-            const N = Math.min(PRELOAD_SEGMENT_COUNT, synthSegments.length);
-            isSynthPreloading = true;
-            updatePreviewToggleLabel();
-            try {
-                for (let i = 0; i < N; i += 1) {
-                    await bakeSegmentAsync(i);
-                }
-            } finally {
-                isSynthPreloading = false;
-                updatePreviewToggleLabel();
-            }
-            previewBakedPlayStartTime = performance.now() / 1000;
-            playBakedSegment(0, performance.now() / 1000 + 0.02);
-            startBakedPreload(N);
-        } else {
-            synthSegments.forEach((segment) => {
-                if (!(segment.bassEvents?.length || segment.trebleEvents?.length)) return;
-                scheduleSynthPlay(async () => {
-                    if (!isSequencePreviewing) return;
-                    applySynthSettingsFromGroup(segment.group, 'bass');
-                    applySynthSettingsFromGroup(segment.group, 'treble');
-                    const bassEngine = getSynthEngine('bass');
-                    const trebleEngine = getSynthEngine('treble');
-                    await Promise.all([
-                        bassEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve(),
-                        trebleEngine?.ensureCurrentPresetLoaded?.() ?? Promise.resolve()
-                    ]);
-                    if (!isSequencePreviewing) return;
-                    const preloadSecs = SYNTH_PRELOAD_SECONDS;
-                    if (segment.bassEvents?.length && bassEngine) {
-                        bassEngine.play(
-                            { events: segment.bassEvents, durationSeconds: segment.durationSeconds, bpm: segment.bpm },
-                            null,
-                            null,
-                            { overlap: true, preloadSeconds: preloadSecs }
-                        );
-                    }
-                    if (segment.trebleEvents?.length && trebleEngine) {
-                        trebleEngine.play(
-                            { events: segment.trebleEvents, durationSeconds: segment.durationSeconds, bpm: segment.bpm },
-                            null,
-                            null,
-                            { overlap: true, preloadSeconds: preloadSecs }
-                        );
-                    }
-                }, segment.startDelaySeconds * 1000);
-            });
+    if (useSynth) {
+        loopChain = buildLoopChain();
+        clearChainBakedCache();
+        const L = loopChain.length;
+        if (L > 0) {
+            for (let i = 0; i < Math.min(LOOP_CHAIN_PREBAKE_COUNT, L); i += 1) bakeChainChord(i);
+            const startChainIndex = Math.min(
+                L - 1,
+                segments.slice(0, startAtSegmentIndex).reduce((sum, seg) => sum + seg.chordSequence.length, 0) + startAtChordIndex
+            );
+            playBakedChainLoop(startChainIndex);
         }
-    }
-
-    if (!useBakedSynth) {
+    } else {
         const loopDurationMs = Math.max(0, totalDurationSeconds * 1000);
         schedulePreviewTimer(() => {
             if (isSequencePreviewing) {
@@ -1787,10 +1714,7 @@ function stopPreview() {
     clearPreviewTimers();
     clearResyncTimer();
     clearSynthPlayTimers();
-    stopBakedHighlightLoop();
-    previewBakedBass = [];
-    previewBakedTreble = [];
-    previewPreloadPromises = {};
+    clearChainBakedCache();
     const bassEngine = getSynthEngine('bass');
     const trebleEngine = getSynthEngine('treble');
     if (bassEngine) bassEngine.stop();
@@ -1843,7 +1767,7 @@ async function playChordOnce(group, chord, index) {
     const delayState = { counter: 0 };
 
     if (isSynthEnabled()) {
-        await ensureSynthReady();
+        await ensureSynthContextReady();
         const bassEvents = [];
         const trebleEvents = [];
         const fastestMultiplier = Math.min(...DURATION_MULTIPLIERS);
@@ -1893,7 +1817,7 @@ async function playChordOnce(group, chord, index) {
                 { events: bassEvents, durationSeconds: durationSeconds + 0.05, bpm },
                 null,
                 null,
-                { overlap: true, preloadSeconds: SYNTH_PRELOAD_SECONDS }
+                { overlap: true, preloadSeconds: 0 }
                 );
             }
         }
@@ -1905,7 +1829,7 @@ async function playChordOnce(group, chord, index) {
                 { events: trebleEvents, durationSeconds: durationSeconds + 0.05, bpm },
                 null,
                 null,
-                { overlap: true, preloadSeconds: SYNTH_PRELOAD_SECONDS }
+                { overlap: true, preloadSeconds: 0 }
                 );
             }
         }
@@ -1938,7 +1862,7 @@ const TREBLE_NOTE_PREVIEW_DURATION = 0.4;
 async function playSingleTrebleNote(group, midiNote) {
     if (!group || midiNote == null) return;
     if (isSynthEnabled()) {
-        await ensureSynthReady();
+        await ensureSynthContextReady();
         const trebleEngine = getSynthEngine('treble');
         if (!trebleEngine) return;
         applySynthSettingsFromGroup(group, 'treble');
@@ -1950,7 +1874,7 @@ async function playSingleTrebleNote(group, midiNote) {
             { events, durationSeconds: TREBLE_NOTE_PREVIEW_DURATION + 0.05, bpm: getBpmValue(group) },
             null,
             null,
-            { overlap: true, preloadSeconds: SYNTH_PRELOAD_SECONDS }
+            { overlap: true, preloadSeconds: 0 }
         );
     } else {
         await player.ensureReady();
@@ -2203,9 +2127,7 @@ function updateCurrentHighNotes(group, index) {
 }
 
 function updatePreviewToggleLabel() {
-    const nextText = isSynthPreloading
-        ? 'Preloading...'
-        : (isSequencePreviewing ? 'Stop' : 'Play');
+    const nextText = isSequencePreviewing ? 'Stop' : 'Play';
     const label = previewToggle?.querySelector('.play-label');
     if (label) {
         label.textContent = nextText;
@@ -2793,13 +2715,15 @@ if (playOptionsLoopSelect) {
     });
 }
 
+document.addEventListener('click', startPrebakeOnFirstClick, { once: true });
+
 if (playOptionsPlaybackSelect) {
     playOptionsPlaybackSelect.addEventListener('change', () => {
         const wasSynth = isSynthMode;
         isSynthMode = playOptionsPlaybackSelect.value === 'synth';
         if (isSynthMode && !wasSynth) {
             if (isPreviewing || isSequencePreviewing) stopPreview();
-            ensureSynthReady().catch(() => {});
+            ensureSynthContextReady().catch(() => {});
         }
     });
 }
