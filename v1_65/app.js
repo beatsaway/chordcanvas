@@ -182,8 +182,8 @@ function buildPanelGroupState(groupEl) {
         synthTreblePreset: 'pluck',
         synthBassVolumeModPattern: 'valley',
         synthTrebleVolumeModPattern: '3hill',
-        synthBassOutputGain: 1,
-        synthTrebleOutputGain: 1,
+        synthBassOutputGain: 0.4,
+        synthTrebleOutputGain: 0.6,
         synthBassSemitoneOffset: 0,
         synthTrebleSemitoneOffset: 0
     };
@@ -402,10 +402,10 @@ function getSynthSemitone(group, part = 'bass') {
 }
 
 function updateSynthOutputGainFromSliders(group) {
-    const bassValue = parseInt(group?.synthBassOutputSlider?.value ?? '100', 10);
-    const trebleValue = parseInt(group?.synthTrebleOutputSlider?.value ?? '100', 10);
-    group.synthBassOutputGain = Number.isFinite(bassValue) ? Math.max(0, Math.min(100, bassValue)) / 100 : 1;
-    group.synthTrebleOutputGain = Number.isFinite(trebleValue) ? Math.max(0, Math.min(100, trebleValue)) / 100 : 1;
+    const bassValue = parseInt(group?.synthBassOutputSlider?.value ?? '40', 10);
+    const trebleValue = parseInt(group?.synthTrebleOutputSlider?.value ?? '60', 10);
+    group.synthBassOutputGain = Number.isFinite(bassValue) ? Math.max(0, Math.min(100, bassValue)) / 100 : 0.4;
+    group.synthTrebleOutputGain = Number.isFinite(trebleValue) ? Math.max(0, Math.min(100, trebleValue)) / 100 : 0.6;
 }
 
 function applySynthSettingsFromGroup(group, part = 'bass') {
@@ -1481,10 +1481,30 @@ let chainBakedBuffers = {};
 let chainBakingPromises = {};
 let prebakeResumeThreshold = 1;
 let hasUserClickedForPrebake = false;
+let currentSynthChainIndex = null;
+let synthLoopResyncing = false;
 
 function clearChainBakedCache() {
     chainBakedBuffers = {};
     chainBakingPromises = {};
+}
+
+function resumeSynthLoopAfterSettingsChange() {
+    if (!isSequencePreviewing || !isSynthEnabled()) return;
+    loopChain = buildLoopChain();
+    const L = loopChain.length;
+    if (L === 0) return;
+    const position = currentSynthChainIndex != null ? currentSynthChainIndex % L : 0;
+    clearChainBakedCache();
+    const N = Math.min(prebakeResumeThreshold, L);
+    const indicesToBake = [];
+    for (let k = 0; k < N; k += 1) indicesToBake.push((position + k) % L);
+    Promise.all(indicesToBake.map((i) => bakeChainChord(i))).then(() => {
+        if (!isSequencePreviewing) return;
+        synthLoopResyncing = false;
+        for (let k = 1; k <= LOOP_CHAIN_PREBAKE_COUNT; k += 1) bakeChainChord((position + k) % L);
+        playBakedChainLoop(position);
+    });
 }
 
 function bakeChainChord(chainIndex) {
@@ -1538,6 +1558,8 @@ async function playBakedChainLoop(position) {
         await Promise.all(indicesToWait.map((i) => bakeChainChord(i)));
         prebakeResumeThreshold = Math.min(8, prebakeResumeThreshold + 1);
     }
+    if (synthLoopResyncing) return;
+    currentSynthChainIndex = position;
     for (let k = 1; k <= LOOP_CHAIN_PREBAKE_COUNT; k += 1) bakeChainChord((position + k) % L);
     const item = loopChain[position];
     const buffers = chainBakedBuffers[position];
@@ -1806,6 +1828,7 @@ function stopPreview() {
     clearResyncTimer();
     clearSynthPlayTimers();
     clearChainBakedCache();
+    currentSynthChainIndex = null;
     const bassEngine = getSynthEngine('bass');
     const trebleEngine = getSynthEngine('treble');
     if (bassEngine) bassEngine.stop();
@@ -2464,8 +2487,14 @@ function registerPanelGroup(groupEl) {
         updateSynthOutputGainFromSliders(group);
         updateChordPreviewItemsSettings(group);
         if (isSequencePreviewing && isSynthEnabled()) {
-            stopPreview();
-            startPreview().catch(() => {});
+            synthLoopResyncing = true;
+            clearPreviewTimers();
+            clearChainBakedCache();
+            const bassEngine = getSynthEngine('bass');
+            const trebleEngine = getSynthEngine('treble');
+            if (bassEngine) bassEngine.stop();
+            if (trebleEngine && trebleEngine !== bassEngine) trebleEngine.stop();
+            resumeSynthLoopAfterSettingsChange();
         }
     };
 
