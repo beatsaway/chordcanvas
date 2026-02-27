@@ -774,6 +774,75 @@ function encodeWavFromBuffer(buffer) {
     return new Blob([view], { type: 'audio/wav' });
 }
 
+const WAV_ENCODE_CHUNK_FRAMES = 44100;
+
+function encodeWavFromBufferAsync(buffer, onProgress) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const numFrames = buffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const dataSize = numFrames * blockAlign;
+    const arrayBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(arrayBuffer);
+
+    function writeString(offset, text) {
+        for (let i = 0; i < text.length; i += 1) {
+            view.setUint8(offset + i, text.charCodeAt(i));
+        }
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    const channelData = Array.from({ length: numChannels }, (_, c) => buffer.getChannelData(c));
+
+    function doChunk(startFrame, endFrame) {
+        for (let i = startFrame; i < endFrame; i += 1) {
+            for (let channel = 0; channel < numChannels; channel += 1) {
+                let sample = channelData[channel][i];
+                sample = Math.max(-1, Math.min(1, sample));
+                view.setInt16(
+                    offset,
+                    sample < 0 ? sample * 0x8000 : sample * 0x7fff,
+                    true
+                );
+                offset += 2;
+            }
+        }
+    }
+
+    return new Promise((resolve) => {
+        let frame = 0;
+        function nextChunk() {
+            const chunkEnd = Math.min(frame + WAV_ENCODE_CHUNK_FRAMES, numFrames);
+            doChunk(frame, chunkEnd);
+            frame = chunkEnd;
+            if (onProgress && numFrames > 0) {
+                onProgress(Math.round((frame / numFrames) * 100));
+            }
+            if (frame < numFrames) {
+                setTimeout(nextChunk, 0);
+            } else {
+                resolve(new Blob([view], { type: 'audio/wav' }));
+            }
+        }
+        nextChunk();
+    });
+}
+
 function mixBuffersToWav(buffers, sampleRate = 44100) {
     const validBuffers = buffers.filter(Boolean);
     if (validBuffers.length === 0) return null;
@@ -789,6 +858,25 @@ function mixBuffersToWav(buffers, sampleRate = 44100) {
         source.start(0);
     });
     return offlineCtx.startRendering().then((mixedBuffer) => encodeWavFromBuffer(mixedBuffer));
+}
+
+function mixBuffersToWavWithProgress(buffers, sampleRate, onProgress) {
+    const validBuffers = buffers.filter(Boolean);
+    if (validBuffers.length === 0) return Promise.resolve(null);
+    if (validBuffers.length === 1) {
+        return encodeWavFromBufferAsync(validBuffers[0], onProgress);
+    }
+    const maxLength = Math.max(...validBuffers.map((b) => b.length));
+    const offlineCtx = new OfflineAudioContext(2, maxLength, sampleRate);
+    validBuffers.forEach((buffer) => {
+        const source = offlineCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+    });
+    return offlineCtx.startRendering().then((mixedBuffer) =>
+        encodeWavFromBufferAsync(mixedBuffer, onProgress)
+    );
 }
 
 function getBpmValue(group) {
@@ -2745,10 +2833,13 @@ async function downloadWavFile(button) {
     }
 
     const originalLabel = button?.textContent || 'Download';
-    if (button) {
-        button.disabled = true;
-        button.textContent = 'Rendering...';
-    }
+    const setStatus = (text) => {
+        if (button) {
+            button.disabled = true;
+            button.textContent = text;
+        }
+    };
+    setStatus('Rendering...');
     try {
         const bassSegments = buildSynthRenderSegments(segments, 'bass');
         const trebleSegments = buildSynthRenderSegments(segments, 'treble');
@@ -2760,7 +2851,12 @@ async function downloadWavFile(button) {
             ? await trebleEngine.renderBuffer(trebleSegments, { sampleRate })
             : null;
 
-        const wavBlob = await mixBuffersToWav([bassBuffer, trebleBuffer], sampleRate);
+        setStatus('Encoding WAV... 0%');
+        const wavBlob = await mixBuffersToWavWithProgress(
+            [bassBuffer, trebleBuffer],
+            sampleRate,
+            (percent) => setStatus(`Encoding WAV... ${percent}%`)
+        );
         if (!wavBlob) {
             alert('WAV render failed. Please try again.');
             return;
