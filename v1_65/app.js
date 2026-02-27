@@ -191,8 +191,8 @@ function buildPanelGroupState(groupEl) {
         synthTreblePreset: 'pluck',
         synthBassVolumeModPattern: 'valley',
         synthTrebleVolumeModPattern: '3hill',
-        synthBassOutputGain: 0.4,
-        synthTrebleOutputGain: 0.6,
+        synthBassOutputGain: 0.8,
+        synthTrebleOutputGain: 1.2,
         synthBassSemitoneOffset: 0,
         synthTrebleSemitoneOffset: 0
     };
@@ -233,10 +233,12 @@ function buildPanelGroupState(groupEl) {
         state.synthTrebleVolumeModPattern = state.synthTrebleVolumeModSelect.value;
     }
     if (state.synthBassOutputSlider?.value) {
-        state.synthBassOutputGain = Math.max(0, Math.min(100, parseInt(state.synthBassOutputSlider.value, 10))) / 100;
+        const v = Math.max(0, Math.min(100, parseInt(state.synthBassOutputSlider.value, 10)));
+        state.synthBassOutputGain = (v / 100) * 2;
     }
     if (state.synthTrebleOutputSlider?.value) {
-        state.synthTrebleOutputGain = Math.max(0, Math.min(100, parseInt(state.synthTrebleOutputSlider.value, 10))) / 100;
+        const v = Math.max(0, Math.min(100, parseInt(state.synthTrebleOutputSlider.value, 10)));
+        state.synthTrebleOutputGain = (v / 100) * 2;
     }
     if (globalBassVolumeSlider) {
         const v = parseInt(globalBassVolumeSlider.value, 10);
@@ -417,8 +419,10 @@ function getSynthSemitone(group, part = 'bass') {
 function updateSynthOutputGainFromSliders(group) {
     const bassValue = parseInt(group?.synthBassOutputSlider?.value ?? '40', 10);
     const trebleValue = parseInt(group?.synthTrebleOutputSlider?.value ?? '60', 10);
-    group.synthBassOutputGain = Number.isFinite(bassValue) ? Math.max(0, Math.min(100, bassValue)) / 100 : 0.4;
-    group.synthTrebleOutputGain = Number.isFinite(trebleValue) ? Math.max(0, Math.min(100, trebleValue)) / 100 : 0.6;
+    const bassPct = Number.isFinite(bassValue) ? Math.max(0, Math.min(100, bassValue)) : 40;
+    const treblePct = Number.isFinite(trebleValue) ? Math.max(0, Math.min(100, trebleValue)) : 60;
+    group.synthBassOutputGain = (bassPct / 100) * 2;
+    group.synthTrebleOutputGain = (treblePct / 100) * 2;
 }
 
 function applySynthSettingsFromGroup(group, part = 'bass') {
