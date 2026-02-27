@@ -106,6 +106,9 @@ const randomByKeyPlayBtn = document.getElementById('randomByKeyPlayBtn');
 const chordItemOptionsModal = document.getElementById('chordItemOptionsModal');
 const chordItemChangeTypeBtn = document.getElementById('chordItemChangeTypeBtn');
 const chordItemCustomiseTrebleBtn = document.getElementById('chordItemCustomiseTrebleBtn');
+const everyBarIntensityModal = document.getElementById('everyBarIntensityModal');
+const everyBarIntensitySlider = document.getElementById('everyBarIntensitySlider');
+const everyBarIntensityValue = document.getElementById('everyBarIntensityValue');
 const downloadOptionsModal = document.getElementById('downloadOptionsModal');
 const helpOptionsModal = document.getElementById('helpOptionsModal');
 const trebleNotesModal = document.getElementById('trebleNotesModal');
@@ -143,7 +146,8 @@ function buildPanelGroupState(groupEl) {
         bpmInput: getGroupRole(groupEl, 'bpmInput'),
         bpmDownBtn: getGroupRole(groupEl, 'bpmDownBtn'),
         bpmUpBtn: getGroupRole(groupEl, 'bpmUpBtn'),
-        volumeModSelect: getGroupRole(groupEl, 'volumeModSelect'),
+        bassVolumeModSelect: getGroupRole(groupEl, 'bassVolumeModSelect'),
+        trebleVolumeModSelect: getGroupRole(groupEl, 'trebleVolumeModSelect'),
         delayModSelect: getGroupRole(groupEl, 'delayModSelect'),
         patternSelect: getGroupRole(groupEl, 'patternSelect'),
         skipSelect: getGroupRole(groupEl, 'skipSelect'),
@@ -170,7 +174,12 @@ function buildPanelGroupState(groupEl) {
         previewItems: [],
         bassDurationMultiplier: DEFAULT_BASS_DURATION,
         highDurationMultiplier: DEFAULT_HIGH_DURATION,
-        volumeModPattern: DEFAULT_VOLUME_MOD,
+        bassVolumeModPattern: DEFAULT_VOLUME_MOD,
+        trebleVolumeModPattern: DEFAULT_VOLUME_MOD,
+        humanBassVolumeModIntensity: 0.76,
+        humanTrebleVolumeModIntensity: 0.76,
+        synthBassVolumeModIntensity: 0.76,
+        synthTrebleVolumeModIntensity: 0.76,
         delayModPattern: DEFAULT_DELAY_MOD,
         patternMode: DEFAULT_PATTERN_MODE,
         skipPattern: [],
@@ -196,8 +205,11 @@ function buildPanelGroupState(groupEl) {
     if (trebleSemitoneVal !== undefined && trebleSemitoneVal !== '') {
         state.synthTrebleSemitoneOffset = Math.max(-12, Math.min(12, parseInt(trebleSemitoneVal, 10) || 0));
     }
-    if (state.volumeModSelect?.value) {
-        state.volumeModPattern = state.volumeModSelect.value;
+    if (state.bassVolumeModSelect?.value) {
+        state.bassVolumeModPattern = state.bassVolumeModSelect.value;
+    }
+    if (state.trebleVolumeModSelect?.value) {
+        state.trebleVolumeModPattern = state.trebleVolumeModSelect.value;
     }
     if (state.delayModSelect?.value) {
         state.delayModPattern = state.delayModSelect.value;
@@ -332,7 +344,8 @@ class ChordPreviewItem {
             bpm: getBpmValue(group),
             bassDurationMultiplier: group.bassDurationMultiplier,
             highDurationMultiplier: group.highDurationMultiplier,
-            volumeModPattern: group.volumeModPattern,
+            bassVolumeModPattern: group.bassVolumeModPattern,
+            trebleVolumeModPattern: group.trebleVolumeModPattern,
             delayModPattern: group.delayModPattern,
             patternMode: group.patternMode,
             skipPattern: [...(group.skipPattern || [])],
@@ -427,7 +440,7 @@ function pushSynthNoteEvents(events, note, startTime, durationSeconds, velocity)
     events.push({ type: 'noteOff', note, velocity, channel: 0, timeSeconds: startTime + durationSeconds });
 }
 
-function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern, outputGain = 1, trackLabel = 'synth', debugContext = null) {
+function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern, outputGain = 1, trackLabel = 'synth', debugContext = null, intensity = 1) {
     if (!events || !barSeconds || barCount <= 0) return;
     const clampedGain = Math.max(0, Math.min(2, Number.isFinite(outputGain) ? outputGain : 1));
     if (!volumeModPattern || volumeModPattern === 'none') {
@@ -437,7 +450,7 @@ function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern
     const steps = 16;
     const bpm = barSeconds > 0 ? (240 / barSeconds) : 0;
     const tailSeconds = Math.max(0, Math.min(bpm / 80, barSeconds / 8));
-    const startLevel = getLinearVolumeModMultiplier(volumeModPattern, 0) * clampedGain;
+    const startLevel = getLinearVolumeModMultiplier(volumeModPattern, 0, intensity) * clampedGain;
     for (let barIndex = 0; barIndex < barCount; barIndex += 1) {
         const barStart = barIndex * barSeconds;
         const barEnd = barStart + barSeconds;
@@ -446,7 +459,7 @@ function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern
         const rampStartPos = barSeconds > 0
             ? Math.max(0, Math.min(1, (rampStart - barStart) / barSeconds))
             : 1;
-        const rampStartLevel = getLinearVolumeModMultiplier(volumeModPattern, rampStartPos) * clampedGain;
+        const rampStartLevel = getLinearVolumeModMultiplier(volumeModPattern, rampStartPos, intensity) * clampedGain;
         if (volumeModPattern === '4hill' && debugContext?.midiVolumeModPattern === 'none' && debugContext?.rhythmMultiplier === debugContext?.fastestMultiplier) {
             const peakPositions = [1 / 8, 3 / 8, 5 / 8, 7 / 8];
             const peakCount = peakPositions.filter(pos => pos <= rampStartPos + 1e-6).length;
@@ -466,7 +479,7 @@ function addSynthVolumeAutomation(events, barSeconds, barCount, volumeModPattern
             if (rampWindow > 0 && position > rampStartPos) {
                 continue;
             }
-            const multiplier = getLinearVolumeModMultiplier(volumeModPattern, position) * clampedGain;
+            const multiplier = getLinearVolumeModMultiplier(volumeModPattern, position, intensity) * clampedGain;
             events.push({
                 type: 'volume',
                 timeSeconds: barStart + (position * barSeconds),
@@ -626,7 +639,8 @@ function buildSynthRenderSegments(segments, part) {
         const delayState = { counter: 0 };
         const skipState = buildSkipStateFromPattern(segment.skipPattern);
         const events = [];
-        const velocityVolumeModPattern = 'none';
+        const velocityVolumeModPattern = part === 'bass' ? (segment.bassVolumeModPattern || 'none') : (segment.trebleVolumeModPattern || 'none');
+        const velocityVolumeModIntensity = part === 'bass' ? segment.humanBassVolumeModIntensity : segment.humanTrebleVolumeModIntensity;
 
         segment.chordSequence.forEach((chord, index) => {
             const chordStart = index * barSeconds;
@@ -647,6 +661,7 @@ function buildSynthRenderSegments(segments, part) {
                     {
                         applySkip: false,
                         volumeModPattern: velocityVolumeModPattern,
+                        volumeModIntensity: velocityVolumeModIntensity,
                         delayModPattern: segment.delayModPattern,
                         delayState,
                         skipState
@@ -669,6 +684,7 @@ function buildSynthRenderSegments(segments, part) {
                     {
                         applySkip: true,
                         volumeModPattern: velocityVolumeModPattern,
+                        volumeModIntensity: velocityVolumeModIntensity,
                         delayModPattern: segment.delayModPattern,
                         delayState,
                         skipState
@@ -687,6 +703,7 @@ function buildSynthRenderSegments(segments, part) {
                     {
                         applySkip: true,
                         volumeModPattern: velocityVolumeModPattern,
+                        volumeModIntensity: velocityVolumeModIntensity,
                         delayModPattern: segment.delayModPattern,
                         delayState,
                         skipState
@@ -702,6 +719,7 @@ function buildSynthRenderSegments(segments, part) {
         const outputGain = part === 'treble'
             ? segment.synthTrebleOutputGain
             : segment.synthBassOutputGain;
+        const synthIntensity = part === 'treble' ? segment.synthTrebleVolumeModIntensity : segment.synthBassVolumeModIntensity;
         const fastestMultiplier = Math.min(...DURATION_MULTIPLIERS);
         addSynthVolumeAutomation(
             events,
@@ -711,10 +729,11 @@ function buildSynthRenderSegments(segments, part) {
             outputGain,
             part,
             {
-                midiVolumeModPattern: segment.volumeModPattern,
+                midiVolumeModPattern: part === 'treble' ? segment.trebleVolumeModPattern : segment.bassVolumeModPattern,
                 rhythmMultiplier: part === 'treble' ? segment.highDurationMultiplier : segment.bassDurationMultiplier,
                 fastestMultiplier
-            }
+            },
+            synthIntensity
         );
 
         return {
@@ -972,7 +991,7 @@ function scheduleMidiNotes(events, notes, startTick, endTick, cycleTicks, veloci
     }
 }
 
-function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks, bpm, barStartSeconds, barSeconds, baseVelocity, pattern, delayState, applySkip, skipState, volumeModPattern, delayModPattern) {
+function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks, bpm, barStartSeconds, barSeconds, baseVelocity, pattern, delayState, applySkip, skipState, volumeModPattern, delayModPattern, volumeModIntensity = 1) {
     if (!notes || notes.length === 0) return;
     const cycleSeconds = ticksToSeconds(cycleTicks, bpm);
     const ordered = [...notes].sort((a, b) => a - b);
@@ -989,7 +1008,7 @@ function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks
             }
             const noteDurationSeconds = cycleSeconds * MIDI_NOTE_DURATION_FACTOR;
             const cyclePosition = barSeconds > 0 ? (cycleStartSeconds - barStartSeconds) / barSeconds : 0;
-            const volumeMultiplier = getVolumeModMultiplier(volumeModPattern, cyclePosition);
+            const volumeMultiplier = getLinearVolumeModMultiplier(volumeModPattern, cyclePosition, volumeModIntensity);
             const velocity = clampMidiExportVelocity(baseVelocity * volumeMultiplier);
             ordered.forEach(note => {
                 const delayOffsetSeconds = getDelayOffsetSeconds(noteDurationSeconds, delayModPattern, delayState);
@@ -1003,7 +1022,7 @@ function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks
             const noteDurationSeconds = cycleSeconds * MIDI_NOTE_DURATION_FACTOR;
             const notesForCycle = getPatternNotesForCycle(ordered, pattern, cycleIndex);
             const cyclePosition = barSeconds > 0 ? (cycleStartSeconds - barStartSeconds) / barSeconds : 0;
-            const volumeMultiplier = getVolumeModMultiplier(volumeModPattern, cyclePosition);
+            const volumeMultiplier = getLinearVolumeModMultiplier(volumeModPattern, cyclePosition, volumeModIntensity);
             const delayOffsetSeconds = getDelayOffsetSeconds(noteDurationSeconds, delayModPattern, delayState);
             const onTimeSeconds = cycleStartSeconds + delayOffsetSeconds;
             const onTime = startTick + secondsToTicks(onTimeSeconds - barStartSeconds, bpm);
@@ -1027,7 +1046,7 @@ function scheduleUiHighlight(group, index, atTime) {
     return timerId;
 }
 
-function getVolumeModMultiplier(volumeMod, cyclePosition) {
+function getVolumeModMultiplier(volumeMod, cyclePosition, intensity = 1) {
     if (!volumeMod || volumeMod === 'none') {
         return 1.0;
     }
@@ -1035,103 +1054,119 @@ function getVolumeModMultiplier(volumeMod, cyclePosition) {
     const curvedPos = applyVolumeCurve(pos);
     const minDb = linearToDb(VOLUME_MOD_MIN);
     const maxDb = linearToDb(VOLUME_MOD_MAX);
+    let raw = 1.0;
     switch (volumeMod) {
         case 'uphill':
-            return dbToLinear(minDb + (curvedPos * (maxDb - minDb)));
+            raw = dbToLinear(minDb + (curvedPos * (maxDb - minDb)));
+            break;
         case 'downhill':
-            return dbToLinear(maxDb - (curvedPos * (maxDb - minDb)));
+            raw = dbToLinear(maxDb - (curvedPos * (maxDb - minDb)));
+            break;
         case 'valley':
-            if (pos <= 0.5) {
-                return dbToLinear(maxDb - (applyVolumeCurve(pos * 2) * (maxDb - minDb)));
-            }
-            return dbToLinear(minDb + (applyVolumeCurve((pos - 0.5) * 2) * (maxDb - minDb)));
+            raw = pos <= 0.5
+                ? dbToLinear(maxDb - (applyVolumeCurve(pos * 2) * (maxDb - minDb)))
+                : dbToLinear(minDb + (applyVolumeCurve((pos - 0.5) * 2) * (maxDb - minDb)));
+            break;
         case 'hill':
-            if (pos <= 0.5) {
-                return dbToLinear(minDb + (applyVolumeCurve(pos * 2) * (maxDb - minDb)));
-            }
-            return dbToLinear(maxDb - (applyVolumeCurve((pos - 0.5) * 2) * (maxDb - minDb)));
+            raw = pos <= 0.5
+                ? dbToLinear(minDb + (applyVolumeCurve(pos * 2) * (maxDb - minDb)))
+                : dbToLinear(maxDb - (applyVolumeCurve((pos - 0.5) * 2) * (maxDb - minDb)));
+            break;
         case '2hill': {
             const phase = (pos * 4) % 2;
-            if (phase <= 1) {
-                return dbToLinear(minDb + (applyVolumeCurve(phase) * (maxDb - minDb)));
-            }
-            return dbToLinear(maxDb - (applyVolumeCurve(phase - 1) * (maxDb - minDb)));
+            raw = phase <= 1
+                ? dbToLinear(minDb + (applyVolumeCurve(phase) * (maxDb - minDb)))
+                : dbToLinear(maxDb - (applyVolumeCurve(phase - 1) * (maxDb - minDb)));
+            break;
         }
         default: {
             const nvalleyMatch = volumeMod && volumeMod.match(/^(\d+)valley$/);
             if (nvalleyMatch) {
                 const n = Math.max(1, Math.min(99, parseInt(nvalleyMatch[1], 10)));
                 const phase = (pos * n) % 1;
-                if (phase <= 0.5) {
-                    return dbToLinear(maxDb - (applyVolumeCurve(phase * 2) * (maxDb - minDb)));
+                raw = phase <= 0.5
+                    ? dbToLinear(maxDb - (applyVolumeCurve(phase * 2) * (maxDb - minDb)))
+                    : dbToLinear(minDb + (applyVolumeCurve((phase - 0.5) * 2) * (maxDb - minDb)));
+            } else {
+                const nhillMatch = volumeMod && volumeMod.match(/^(\d+)hill$/);
+                if (nhillMatch) {
+                    const n = Math.max(1, Math.min(99, parseInt(nhillMatch[1], 10)));
+                    const phase = (pos * 2 * n) % 2;
+                    raw = phase <= 1
+                        ? dbToLinear(minDb + (applyVolumeCurve(phase) * (maxDb - minDb)))
+                        : dbToLinear(maxDb - (applyVolumeCurve(phase - 1) * (maxDb - minDb)));
+                } else {
+                    raw = 1.0;
                 }
-                return dbToLinear(minDb + (applyVolumeCurve((phase - 0.5) * 2) * (maxDb - minDb)));
             }
-            const nhillMatch = volumeMod && volumeMod.match(/^(\d+)hill$/);
-            if (nhillMatch) {
-                const n = Math.max(1, Math.min(99, parseInt(nhillMatch[1], 10)));
-                const phase = (pos * 2 * n) % 2;
-                if (phase <= 1) {
-                    return dbToLinear(minDb + (applyVolumeCurve(phase) * (maxDb - minDb)));
-                }
-                return dbToLinear(maxDb - (applyVolumeCurve(phase - 1) * (maxDb - minDb)));
-            }
-            return 1.0;
+            break;
         }
     }
+    return applyVolumeModIntensity(raw, intensity);
 }
 
-function getLinearVolumeModMultiplier(volumeMod, cyclePosition) {
+function applyVolumeModIntensity(multiplier, intensity = 1) {
+    if (intensity <= 0) return 1.0;
+    if (intensity >= 1) return multiplier;
+    return intensity * (multiplier - 1) + 1;
+}
+
+function getLinearVolumeModMultiplier(volumeMod, cyclePosition, intensity = 1) {
     if (!volumeMod || volumeMod === 'none') {
         return 1.0;
     }
     const pos = Math.max(0, Math.min(1, cyclePosition));
     const minDb = linearToDb(VOLUME_MOD_MIN);
     const maxDb = linearToDb(VOLUME_MOD_MAX);
+    let raw = 1.0;
     switch (volumeMod) {
         case 'uphill':
-            return dbToLinear(minDb + (pos * (maxDb - minDb)));
+            raw = dbToLinear(minDb + (pos * (maxDb - minDb)));
+            break;
         case 'downhill':
-            return dbToLinear(maxDb - (pos * (maxDb - minDb)));
+            raw = dbToLinear(maxDb - (pos * (maxDb - minDb)));
+            break;
         case 'valley':
-            if (pos <= 0.5) {
-                return dbToLinear(maxDb - ((pos * 2) * (maxDb - minDb)));
-            }
-            return dbToLinear(minDb + (((pos - 0.5) * 2) * (maxDb - minDb)));
+            raw = pos <= 0.5
+                ? dbToLinear(maxDb - ((pos * 2) * (maxDb - minDb)))
+                : dbToLinear(minDb + (((pos - 0.5) * 2) * (maxDb - minDb)));
+            break;
         case 'hill':
-            if (pos <= 0.5) {
-                return dbToLinear(minDb + ((pos * 2) * (maxDb - minDb)));
-            }
-            return dbToLinear(maxDb - (((pos - 0.5) * 2) * (maxDb - minDb)));
+            raw = pos <= 0.5
+                ? dbToLinear(minDb + ((pos * 2) * (maxDb - minDb)))
+                : dbToLinear(maxDb - (((pos - 0.5) * 2) * (maxDb - minDb)));
+            break;
         case '2hill': {
-            const phase = (pos * 4) % 2;
-            if (phase <= 1) {
-                return dbToLinear(minDb + (phase * (maxDb - minDb)));
-            }
-            return dbToLinear(maxDb - ((phase - 1) * (maxDb - minDb)));
+            const phase2 = (pos * 4) % 2;
+            raw = phase2 <= 1
+                ? dbToLinear(minDb + (phase2 * (maxDb - minDb)))
+                : dbToLinear(maxDb - ((phase2 - 1) * (maxDb - minDb)));
+            break;
         }
         default: {
             const nvalleyMatch = volumeMod && volumeMod.match(/^(\d+)valley$/);
             if (nvalleyMatch) {
                 const n = Math.max(1, Math.min(99, parseInt(nvalleyMatch[1], 10)));
                 const phase = (pos * n) % 1;
-                if (phase <= 0.5) {
-                    return dbToLinear(maxDb - ((phase * 2) * (maxDb - minDb)));
+                raw = phase <= 0.5
+                    ? dbToLinear(maxDb - ((phase * 2) * (maxDb - minDb)))
+                    : dbToLinear(minDb + (((phase - 0.5) * 2) * (maxDb - minDb)));
+            } else {
+                const nhillMatch = volumeMod && volumeMod.match(/^(\d+)hill$/);
+                if (nhillMatch) {
+                    const n = Math.max(1, Math.min(99, parseInt(nhillMatch[1], 10)));
+                    const phase = (pos * 2 * n) % 2;
+                    raw = phase <= 1
+                        ? dbToLinear(minDb + (phase * (maxDb - minDb)))
+                        : dbToLinear(maxDb - ((phase - 1) * (maxDb - minDb)));
+                } else {
+                    raw = 1.0;
                 }
-                return dbToLinear(minDb + (((phase - 0.5) * 2) * (maxDb - minDb)));
             }
-            const nhillMatch = volumeMod && volumeMod.match(/^(\d+)hill$/);
-            if (nhillMatch) {
-                const n = Math.max(1, Math.min(99, parseInt(nhillMatch[1], 10)));
-                const phase = (pos * 2 * n) % 2;
-                if (phase <= 1) {
-                    return dbToLinear(minDb + (phase * (maxDb - minDb)));
-                }
-                return dbToLinear(maxDb - ((phase - 1) * (maxDb - minDb)));
-            }
-            return 1.0;
+            break;
         }
     }
+    return applyVolumeModIntensity(raw, intensity);
 }
 
 function applyVolumeCurve(pos) {
@@ -1212,7 +1247,7 @@ function schedulePreviewNotes(notes, startTime, endTime, cycleSeconds, barSecond
             continue;
         }
         const cyclePosition = barSeconds > 0 ? (t - startTime) / barSeconds : 0;
-        const volumeMultiplier = getVolumeModMultiplier(options.volumeModPattern, cyclePosition);
+        const volumeMultiplier = getVolumeModMultiplier(options.volumeModPattern, cyclePosition, options.volumeModIntensity ?? 1);
         notes.forEach((note) => {
             const delayOffset = getDelayOffsetSeconds(noteDuration, options.delayModPattern, options.delayState);
             const noteStart = t + delayOffset;
@@ -1240,7 +1275,7 @@ function schedulePreviewArpeggio(notes, startTime, endTime, cycleSeconds, barSec
         }
         const notesForCycle = getPatternNotesForCycle(ordered, direction, cycleIndex);
         const cyclePosition = barSeconds > 0 ? (t - startTime) / barSeconds : 0;
-        const volumeMultiplier = getVolumeModMultiplier(options.volumeModPattern, cyclePosition);
+        const volumeMultiplier = getVolumeModMultiplier(options.volumeModPattern, cyclePosition, options.volumeModIntensity ?? 1);
         const delayOffset = getDelayOffsetSeconds(noteDuration, options.delayModPattern, options.delayState);
         const noteStart = t + delayOffset;
         const finalGain = gainValue * volumeMultiplier;
@@ -1340,7 +1375,12 @@ function buildSegment(group) {
         bpm: getBpmValue(group),
         bassDurationMultiplier: group.bassDurationMultiplier,
         highDurationMultiplier: group.highDurationMultiplier,
-        volumeModPattern: group.volumeModPattern,
+        bassVolumeModPattern: group.bassVolumeModPattern,
+        trebleVolumeModPattern: group.trebleVolumeModPattern,
+        humanBassVolumeModIntensity: group.humanBassVolumeModIntensity ?? 0.76,
+        humanTrebleVolumeModIntensity: group.humanTrebleVolumeModIntensity ?? 0.76,
+        synthBassVolumeModIntensity: group.synthBassVolumeModIntensity ?? 0.76,
+        synthTrebleVolumeModIntensity: group.synthTrebleVolumeModIntensity ?? 0.76,
         delayModPattern: group.delayModPattern,
         patternMode: group.patternMode,
         skipPattern: group.skipPattern,
@@ -1402,7 +1442,8 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
     const skipState = buildSkipStateFromPattern(segment.skipPattern);
     const chordNotes = getResolvedChordNotes(segment.chordSequence[chordIndex]);
     const highNotes = getHighNotesForPattern(chordNotes, segment.doubleHighEnabled);
-    const velocityVolumeModPattern = 'none';
+    const bassVelocityPattern = segment.bassVolumeModPattern || 'none';
+    const trebleVelocityPattern = segment.trebleVolumeModPattern || 'none';
 
     const bassEvents = [];
     const trebleEvents = [];
@@ -1418,7 +1459,7 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
         bassCycleSeconds,
         barSeconds,
         0.4 * segment.bassPlaybackVolume,
-        { applySkip: false, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+        { applySkip: false, volumeModPattern: bassVelocityPattern, volumeModIntensity: segment.humanBassVolumeModIntensity, delayModPattern: segment.delayModPattern, delayState, skipState },
         bassEvents
     );
     if (segment.patternMode === 'normal') {
@@ -1429,7 +1470,7 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
             highCycleSeconds,
             barSeconds,
             0.24 * segment.highPlaybackVolume,
-            { applySkip: true, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+            { applySkip: true, volumeModPattern: trebleVelocityPattern, volumeModIntensity: segment.humanTrebleVolumeModIntensity, delayModPattern: segment.delayModPattern, delayState, skipState },
             trebleEvents
         );
     } else {
@@ -1441,7 +1482,7 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
             barSeconds,
             0.24 * segment.highPlaybackVolume,
             segment.patternMode,
-            { applySkip: true, volumeModPattern: velocityVolumeModPattern, delayModPattern: segment.delayModPattern, delayState, skipState },
+            { applySkip: true, volumeModPattern: trebleVelocityPattern, volumeModIntensity: segment.humanTrebleVolumeModIntensity, delayModPattern: segment.delayModPattern, delayState, skipState },
             trebleEvents
         );
     }
@@ -1453,7 +1494,8 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
         getSynthVolumeModPattern(segment.group, 'bass'),
         segment.group.synthBassOutputGain,
         'bass',
-        { midiVolumeModPattern: segment.volumeModPattern, rhythmMultiplier: segment.bassDurationMultiplier, fastestMultiplier }
+        { midiVolumeModPattern: segment.bassVolumeModPattern, rhythmMultiplier: segment.bassDurationMultiplier, fastestMultiplier },
+        segment.synthBassVolumeModIntensity
     );
     addSynthVolumeAutomation(
         trebleEvents,
@@ -1462,7 +1504,8 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
         getSynthVolumeModPattern(segment.group, 'treble'),
         segment.group.synthTrebleOutputGain,
         'treble',
-        { midiVolumeModPattern: segment.volumeModPattern, rhythmMultiplier: segment.highDurationMultiplier, fastestMultiplier }
+        { midiVolumeModPattern: segment.trebleVolumeModPattern, rhythmMultiplier: segment.highDurationMultiplier, fastestMultiplier },
+        segment.synthTrebleVolumeModIntensity
     );
 
     const bassRenderSegment = bassEvents.length ? {
@@ -1661,7 +1704,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
 
         const segmentBassEvents = useSynth ? [] : null;
         const segmentTrebleEvents = useSynth ? [] : null;
-        const velocityVolumeModPattern = useSynth ? 'none' : segment.volumeModPattern;
+        const bassVolumeModPattern = useSynth ? 'none' : (segment.bassVolumeModPattern || 'none');
+        const trebleVolumeModPattern = useSynth ? 'none' : (segment.trebleVolumeModPattern || 'none');
         const barsToPlay = Math.max(0, segment.chordSequence.length - chordStartIndex);
         segment.chordSequence.forEach((chord, index) => {
             if (index < chordStartIndex) {
@@ -1696,7 +1740,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                 0.4 * segment.bassPlaybackVolume,
                 {
                     applySkip: false,
-                    volumeModPattern: velocityVolumeModPattern,
+                    volumeModPattern: bassVolumeModPattern,
+                    volumeModIntensity: segment.humanBassVolumeModIntensity,
                     delayModPattern: segment.delayModPattern,
                     delayState,
                     skipState
@@ -1714,7 +1759,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                     0.24 * segment.highPlaybackVolume,
                     {
                         applySkip: true,
-                        volumeModPattern: velocityVolumeModPattern,
+                        volumeModPattern: trebleVolumeModPattern,
+                        volumeModIntensity: segment.humanTrebleVolumeModIntensity,
                         delayModPattern: segment.delayModPattern,
                         delayState,
                         skipState
@@ -1732,7 +1778,8 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                     segment.patternMode,
                     {
                         applySkip: true,
-                        volumeModPattern: velocityVolumeModPattern,
+                        volumeModPattern: trebleVolumeModPattern,
+                        volumeModIntensity: segment.humanTrebleVolumeModIntensity,
                         delayModPattern: segment.delayModPattern,
                         delayState,
                         skipState
@@ -1761,10 +1808,11 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                 segment.group.synthBassOutputGain,
                 'bass',
                 {
-                    midiVolumeModPattern: segment.volumeModPattern,
+                    midiVolumeModPattern: segment.bassVolumeModPattern,
                     rhythmMultiplier: segment.bassDurationMultiplier,
                     fastestMultiplier
-                }
+                },
+                segment.synthBassVolumeModIntensity
             );
             addSynthVolumeAutomation(
                 segmentTrebleEvents,
@@ -1774,10 +1822,11 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                 segment.group.synthTrebleOutputGain,
                 'treble',
                 {
-                    midiVolumeModPattern: segment.volumeModPattern,
+                    midiVolumeModPattern: segment.trebleVolumeModPattern,
                     rhythmMultiplier: segment.highDurationMultiplier,
                     fastestMultiplier
-                }
+                },
+                segment.synthTrebleVolumeModIntensity
             );
         }
 
@@ -1881,7 +1930,7 @@ async function playChordOnce(group, chord, index) {
     const highNotes = getHighNotesForPattern(chordNotes, group.doubleHighEnabled);
     const volumeMultiplier = isSynthEnabled()
         ? 1
-        : getVolumeModMultiplier(group.volumeModPattern, 0.5);
+        : (getVolumeModMultiplier(group.bassVolumeModPattern, 0.5, group.humanBassVolumeModIntensity) + getVolumeModMultiplier(group.trebleVolumeModPattern, 0.5, group.humanTrebleVolumeModIntensity)) / 2;
     setChordPreviewPlaying(group, index);
     isPreviewing = true;
     const delayState = { counter: 0 };
@@ -1899,10 +1948,11 @@ async function playChordOnce(group, chord, index) {
             group.synthBassOutputGain,
             'bass',
             {
-                midiVolumeModPattern: group.volumeModPattern,
+                midiVolumeModPattern: group.bassVolumeModPattern,
                 rhythmMultiplier: group.bassDurationMultiplier,
                 fastestMultiplier
-            }
+            },
+            group.synthBassVolumeModIntensity
         );
         addSynthVolumeAutomation(
             trebleEvents,
@@ -1912,10 +1962,11 @@ async function playChordOnce(group, chord, index) {
             group.synthTrebleOutputGain,
             'treble',
             {
-                midiVolumeModPattern: group.volumeModPattern,
+                midiVolumeModPattern: group.trebleVolumeModPattern,
                 rhythmMultiplier: group.highDurationMultiplier,
                 fastestMultiplier
-            }
+            },
+            group.synthTrebleVolumeModIntensity
         );
         const bassSemitone = getSynthSemitone(group, 'bass');
         const trebleSemitone = getSynthSemitone(group, 'treble');
@@ -2054,8 +2105,9 @@ async function exportMidiFile() {
                 delayState,
                 false,
                 skipState,
-                segment.volumeModPattern,
-                segment.delayModPattern
+                segment.bassVolumeModPattern,
+                segment.delayModPattern,
+                segment.humanBassVolumeModIntensity
             );
             scheduleMidiNotesWithMods(
                 highEvents,
@@ -2071,8 +2123,9 @@ async function exportMidiFile() {
                 delayState,
                 true,
                 skipState,
-                segment.volumeModPattern,
-                segment.delayModPattern
+                segment.trebleVolumeModPattern,
+                segment.delayModPattern,
+                segment.humanTrebleVolumeModIntensity
             );
         });
 
@@ -2296,8 +2349,11 @@ function syncGroupFromInputs(group, { stopOnEmpty = true } = {}) {
     if (group.bpmInput) {
         updateRhythmSelectOptions(group);
     }
-    if (group.volumeModSelect) {
-        group.volumeModPattern = group.volumeModSelect.value || DEFAULT_VOLUME_MOD;
+    if (group.bassVolumeModSelect) {
+        group.bassVolumeModPattern = group.bassVolumeModSelect.value || DEFAULT_VOLUME_MOD;
+    }
+    if (group.trebleVolumeModSelect) {
+        group.trebleVolumeModPattern = group.trebleVolumeModSelect.value || DEFAULT_VOLUME_MOD;
     }
     if (group.delayModSelect) {
         group.delayModPattern = group.delayModSelect.value || DEFAULT_DELAY_MOD;
@@ -2415,9 +2471,15 @@ function registerPanelGroup(groupEl) {
         }
     }
 
-    if (group.volumeModSelect) {
-        group.volumeModSelect.addEventListener('change', (event) => {
-            group.volumeModPattern = event.target.value;
+    if (group.bassVolumeModSelect) {
+        group.bassVolumeModSelect.addEventListener('change', (event) => {
+            group.bassVolumeModPattern = event.target.value || DEFAULT_VOLUME_MOD;
+            requestPreviewResync();
+        });
+    }
+    if (group.trebleVolumeModSelect) {
+        group.trebleVolumeModSelect.addEventListener('change', (event) => {
+            group.trebleVolumeModPattern = event.target.value || DEFAULT_VOLUME_MOD;
             requestPreviewResync();
         });
     }
@@ -2940,6 +3002,49 @@ if (synthInfoCloseBtn) {
 if (synthInfoModal) {
     synthInfoModal.addEventListener('click', (event) => {
         if (event.target === synthInfoModal) closeModal(synthInfoModal);
+    });
+}
+
+const EVERY_BAR_SLOT_KEYS = {
+    humanBass: 'humanBassVolumeModIntensity',
+    humanTreble: 'humanTrebleVolumeModIntensity',
+    synthBass: 'synthBassVolumeModIntensity',
+    synthTreble: 'synthTrebleVolumeModIntensity'
+};
+let everyBarIntensityContext = null;
+
+document.addEventListener('click', (event) => {
+    if (!event.target.matches('.every-bar-label')) return;
+    const slot = event.target.getAttribute('data-every-bar');
+    if (!slot || !EVERY_BAR_SLOT_KEYS[slot]) return;
+    const panelEl = event.target.closest('[id="panelGroup"], [id^="panelGroup-"]');
+    const group = panelGroups.find((g) => g.el === panelEl);
+    if (!group || !everyBarIntensityModal || !everyBarIntensitySlider || !everyBarIntensityValue) return;
+    everyBarIntensityContext = { group, slot };
+    const key = EVERY_BAR_SLOT_KEYS[slot];
+    const value = (group[key] ?? 0.76) * 100;
+    everyBarIntensitySlider.value = Math.round(value);
+    everyBarIntensityValue.textContent = `${Math.round(value)}%`;
+    openModal(everyBarIntensityModal);
+});
+
+if (everyBarIntensitySlider) {
+    everyBarIntensitySlider.addEventListener('input', () => {
+        if (!everyBarIntensityContext) return;
+        const { group, slot } = everyBarIntensityContext;
+        const key = EVERY_BAR_SLOT_KEYS[slot];
+        const pct = Math.max(0, Math.min(100, parseInt(everyBarIntensitySlider.value, 10)));
+        group[key] = pct / 100;
+        if (everyBarIntensityValue) everyBarIntensityValue.textContent = `${pct}%`;
+        requestPreviewResync();
+    });
+}
+if (everyBarIntensityModal) {
+    everyBarIntensityModal.addEventListener('click', (event) => {
+        if (event.target === everyBarIntensityModal) {
+            everyBarIntensityContext = null;
+            closeModal(everyBarIntensityModal);
+        }
     });
 }
 

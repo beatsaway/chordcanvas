@@ -992,8 +992,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="volumeModSelect">Every bar</label>
-                    <select id="volumeModSelect" data-role="volumeModSelect">
+                    <label for="bassVolumeModSelect" class="every-bar-label" data-every-bar="humanBass" title="Click to set intensity">Bass every bar</label>
+                    <select id="bassVolumeModSelect" data-role="bassVolumeModSelect">
                         <option value="none">none</option>
                         <option value="uphill" selected>uphill</option>
                         <option value="downhill">downhill</option>
@@ -1015,7 +1015,30 @@
                         <option value="8hill">8hill</option>
                     </select>
                 </div>
-                
+                <div>
+                    <label for="trebleVolumeModSelect" class="every-bar-label" data-every-bar="humanTreble" title="Click to set intensity">Treble every bar</label>
+                    <select id="trebleVolumeModSelect" data-role="trebleVolumeModSelect">
+                        <option value="none">none</option>
+                        <option value="uphill" selected>uphill</option>
+                        <option value="downhill">downhill</option>
+                        <option value="valley">valley</option>
+                        <option value="hill">hill</option>
+                        <option value="2valley">2valley</option>
+                        <option value="3valley">3valley</option>
+                        <option value="4valley">4valley</option>
+                        <option value="5valley">5valley</option>
+                        <option value="6valley">6valley</option>
+                        <option value="7valley">7valley</option>
+                        <option value="8valley">8valley</option>
+                        <option value="2hill">2hill</option>
+                        <option value="3hill">3hill</option>
+                        <option value="4hill">4hill</option>
+                        <option value="5hill">5hill</option>
+                        <option value="6hill">6hill</option>
+                        <option value="7hill">7hill</option>
+                        <option value="8hill">8hill</option>
+                    </select>
+                </div>
             </section>
 
             <section id="panel-synth" hidden>
@@ -1040,7 +1063,7 @@
                                 </select>
                             </div>
                             <div class="control-pair">
-                                <label for="synthBassVolumeMod">Every bar</label>
+                                <label for="synthBassVolumeMod" class="every-bar-label" data-every-bar="synthBass" title="Click to set intensity">Every bar</label>
                                 <select id="synthBassVolumeMod" data-role="synthBassVolumeMod">
                                     <option value="none">none</option>
                                     <option value="uphill">uphill</option>
@@ -1124,7 +1147,7 @@
                                 </select>
                             </div>
                             <div class="control-pair">
-                                <label for="synthTrebleVolumeMod">Every bar</label>
+                                <label for="synthTrebleVolumeMod" class="every-bar-label" data-every-bar="synthTreble" title="Click to set intensity">Every bar</label>
                                 <select id="synthTrebleVolumeMod" data-role="synthTrebleVolumeMod">
                                     <option value="none">none</option>
                                     <option value="uphill">uphill</option>
@@ -1321,6 +1344,15 @@
         </div>
     </div>
 
+    <div id="everyBarIntensityModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="control-row">
+                <label for="everyBarIntensitySlider">Filter</label>
+                <input type="range" id="everyBarIntensitySlider" min="0" max="100" value="76" class="every-bar-intensity-slider">
+                <span id="everyBarIntensityValue">76%</span>
+            </div>
+        </div>
+    </div>
     <div id="trebleNotesModal" class="options-modal" aria-hidden="true">
         <div class="options-card treble-notes-card">
             <h3 id="trebleNotesModalTitle">Customise treble</h3>
