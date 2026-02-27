@@ -924,7 +924,7 @@ function ticksToSeconds(ticks, bpm) {
     return (ticks * 60) / (bpm * MIDI_TICKS_PER_BEAT);
 }
 
-const MIN_MIDI_EXPORT_VELOCITY = 41;
+const MIN_MIDI_EXPORT_VELOCITY = 25;
 
 function clampVelocity(value) {
     return Math.max(1, Math.min(127, Math.round(value)));
