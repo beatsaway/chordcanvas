@@ -924,8 +924,14 @@ function ticksToSeconds(ticks, bpm) {
     return (ticks * 60) / (bpm * MIDI_TICKS_PER_BEAT);
 }
 
+const MIN_MIDI_EXPORT_VELOCITY = 41;
+
 function clampVelocity(value) {
     return Math.max(1, Math.min(127, Math.round(value)));
+}
+
+function clampMidiExportVelocity(value) {
+    return Math.max(MIN_MIDI_EXPORT_VELOCITY, Math.min(127, Math.round(value)));
 }
 
 function addMidiEvents(track, events) {
@@ -984,7 +990,7 @@ function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks
             const noteDurationSeconds = cycleSeconds * MIDI_NOTE_DURATION_FACTOR;
             const cyclePosition = barSeconds > 0 ? (cycleStartSeconds - barStartSeconds) / barSeconds : 0;
             const volumeMultiplier = getVolumeModMultiplier(volumeModPattern, cyclePosition);
-            const velocity = clampVelocity(baseVelocity * volumeMultiplier);
+            const velocity = clampMidiExportVelocity(baseVelocity * volumeMultiplier);
             ordered.forEach(note => {
                 const delayOffsetSeconds = getDelayOffsetSeconds(noteDurationSeconds, delayModPattern, delayState);
                 const onTimeSeconds = cycleStartSeconds + delayOffsetSeconds;
@@ -1002,7 +1008,7 @@ function scheduleMidiNotesWithMods(events, notes, startTick, endTick, cycleTicks
             const onTimeSeconds = cycleStartSeconds + delayOffsetSeconds;
             const onTime = startTick + secondsToTicks(onTimeSeconds - barStartSeconds, bpm);
             const offTime = Math.min(endTick, onTime + secondsToTicks(noteDurationSeconds, bpm));
-            const velocity = clampVelocity(baseVelocity * volumeMultiplier);
+            const velocity = clampMidiExportVelocity(baseVelocity * volumeMultiplier);
             notesForCycle.forEach(note => {
                 events.push({ type: 'on', time: onTime, note, velocity });
                 events.push({ type: 'off', time: offTime, note, velocity });
