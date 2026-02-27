@@ -882,7 +882,7 @@
   
     function playBuffer(buffer, onProgress, onDone, options = {}) {
       if (!buffer) return;
-      const { overlap = false, preloadSeconds = 0.18 } = options;
+      const { overlap = false, preloadSeconds = 0.18, startTime: optionsStartTime } = options;
       ensureAudioGraph();
       if (suspendTimeout) {
         clearTimeout(suspendTimeout);
@@ -890,17 +890,20 @@
       }
       const now = audioCtx.currentTime;
       audioCtx.resume().catch(() => {});
-      masterGain.gain.cancelScheduledValues(now);
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      if (!overlap) {
-        masterGain.gain.setValueAtTime(0, now);
+      const useExplicitStart = optionsStartTime != null && typeof optionsStartTime === "number";
+      if (!useExplicitStart) {
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+        if (!overlap) {
+          masterGain.gain.setValueAtTime(0, now);
+        }
       }
-  
-      const startTime = audioCtx.currentTime + preloadSeconds;
+
+      const startTime = useExplicitStart ? optionsStartTime : audioCtx.currentTime + preloadSeconds;
       if (overlap) {
-        masterGain.gain.setTargetAtTime(0.9, now, 0.02);
-      } else {
-        masterGain.gain.linearRampToValueAtTime(0.9, startTime + 0.03);
+        masterGain.gain.setTargetAtTime(lastMasterVolume, now, 0.02);
+      } else if (!useExplicitStart) {
+        masterGain.gain.linearRampToValueAtTime(lastMasterVolume, startTime + 0.03);
       }
   
       const source = audioCtx.createBufferSource();
@@ -936,6 +939,11 @@
       bufferRafId = requestAnimationFrame(tick);
     }
   
+    function getCurrentTime() {
+      if (!audioCtx) return typeof performance !== "undefined" ? performance.now() / 1000 : 0;
+      return audioCtx.currentTime;
+    }
+
     return {
       PRESETS: getInstrumentRegistry(),
       getInstrumentProfiles: getInstrumentRegistry,
@@ -945,6 +953,7 @@
       ensureCurrentPresetLoaded,
       setEffects,
       setMasterVolume,
+      getCurrentTime,
       play,
       playBuffer,
       renderBuffer,
