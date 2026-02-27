@@ -1622,7 +1622,7 @@ async function startPreview({ fromLoop = false, startAt = null, loopOnlyActiveSe
                 );
             }
 
-            if (useSynth) {
+            if (!useSynth) {
                 schedulePreviewTimer(() => {
                     if (isSequencePreviewing) {
                         clearAllHighlights();
