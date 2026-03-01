@@ -39,6 +39,38 @@
         html {
             min-height: 100%;
         }
+        /* Dim-to-bright overlay: dark on load, fades to reveal bg over ~3.5s */
+        .bg-reveal {
+            position: fixed;
+            inset: 0;
+            background: #0f1416;
+            z-index: 1;
+            opacity: 1;
+            transition: opacity 3.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+            pointer-events: none;
+        }
+        .bg-reveal.revealed {
+            opacity: 0;
+        }
+        /* Background image: blur-up on load (blurred when first shown, then sharpens) */
+        .bg-img {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            z-index: 0;
+            opacity: 0;
+            filter: blur(24px);
+            transform: scale(1.05);
+            transition: opacity 1.4s ease, filter 2s cubic-bezier(0.25, 0.1, 0.25, 1), transform 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .bg-img.loaded {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
         body {
             margin: 0;
             min-height: 100vh;
@@ -58,6 +90,15 @@
         main {
             max-width: 760px;
             margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+        .main-content-fade {
+            opacity: 0;
+            transition: opacity 2.5s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        body.page-ready .main-content-fade {
+            opacity: 1;
         }
         h1.app-logo {
             margin: 0 0 14px 0;
@@ -76,6 +117,9 @@
         h1.app-logo.font-loaded {
             opacity: 1;
         }
+        h1.app-logo.font-loaded:hover {
+            opacity: 0.33;
+        }
         .tabs {
             display: flex;
             gap: 0;
@@ -91,12 +135,14 @@
             border-radius: 6px 6px 0 0;
             font-size: 11px;
             padding: 5px 7px;
-            transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
+            opacity: 0.66;
+            transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease, opacity 0.22s ease;
         }
         .tabs button:hover:not(.active) {
             background: var(--control-hover-solid);
             color: var(--surface-text);
             border-color: var(--hairline);
+            opacity: 1;
         }
         .tabs button.active {
             background: var(--surface);
@@ -104,6 +150,7 @@
             border-color: var(--control-border);
             margin-bottom: -1px;
             border-bottom: 1px solid var(--surface);
+            opacity: 1;
         }
         section {
             border: 1px solid var(--control-border);
@@ -1093,17 +1140,25 @@
     </style>
 </head>
 <body>
+    <img class="bg-img" id="bg-img" src="" alt="" role="presentation">
+    <div class="bg-reveal" id="bg-reveal" aria-hidden="true"></div>
     <script>
     (function() {
         var n = 222;
         var i = Math.floor(Math.random() * n) + 1;
         var num = (i < 10 ? '00' : i < 100 ? '0' : '') + i;
-        document.body.style.backgroundImage = "url('chillbg/bgchill_" + num + ".jpg')";
+        var url = 'chillbg/bgchill_' + num + '.jpg';
+        var img = document.getElementById('bg-img');
+        if (img) {
+            img.onload = function() { img.classList.add('loaded'); };
+            img.src = url;
+        }
     })();
     </script>
     <main>
         <h1 class="app-logo" id="app-logo">Chord Canvas</h1>
 
+        <div class="main-content-fade">
         <div id="panelGroup" class="panel-group">
             <nav class="tabs">
                 <button type="button" data-panel="panel-sequence" class="active">Sequence</button>
@@ -1114,7 +1169,7 @@
             </nav>
 
             <section id="panel-sequence" class="panel-sequence-section">
-                <textarea id="chordInput" data-role="chordInput" placeholder="e.g. C, Dm, G7, Am">D, A, C#m, Dmaj13, F#m, Aadd2, C#7, D, Dadd2, Asus4, Eadd13, F#m7</textarea>
+                <textarea id="chordInput" data-role="chordInput" placeholder="e.g. C, Dm, G7, Am">D, A, C#m7, Dmaj13, F#m, Aadd2, C#7, Dmaj13, Dadd2, Asus4, Eadd13, F#m9</textarea>
                 <div id="chordPreview" data-role="chordPreview"></div>
                 <div id="currentHighNotes" class="notes-info" data-role="currentHighNotes"></div>
             </section>
@@ -1430,6 +1485,7 @@
             </button>
             <button id="downloadBtn" type="button">Download</button>
         </div>
+        </div>
     </main>
 
     <div id="downloadOptionsModal" class="options-modal" aria-hidden="true">
@@ -1598,15 +1654,13 @@
             </nav>
             <div class="info-modal-panels">
             <section class="modal-panel is-active" data-panel="about">
-                <p><strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65</strong>
+                <p><strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65,</strong>
                     developed by
                     <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>
                 </p>
                 <p>
-                    If you enjoy this free app,
-                    <a class="modal-link" href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">
-                        buy him a coffee🤗☕
-                    </a>
+                    If you enjoy using this, you can
+                    <a class="modal-link" href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">support its development.</a>
                 </p>
             </section>
             <section class="modal-panel" data-panel="audio">
@@ -1690,17 +1744,29 @@
 
     <script>
     (function() {
-        var logo = document.getElementById('app-logo');
-        if (!logo) return;
-        if (document.fonts && document.fonts.load) {
-            document.fonts.load('1em Pacifico').then(function() {
-                logo.classList.add('font-loaded');
-            }).catch(function() {
-                logo.classList.add('font-loaded');
+        // Page load: dim-to-bright immediately; UI fades in after 1s (premium brand feel)
+        document.addEventListener('DOMContentLoaded', function() {
+            requestAnimationFrame(function() {
+                var bgReveal = document.getElementById('bg-reveal');
+                if (bgReveal) bgReveal.classList.add('revealed');
             });
-            setTimeout(function() { logo.classList.add('font-loaded'); }, 2500);
-        } else {
-            logo.classList.add('font-loaded');
+            setTimeout(function() {
+                document.body.classList.add('page-ready');
+            }, 3000);
+        });
+        // Logo: show after Pacifico font loads (avoid FOUT)
+        var logo = document.getElementById('app-logo');
+        if (logo) {
+            if (document.fonts && document.fonts.load) {
+                document.fonts.load('1em Pacifico').then(function() {
+                    logo.classList.add('font-loaded');
+                }).catch(function() {
+                    logo.classList.add('font-loaded');
+                });
+                setTimeout(function() { logo.classList.add('font-loaded'); }, 2500);
+            } else {
+                logo.classList.add('font-loaded');
+            }
         }
     })();
     </script>
