@@ -2424,10 +2424,14 @@ function syncGroupFromInputs(group, { stopOnEmpty = true } = {}) {
     updateChordPreviewItemsSettings(group);
 }
 
-function registerPanelGroup(groupEl) {
+function registerPanelGroup(groupEl, insertIndex) {
     if (!groupEl) return null;
     const group = buildPanelGroupState(groupEl);
-    panelGroups.push(group);
+    if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= panelGroups.length) {
+        panelGroups.splice(insertIndex, 0, group);
+    } else {
+        panelGroups.push(group);
+    }
     if (!activeGroup) {
         setActiveGroup(group);
     }
@@ -2711,8 +2715,13 @@ function clonePanelGroup(opts) {
         button.classList.toggle('active', isSequence);
     });
 
-    panelGroup.parentElement.insertBefore(clone, actionButtons);
-    const newGroup = registerPanelGroup(clone);
+    const active = getActiveGroup();
+    const insertBeforeNode = active && active.el && active.el.nextElementSibling
+        ? active.el.nextElementSibling
+        : actionButtons;
+    panelGroup.parentElement.insertBefore(clone, insertBeforeNode);
+    const activeIndex = active ? panelGroups.findIndex((g) => g === active) : -1;
+    const newGroup = registerPanelGroup(clone, activeIndex >= 0 ? activeIndex + 1 : undefined);
     if (newGroup) {
         if (emptySequence && newGroup.chordInput) {
             newGroup.chordInput.value = '';
@@ -2789,23 +2798,23 @@ function renderPresets() {
 
 function openPresets() {
     if (!presetsModal) return;
-    presetsModal.setAttribute('aria-hidden', 'false');
     renderPresets();
+    openModal(presetsModal);
 }
 
 function closePresets() {
     if (!presetsModal) return;
-    presetsModal.setAttribute('aria-hidden', 'true');
+    closeModal(presetsModal);
 }
 
 function openContact() {
     if (!contactModal) return;
-    contactModal.setAttribute('aria-hidden', 'false');
+    openModal(contactModal);
 }
 
 function closeContact() {
     if (!contactModal) return;
-    contactModal.setAttribute('aria-hidden', 'true');
+    closeModal(contactModal);
 }
 
 function humanizeChordTypeKey(key) {
@@ -2831,12 +2840,12 @@ function openChordTypes() {
         item.appendChild(exEl);
         chordTypesList.appendChild(item);
     });
-    chordTypesModal.setAttribute('aria-hidden', 'false');
+    openModal(chordTypesModal);
 }
 
 function closeChordTypes() {
     if (!chordTypesModal) return;
-    chordTypesModal.setAttribute('aria-hidden', 'true');
+    closeModal(chordTypesModal);
 }
 
 const helpSteps = [
@@ -2911,13 +2920,13 @@ function setHelpStep(index) {
 
 function openHelp() {
     if (!helpModal) return;
-    helpModal.setAttribute('aria-hidden', 'false');
     setHelpStep(0);
+    openModal(helpModal);
 }
 
 function closeHelp() {
     if (!helpModal) return;
-    helpModal.setAttribute('aria-hidden', 'true');
+    closeModal(helpModal);
     clearHelpHighlight();
 }
 
@@ -3011,14 +3020,25 @@ async function downloadWavFile(button) {
     }
 }
 
+var POPUP_TRANSITION_MS = 400;
+
 function openModal(modal) {
     if (!modal) return;
+    modal.classList.remove('popup-visible');
     modal.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            modal.classList.add('popup-visible');
+        });
+    });
 }
 
 function closeModal(modal) {
     if (!modal) return;
-    modal.setAttribute('aria-hidden', 'true');
+    modal.classList.remove('popup-visible');
+    setTimeout(function() {
+        modal.setAttribute('aria-hidden', 'true');
+    }, POPUP_TRANSITION_MS);
 }
 
 function openSynthInfoModal(fullMessage) {
@@ -3086,12 +3106,12 @@ let chordItemOptionsContext = null;
 function openChordItemOptionsModal({ group, chord, index }) {
     if (!chordItemOptionsModal || !group || !chord) return;
     chordItemOptionsContext = { group, chord, index };
-    chordItemOptionsModal.setAttribute('aria-hidden', 'false');
+    openModal(chordItemOptionsModal);
 }
 
 function closeChordItemOptionsModal() {
     chordItemOptionsContext = null;
-    if (chordItemOptionsModal) chordItemOptionsModal.setAttribute('aria-hidden', 'true');
+    if (chordItemOptionsModal) closeModal(chordItemOptionsModal);
 }
 
 function openTrebleModal({ group, chord, index }) {
@@ -3336,13 +3356,6 @@ if (quickHelpBtn && contactModal && contactClose) {
     });
 }
 
-window.addEventListener('load', () => {
-    if (helpModal && helpText && helpPrev && helpNext && helpClose) {
-        openHelp();
-    }
-});
-
-
 if (addOptionsModal) {
     addOptionsModal.addEventListener('click', (event) => {
         if (event.target === addOptionsModal) {
@@ -3440,7 +3453,7 @@ function openAddChordModal() {
     if (addChordSpellingSelect) addChordSpellingSelect.value = '';
     addChordState.accidental = '';
     populateAddChordRootBtns();
-    addChordModal.setAttribute('aria-hidden', 'false');
+    openModal(addChordModal);
 }
 
 function openEditChordTypeModal({ group, chord, index }) {
@@ -3472,11 +3485,11 @@ function openEditChordTypeModal({ group, chord, index }) {
             addChordTypeList.appendChild(b);
         });
     }
-    addChordModal.setAttribute('aria-hidden', 'false');
+    openModal(addChordModal);
 }
 
 function closeAddChordModal() {
-    if (addChordModal) addChordModal.setAttribute('aria-hidden', 'true');
+    if (addChordModal) closeModal(addChordModal);
 }
 
 if (addChordBtn) {
@@ -3797,7 +3810,7 @@ if (title && infoModal) {
             tab.classList.toggle('active', tab.getAttribute('data-panel') === panelId);
         });
         infoPanels.forEach((panel) => {
-            panel.hidden = panel.getAttribute('data-panel') !== panelId;
+            panel.classList.toggle('is-active', panel.getAttribute('data-panel') === panelId);
         });
     };
 
@@ -3810,15 +3823,26 @@ if (title && infoModal) {
         });
     });
 
-    title.addEventListener('click', () => {
+    const openInfoModal = () => {
         infoModal.hidden = false;
+        requestAnimationFrame(() => {
+            infoModal.classList.add('info-modal-visible');
+        });
+    };
+    const closeInfoModal = () => {
+        infoModal.classList.remove('info-modal-visible');
+        setTimeout(() => {
+            infoModal.hidden = true;
+        }, 400);
+    };
+
+    title.addEventListener('click', () => {
+        openInfoModal();
         setInfoTab('about');
     });
 
     if (infoBackdrop) {
-        infoBackdrop.addEventListener('click', () => {
-            infoModal.hidden = true;
-        });
+        infoBackdrop.addEventListener('click', closeInfoModal);
     }
 }
 

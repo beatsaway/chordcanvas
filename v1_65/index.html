@@ -12,14 +12,46 @@
     <script src="lib/jsmidgen.js"></script>
     <script src="chord-intervals-config.js"></script>
     <style>
+        /* White + teal theme — sky blue vignette (stronger falloff at edges) */
+        :root {
+            --bg-center:     #f2f8fc;
+            --bg-mid:        #c8dceb;
+            --bg-edge:       #7aa8c4;
+            --surface:       #fafafa;
+            --surface-text:  #2c2c2c;
+            --surface-muted: #737373;
+            --accent:        #0d9488;
+            --accent-hover:  #0f766e;
+            --accent-subtle: rgba(13, 148, 136, 0.12);
+            --control-bg:    #fff;
+            --control-border: rgba(0, 0, 0, 0.12);
+            --control-hover: rgba(0, 0, 0, 0.06);
+            --control-hover-solid: #e0e2e0;
+            --card-bg:       #ffffff;
+            --card-border:   rgba(0, 0, 0, 0.1);
+            --hairline:      rgba(0, 0, 0, 0.06);
+            /* Reusable popup transition (backdrop + card scale/fade) */
+            --popup-backdrop-duration: 0.32s;
+            --popup-card-duration: 0.4s;
+            --popup-card-ease: cubic-bezier(0.32, 0.72, 0, 1);
+        }
         * { box-sizing: border-box; }
+        html {
+            min-height: 100%;
+        }
         body {
             margin: 0;
+            min-height: 100vh;
             padding: 16px;
             padding-top: calc(16px + env(safe-area-inset-top));
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-            color: #e4e4e7;
-            background: #121214;
+            color: var(--surface-text);
+            /* Fallback: sky blue vignette (used if JS doesn't set a random image) */
+            background: radial-gradient(ellipse 90% 80% at 50% 45%, var(--bg-center) 0%, var(--bg-mid) 32%, var(--bg-edge) 100%);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
             font-size: 16px;
             line-height: 1.45;
         }
@@ -27,52 +59,78 @@
             max-width: 760px;
             margin: 0 auto;
         }
-        h1 {
+        h1.app-logo {
             margin: 0 0 14px 0;
-            font-size: 24px;
+            font-size: 36px;
             font-weight: 400;
             font-family: "Pacifico", cursive;
             cursor: pointer;
             touch-action: manipulation;
-            color: #f4f4f5;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.35);
             text-align: center;
+            /* Hidden until Pacifico is loaded to avoid font flash (FOUT) */
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        h1.app-logo.font-loaded {
+            opacity: 1;
         }
         .tabs {
             display: flex;
             gap: 0;
             flex-wrap: wrap;
             margin-bottom: 0;
-            border-bottom: 1px solid #1e1e21;
+            border-bottom: 0;
         }
         .tabs button {
-            background: #27272a;
-            color: #71717a;
-            border: none;
+            background: var(--control-bg);
+            color: var(--surface-muted);
+            border: 1px solid var(--hairline);
+            border-bottom: none;
             border-radius: 6px 6px 0 0;
             font-size: 11px;
             padding: 5px 7px;
+            transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
+        }
+        .tabs button:hover:not(.active) {
+            background: var(--control-hover-solid);
+            color: var(--surface-text);
+            border-color: var(--hairline);
         }
         .tabs button.active {
-            background: #1e1e21;
-            color: #a5f3fc;
-            border: none;
-            margin-bottom: -2px;
-            box-shadow: inset 0 -2px 0 #1e1e21;
+            background: var(--surface);
+            color: var(--accent);
+            border-color: var(--control-border);
+            margin-bottom: -1px;
+            border-bottom: 1px solid var(--surface);
         }
         section {
-            border: 0;
-            border-radius: 0;
+            border: 1px solid var(--control-border);
+            border-radius: 0 8px 8px 8px;
             padding: 4px 12px;
             margin-bottom: 12px;
-            background-color: #1e1e21;
+            background-color: var(--card-bg);
+            transition: border-radius 0.28s ease, box-shadow 0.28s ease;
         }
 
         .panel-group.is-active section {
-            border-color: #1e1e21;
+            border-color: var(--control-border);
             border-style: solid;
         }
 
-        /* Inactive panel: show only chord preview (no textarea, no other tabs) */
+        .panel-group {
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+        .panel-group:not(.is-active) {
+            opacity: 0.33;
+            transform: scale(0.98);
+        }
+        .panel-group.is-active {
+            transform: scale(1);
+        }
+
+        /* Inactive panel: show only chord preview (no textarea, no other tabs), rounded and dimmed */
         .panel-group:not(.is-active) .tabs {
             display: none !important;
         }
@@ -84,6 +142,7 @@
         }
         .panel-group:not(.is-active) section.panel-sequence-section {
             display: block !important;
+            border-radius: 8px;
         }
         section[hidden] {
             display: none;
@@ -102,9 +161,9 @@
             gap: 6px;
         }
         .play-loop {
-            border: 0;
-            background: #e4e4e7;
-            color: #121214;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
             font: inherit;
             cursor: pointer;
             padding: 2px 5px;
@@ -114,8 +173,8 @@
             font-size: 12px;
         }
         .play-loop option {
-            background: #1e1e21;
-            color: #e4e4e7;
+            background: var(--card-bg);
+            color: var(--surface-text);
         }
         .modal {
             position: fixed;
@@ -132,66 +191,104 @@
         .modal-backdrop {
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
         }
         .modal-card {
             position: relative;
             z-index: 1;
             width: min(520px, 100%);
-            border-radius: 0;
+            border-radius: 10px;
             padding: 0;
-            background: transparent;
-            border: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        /* Info modal (About / Audio / Play / Help): premium open/close transition */
+        [data-role="info-modal"] .modal-backdrop {
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        [data-role="info-modal"].info-modal-visible .modal-backdrop {
+            opacity: 1;
+        }
+        [data-role="info-modal"] .modal-card {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        [data-role="info-modal"].info-modal-visible .modal-card {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         .modal-tabs {
             display: flex;
             gap: 0;
             margin: 0;
-            background: transparent;
-            border: none;
+            background: var(--surface);
+            border-bottom: 1px solid var(--control-border);
+            border-radius: 10px 10px 0 0;
         }
         .modal-tabs button {
-            background: #27272a;
-            color: #71717a;
+            background: var(--control-bg);
+            color: var(--surface-muted);
             border: none;
             border-radius: 6px 6px 0 0;
             padding: 5px 10px;
             font-size: 12px;
         }
+        .modal-tabs button:hover:not(.active) {
+            background: var(--control-hover-solid);
+            color: var(--surface-text);
+        }
+        .modal-tabs button {
+            transition: background 0.22s ease, color 0.22s ease;
+        }
         .modal-tabs button.active {
-            background: #1e1e21;
-            color: #a5f3fc;
-            border: none;
-            margin-bottom: -2px;
-            box-shadow: inset 0 -2px 0 #1e1e21;
+            background: var(--accent-subtle);
+            color: var(--accent);
         }
         .modal-panel {
             font-size: 15px;
-            border: 1px solid #3f3f46;
-            border-top: 1px solid #3f3f46;
-            border-radius: 0;
+            border: none;
+            border-radius: 0 0 10px 10px;
             padding: 14px;
             margin: 0;
-            background: #1e1e21;
+            background: var(--card-bg);
         }
         .modal-panel:not([hidden]) {
-            border-style: solid;
-            border-color: #1e1e21;
+            border-style: none;
+        }
+        /* Info modal tab content: crossfade between panels */
+        .info-modal-panels {
+            position: relative;
+            min-height: 200px;
+        }
+        [data-role="info-modal"] .info-modal-panels .modal-panel {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            overflow: auto;
+        }
+        [data-role="info-modal"] .info-modal-panels .modal-panel.is-active {
+            opacity: 1;
+            pointer-events: auto;
         }
         .modal-panel p {
             margin: 0 0 14px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
         }
         .modal-link {
             display: inline-block;
             text-decoration: none;
-            color: #e4e4e7;
-            border-bottom: 0;
+            color: var(--accent);
         }
+        .modal-link:hover { color: var(--accent-hover); }
         #helpModal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
             display: none;
             align-items: flex-end;
             justify-content: center;
@@ -200,22 +297,37 @@
         }
         #helpModal[aria-hidden="false"] {
             display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #helpModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #helpModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #helpModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         #helpModal > div {
-            background: #1e1e21;
+            background: var(--card-bg);
             border-radius: 12px 12px 6px 6px;
             padding: 18px;
             max-width: 520px;
             width: 100%;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
         }
         #helpModal p {
             margin: 0 0 14px;
             font-size: 15px;
-            color: #e4e4e7;
+            color: var(--surface-text);
         }
         #helpModal a {
-            color: inherit;
+            color: var(--accent);
             text-decoration: none;
         }
         #helpModal .help-controls {
@@ -231,7 +343,7 @@
         #contactModal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
             display: none;
             align-items: flex-end;
             justify-content: center;
@@ -240,27 +352,42 @@
         }
         #contactModal[aria-hidden="false"] {
             display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #contactModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #contactModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #contactModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         #contactModal > div {
-            background: #1e1e21;
+            background: var(--card-bg);
             border-radius: 12px 12px 6px 6px;
             padding: 16px;
             max-width: 560px;
             width: 100%;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--card-border);
             font-size: 15px;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
         }
         #contactModal {
-            color: #a1a1aa;
+            color: var(--surface-muted);
         }
         #contactModal a {
-            color: #22d3ee;
+            color: var(--accent);
             text-decoration: none;
         }
         #presetsModal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
             display: none;
             align-items: center;
             justify-content: center;
@@ -269,21 +396,36 @@
         }
         #presetsModal[aria-hidden="false"] {
             display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #presetsModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #presetsModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #presetsModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         #presetsModal > div {
-            background: #1e1e21;
-            border-radius: 8px;
+            background: var(--card-bg);
+            border-radius: 10px;
             padding: 12px;
             max-width: 520px;
             width: 100%;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--card-border);
             max-height: 70vh;
             overflow: auto;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
         }
         #presetsModal h2 {
             margin: 0 0 8px;
             font-size: 18px;
-            color: #f4f4f5;
+            color: var(--surface-text);
         }
         #presetsModal .help-controls {
             margin-top: 8px;
@@ -291,7 +433,7 @@
         #chordTypesModal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
             display: none;
             align-items: center;
             justify-content: center;
@@ -300,25 +442,40 @@
         }
         #chordTypesModal[aria-hidden="false"] {
             display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #chordTypesModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #chordTypesModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #chordTypesModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         #chordTypesModal > div {
-            background: #1e1e21;
+            background: var(--card-bg);
             border-radius: 10px;
             padding: 12px 14px;
             max-width: 480px;
             width: 100%;
             max-height: 80vh;
             overflow: auto;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
         }
         #chordTypesModal h2 {
             margin: 0 0 8px;
             font-size: 16px;
-            color: #f4f4f5;
+            color: var(--surface-text);
         }
         #chordTypesModal p.chord-types-desc {
             font-size: 12px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
             margin: 0 0 10px;
             line-height: 1.35;
         }
@@ -327,7 +484,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 6px 14px;
             font-size: 11px;
-            color: #e4e4e7;
+            color: var(--surface-text);
         }
         #chordTypesList .chord-type-item {
             display: flex;
@@ -336,12 +493,12 @@
             min-width: 0;
         }
         #chordTypesList .chord-type-name {
-            color: #a1a1aa;
+            color: var(--surface-muted);
             flex-shrink: 0;
         }
         #chordTypesList .chord-type-example {
             font-family: ui-monospace, monospace;
-            color: #f4f4f5;
+            color: var(--surface-text);
             flex-shrink: 0;
         }
         #chordTypesModal .help-controls {
@@ -362,15 +519,15 @@
         }
         .add-chord-step-hint {
             font-size: 12px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
             margin: 0 0 8px;
             line-height: 1.35;
         }
         .add-chord-root-btn.selected,
         .add-chord-type-list .add-chord-type-btn.selected {
-            background: #3f3f46;
-            border-color: #71717a;
-            color: #f4f4f5;
+            background: var(--accent-subtle);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .add-chord-confirm-btn {
             margin-top: 12px;
@@ -392,15 +549,16 @@
         }
         .add-chord-spelling-label {
             font-size: 12px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
             margin-right: 8px;
         }
         .add-chord-spelling-select {
             padding: 5px 8px;
             font-size: 12px;
-            background: #27272a;
-            border: none;
+            background: var(--control-bg);
+            border: 1px solid var(--control-border);
             border-radius: 6px;
+            color: var(--surface-text);
         }
         .add-chord-type-list {
             display: flex;
@@ -411,15 +569,17 @@
         }
         .add-chord-type-list.add-chord-preview-items .add-chord-type-btn {
             border-radius: 999px;
-            border: none;
-            background: #27272a;
-            color: #e4e4e7;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
             padding: 5px 10px;
             font-size: 12px;
             cursor: pointer;
         }
         .add-chord-type-list.add-chord-preview-items .add-chord-type-btn:hover {
-            background: #3f3f46;
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .add-chord-type-btn {
             padding: 5px 8px;
@@ -428,13 +588,13 @@
         .add-chord-preview-name {
             font-size: 18px;
             font-family: ui-monospace, monospace;
-            color: #f4f4f5;
+            color: var(--surface-text);
             margin: 0 0 12px;
         }
         .add-chord-selected-name {
             font-size: 16px;
             font-family: ui-monospace, monospace;
-            color: #e4e4e7;
+            color: var(--surface-text);
             margin: 0 0 10px;
         }
         .add-chord-preview-actions {
@@ -448,11 +608,12 @@
             gap: 6px;
         }
         .preset-item {
-            border: 1px solid #3f3f46;
-            border-radius: 6px;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
             padding: 8px;
             display: grid;
             gap: 4px;
+            background: var(--surface);
         }
         .preset-header {
             display: flex;
@@ -463,19 +624,19 @@
         .preset-title {
             font-weight: 600;
             font-size: 15px;
-            color: #f4f4f5;
+            color: var(--surface-text);
         }
         .preset-tag {
             font-size: 12px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
         }
         .preset-chords {
             font-size: 14px;
-            color: #d4d4d8;
+            color: var(--surface-text);
         }
         .notes-info {
             font-size: 11px;
-            color: #71717a;
+            color: var(--surface-muted);
             margin-top: 6px;
         }
         .preset-use {
@@ -490,8 +651,8 @@
         .tour-highlight {
             position: relative;
             z-index: 3;
-            outline: 2px solid #71717a;
-            box-shadow: 0 0 0 4px rgba(18, 18, 20, 0.8);
+            outline: 2px solid var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-subtle);
             border-radius: 6px;
         }
         label {
@@ -499,23 +660,22 @@
             font-weight: 500;
             margin-bottom: 6px;
             font-size: 9px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
         }
         textarea {
             width: 100%;
             min-height: 56px;
-            border: 0;
+            border: none;
             padding: 6px;
-            font-size: 18px;
+            font-size: 15px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
             resize: vertical;
-            background: #a5f3fc;
-            color: #000;
-            border-radius: 4px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border-radius: 6px;
         }
-        textarea:hover {
-            color: #1e1e21;
-            background: #fff;
+        textarea:focus {
+            outline: none;
         }
         .bpm-row {
             display: flex;
@@ -540,13 +700,14 @@
             line-height: 1;
             font-weight: 600;
             border-radius: 6px;
-            border: none;
-            background: #1e1e21;
-            color: #71717a;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-muted);
             cursor: pointer;
         }
         .bpm-step-btn:hover {
-            background: #3f3f46;
+            background: var(--control-hover-solid);
+            color: var(--accent);
         }
         section > div {
             display: flex;
@@ -557,9 +718,9 @@
         }
         
         button {
-            border: none;
-            background: #1e1e21;
-            color: #71717a;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
             padding: 6px 11px;
             border-radius: 6px;
             cursor: pointer;
@@ -567,28 +728,31 @@
             font-size: 13px;
         }
         button:hover {
-            color: #fff;
+            background: var(--control-hover-solid);
+            border-color: var(--control-border);
+            color: var(--surface-text);
         }
         input[type="number"] {
             width: 90px;
             padding: 6px;
             font-size: 13px;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--control-border);
             border-radius: 6px;
-            background: #27272a;
-            color: #e4e4e7;
+            background: var(--control-bg);
+            color: var(--surface-text);
         }
         select {
             padding: 5px 8px;
             font-size: 13px;
-            border: none;
+            border: 1px solid var(--control-border);
             border-radius: 6px;
-            background: #27272a;
-            color: #71717a;
+            background: var(--control-bg);
+            color: var(--surface-text);
             line-height: 1.3;
         }
-        select:hover {
-            color: #fff;
+        select:hover, select:focus {
+            border-color: var(--accent);
+            outline: none;
         }
         #chordPreview {
             margin-top: 8px;
@@ -601,21 +765,21 @@
         }
         .chord-preview-item {
             padding: 3px 8px;
-            background: #27272a;
-            border: 1px solid #3f3f46;
-            border-radius: 4px;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
             font-size: 12px;
-            color: #e4e4e7;
+            color: var(--surface-text);
             cursor: pointer;
         }
         .chord-preview-item.playing {
-            border-color: #71717a;
-            color: #f4f4f5;
-            background: #3f3f46;
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-subtle);
         }
         .chord-preview-empty {
             font-size: 12px;
-            color: #71717a;
+            color: var(--surface-muted);
         }
         .random-by-key-preview {
             margin-top: 8px;
@@ -629,7 +793,7 @@
         .random-by-key-preview:empty::before {
             content: 'Generate to see chords here';
             font-size: 12px;
-            color: #71717a;
+            color: var(--surface-muted);
         }
         .random-by-key-row {
             display: flex;
@@ -639,7 +803,7 @@
         }
         .random-by-key-row .random-by-key-label {
             font-size: 12px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
             flex-shrink: 0;
         }
         .random-by-key-row .play-options-select {
@@ -648,7 +812,7 @@
         }
         .random-by-key-intro {
             font-size: 12px;
-            color: #71717a;
+            color: var(--surface-muted);
             line-height: 1.35;
             margin: 0;
         }
@@ -685,23 +849,26 @@
             margin: 0;
             font-size: 15px;
             font-weight: 600;
+            color: var(--surface-text);
         }
         .synth-info-btn {
             min-width: 32px;
             padding: 4px 8px;
             font-size: 14px;
             cursor: pointer;
-            border-radius: 4px;
-            background: #27272a;
-            color: #e4e4e7;
-            border: 1px solid #3f3f46;
+            border-radius: 6px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
         }
         .synth-info-btn:hover {
-            background: #3f3f46;
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .play-label-inline {
             font-size: 13px;
-            color: #111;
+            color: var(--surface-text);
         }
         .play-options-trigger {
             font-size: 16px;
@@ -710,20 +877,21 @@
         }
         .options-desc {
             font-size: 14px;
-            color: #a1a1aa;
+            color: var(--surface-muted);
         }
         .play-options-select {
             font-size: 13px;
             padding: 6px 10px;
             border-radius: 6px;
-            border: none;
-            background: #27272a;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
             min-width: 0;
         }
         .options-modal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.28);
             display: none;
             align-items: center;
             justify-content: center;
@@ -732,21 +900,40 @@
         }
         .options-modal[aria-hidden="false"] {
             display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        .options-modal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        .options-modal[aria-hidden="false"] .options-card,
+        .options-modal[aria-hidden="false"] .synth-info-card,
+        .options-modal[aria-hidden="false"] .treble-notes-card {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        .options-modal[aria-hidden="false"].popup-visible .options-card,
+        .options-modal[aria-hidden="false"].popup-visible .synth-info-card,
+        .options-modal[aria-hidden="false"].popup-visible .treble-notes-card {
+            opacity: 1;
+            transform: scale(1) translateY(0);
         }
         .options-card {
-            background: #1e1e21;
+            background: var(--card-bg);
             border-radius: 10px;
             padding: 14px;
             width: min(360px, 100%);
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--card-border);
             display: grid;
             gap: 10px;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
         }
         .options-card h3 {
             margin: 0;
             font-size: 16px;
             font-weight: 600;
-            color: #f4f4f5;
+            color: var(--surface-text);
         }
         .options-actions {
             display: grid;
@@ -757,6 +944,7 @@
         }
         .synth-info-title {
             margin: 0 0 8px 0;
+            color: var(--surface-text);
         }
         .synth-info-text {
             user-select: text;
@@ -766,19 +954,24 @@
             white-space: pre-wrap;
             margin: 0 0 12px 0;
             padding: 10px 12px;
-            background: #27272a;
-            border: 1px solid #3f3f46;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
             border-radius: 6px;
             font-size: 14px;
             line-height: 1.5;
-            color: #e4e4e7;
+            color: var(--surface-text);
             max-height: 40vh;
             overflow: auto;
         }
         .options-cancel {
-            background: #1e1e21;
-            color: #71717a;
-            border: none;
+            background: var(--surface);
+            color: var(--surface-muted);
+            border: 1px solid var(--control-border);
+        }
+        .options-cancel:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .treble-notes-card {
             width: min(420px, 100%);
@@ -796,23 +989,25 @@
             align-items: center;
             gap: 4px;
             padding: 3px 6px;
-            background: #27272a;
-            border: 1px solid #3f3f46;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
             border-radius: 6px;
             font-size: 12px;
-            color: #e4e4e7;
+            color: var(--surface-text);
         }
         .treble-note-pill button {
-            background: transparent;
+            background: var(--control-bg);
             border: 0;
-            color: #a1a1aa;
+            color: var(--surface-muted);
             cursor: pointer;
             padding: 0 2px;
             font-size: 12px;
             line-height: 1;
+            border-radius: 3px;
         }
         .treble-note-pill button:hover {
-            color: #f4f4f5;
+            background: var(--control-hover-solid);
+            color: var(--accent);
         }
         .treble-notes-add-row {
             display: flex;
@@ -821,26 +1016,28 @@
             flex-wrap: wrap;
         }
         .treble-add-note-btn {
-            background: #1e1e21;
-            color: #71717a;
-            border: none;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
             padding: 5px 10px;
             font-size: 12px;
             border-radius: 6px;
             cursor: pointer;
         }
         .treble-add-note-btn:hover {
-            background: #3f3f46;
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .treble-notes-input {
             flex: 1;
             min-width: 100px;
             padding: 5px 8px;
             font-size: 12px;
-            border: 1px solid #3f3f46;
+            border: 1px solid var(--control-border);
             border-radius: 6px;
-            background: #27272a;
-            color: #e4e4e7;
+            background: var(--control-bg);
+            color: var(--surface-text);
         }
         .treble-recommendations {
             display: flex;
@@ -849,26 +1046,28 @@
             padding: 8px 0;
         }
         .treble-recommendations button {
-            background: #1e1e21;
-            color: #71717a;
-            border: none;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
             padding: 3px 8px;
             font-size: 12px;
             border-radius: 6px;
             cursor: pointer;
         }
         .treble-recommendations button:hover {
-            background: #3f3f46;
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         .treble-notes-error {
             font-size: 13px;
-            color: #f87171;
+            color: #b91c1c;
             margin-top: 4px;
         }
         .chord-add-btn {
-            background: #a5f3fc;
-            color: #0c4a6e;
-            border: none;
+            background: var(--accent-subtle);
+            color: var(--accent);
+            border: 1px solid rgba(13, 148, 136, 0.25);
             border-radius: 6px;
             padding: 6px 11px;
             font-size: 13px;
@@ -876,25 +1075,34 @@
             cursor: pointer;
         }
         .chord-add-btn:hover {
+            background: var(--accent);
             color: #fff;
-            background: #1e1e21;
         }
         .panel-group:not(.is-active) .chord-add-btn {
-            background: #e4e4e7;
-            color: #121214;
+            background: var(--surface);
+            color: var(--surface-muted);
+            border-color: var(--control-border);
         }
         .panel-group:not(.is-active) .chord-add-btn:hover {
-            color: #fff;
-            background: #1e1e21;
+            border-color: var(--accent);
+            color: var(--accent);
         }
         input[type="range"] {
-            accent-color: #71717a;
+            accent-color: var(--accent);
         }
     </style>
 </head>
 <body>
+    <script>
+    (function() {
+        var n = 222;
+        var i = Math.floor(Math.random() * n) + 1;
+        var num = (i < 10 ? '00' : i < 100 ? '0' : '') + i;
+        document.body.style.backgroundImage = "url('chillbg/bgchill_" + num + ".jpg')";
+    })();
+    </script>
     <main>
-        <h1>Chord Canvas</h1>
+        <h1 class="app-logo" id="app-logo">Chord Canvas</h1>
 
         <div id="panelGroup" class="panel-group">
             <nav class="tabs">
@@ -906,7 +1114,7 @@
             </nav>
 
             <section id="panel-sequence" class="panel-sequence-section">
-                <textarea id="chordInput" data-role="chordInput" placeholder="e.g. C, Dm, G7, Am">Dadd2,A,C#m9,Dmaj13,F#m,Aadd2,C#m7,D,Dadd2,Asus4,Eadd13,F#m7</textarea>
+                <textarea id="chordInput" data-role="chordInput" placeholder="e.g. C, Dm, G7, Am">D, A, C#m, Dmaj13, F#m, Aadd2, C#7, D, Dadd2, Asus4, Eadd13, F#m7</textarea>
                 <div id="chordPreview" data-role="chordPreview"></div>
                 <div id="currentHighNotes" class="notes-info" data-role="currentHighNotes"></div>
             </section>
@@ -1388,7 +1596,8 @@
                 <button type="button" data-role="info-tab" data-panel="play">Play</button>
                 <button type="button" data-role="info-tab" data-panel="help">Help</button>
             </nav>
-            <section class="modal-panel" data-panel="about">
+            <div class="info-modal-panels">
+            <section class="modal-panel is-active" data-panel="about">
                 <p><strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65</strong>
                     developed by
                     <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>
@@ -1400,7 +1609,7 @@
                     </a>
                 </p>
             </section>
-            <section class="modal-panel" data-panel="audio" hidden>
+            <section class="modal-panel" data-panel="audio">
                 <div class="control-row">
                     <label for="masterVolume">Master volume</label>
                     <input id="masterVolume" type="range" min="0" max="800" value="800">
@@ -1414,7 +1623,7 @@
                     <input id="highVolumeSlider" type="range" min="0" max="100" value="100">
                 </div>
             </section>
-            <section class="modal-panel" data-panel="play" hidden>
+            <section class="modal-panel" data-panel="play">
                 <div class="control-row">
                     <label for="playOptionsLoopSelect">Loop</label>
                     <select id="playOptionsLoopSelect" class="play-options-select">
@@ -1430,12 +1639,13 @@
                     </select>
                 </div>
             </section>
-            <section class="modal-panel" data-panel="help" hidden>
+            <section class="modal-panel" data-panel="help">
                 <div class="options-actions">
                     <button id="quickGuideBtn" type="button">Tutorial</button>
                     <button id="quickHelpBtn" type="button">Contact</button>
                 </div>
             </section>
+            </div>
         </div>
     </div>
 
@@ -1478,6 +1688,22 @@
         </div>
     </div>
 
+    <script>
+    (function() {
+        var logo = document.getElementById('app-logo');
+        if (!logo) return;
+        if (document.fonts && document.fonts.load) {
+            document.fonts.load('1em Pacifico').then(function() {
+                logo.classList.add('font-loaded');
+            }).catch(function() {
+                logo.classList.add('font-loaded');
+            });
+            setTimeout(function() { logo.classList.add('font-loaded'); }, 2500);
+        } else {
+            logo.classList.add('font-loaded');
+        }
+    })();
+    </script>
     <script src="chord-presets.js"></script>
     <script src="chordran-styles.js"></script>
     <script src="chordran.js"></script>
