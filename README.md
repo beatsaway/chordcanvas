@@ -1,5 +1,6 @@
 MIT License
-Chord Canvas Version 1.65 is an open source project under the MIT License. Do you like Chord Canvas? 🤗 Buy me a coffee ☕ so I can continue developing more music and art related projects! https://buymeacoffee.com/beatsaway
+
+Chord Canvas is an open source project under the MIT License. Do you like Chord Canvas? 🤗 Buy me a coffee ☕ so I can continue developing more music and art related projects! https://buymeacoffee.com/beatsaway
 
 My name is Beats Away, a music producer and sound designer. I started this project because I have always wanted to just type in any chords to generate customisable MIDI patterns or quality WAV audio without having to purchase a DAW or subscribe to a sound library.
 

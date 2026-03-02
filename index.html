@@ -30,9 +30,19 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
             color: var(--text);
-            background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 45%, var(--bg) 100%);
+            background: radial-gradient(ellipse 80% 70% at 50% 40%, #f0faf9 0%, #b8e0dd 50%, #5eb5b0 100%);
             font-size: 14px;
             line-height: 1.6;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, transparent 55%, rgba(15, 118, 110, 0.05) 85%, rgba(15, 118, 110, 0.12) 100%);
+            pointer-events: none;
+            z-index: 0;
         }
 
         a {
@@ -43,27 +53,9 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            position: relative;
+            z-index: 1;
         }
-
-        .topbar {
-            padding: 24px clamp(20px, 4vw, 48px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            text-align: center;
-        }
-
-        .brand {
-            font-family: "Pacifico", cursive;
-            font-size: 24px;
-            border: none;
-            background: transparent;
-            color: var(--text);
-            cursor: pointer;
-            letter-spacing: 0.2px;
-        }
-
 
         .text-link {
             color: var(--muted);
@@ -99,14 +91,16 @@
         }
 
         .hero {
+            margin-top: clamp(16px, 3vw, 28px);
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: clamp(24px, 5vw, 48px);
+            padding: clamp(10px, 2vw, 18px) clamp(20px, 4vw, 40px);
             box-shadow: var(--shadow);
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            align-items: center;
+            gap: 0;
         }
 
         .eyebrow {
@@ -120,6 +114,7 @@
         .hero h1 {
             font-size: clamp(28px, 4vw, 44px);
             line-height: 1.1;
+            text-align: center;
         }
 
         .hero p {
@@ -127,71 +122,102 @@
             font-size: 15px;
         }
 
-        .versions {
+        .versions-wrap {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 0;
+            align-items: center;
         }
 
-        .section-header {
+        .versions-brand {
             display: flex;
-            align-items: baseline;
-            justify-content: space-between;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .versions-brand .brand {
+            font-family: "Pacifico", cursive;
+            font-size: 22px;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            padding: 0;
+            transition: color 0.2s ease;
+        }
+
+        .versions-brand .brand:hover {
+            color: var(--accent);
+        }
+
+        .versions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             gap: 12px;
             flex-wrap: wrap;
         }
 
-        .section-header h2 {
-            font-size: 18px;
-        }
-
-
-        .version-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-        }
-
-        .version-card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px 16px;
-            text-decoration: none;
+        .version-picker {
             display: flex;
-            flex-direction: column;
-            gap: 6px;
-            transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            align-items: center;
+            gap: 4px;
         }
 
-        .version-card:hover {
-            border-color: rgba(15, 118, 110, 0.45);
-            transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
-        }
-
-        .version-card strong {
-            font-size: 16px;
-        }
-
-        .version-card span {
-            color: var(--muted);
+        .versions .version-label {
             font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
         }
 
-        @keyframes shrinkPulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(0.96);
-            }
+        .versions select {
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            font-size: 14px;
         }
 
-        .version-card.pulse {
-            animation: shrinkPulse 2.4s ease-in-out infinite;
+        .launch-btn {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
         }
 
+        .launch-btn:hover {
+            background: #0d5c56;
+            transform: translateY(-1px);
+        }
+
+        .version-desc {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+
+        .version-desc ul {
+            margin: 0;
+            padding-left: 1.2em;
+            list-style: disc;
+        }
+
+        .version-desc li {
+            margin-bottom: 2px;
+        }
+
+        .version-desc li:last-child {
+            margin-bottom: 0;
+        }
 
         #aboutModal {
             position: fixed;
@@ -211,17 +237,30 @@
         #aboutModal > div {
             background: var(--panel);
             border-radius: 16px;
-            padding: 20px;
-            max-width: 420px;
+            padding: 24px;
+            max-width: 440px;
             width: 100%;
             border: 1px solid var(--border);
             box-shadow: var(--shadow);
         }
 
-        #aboutModal > div > div:first-child {
+        #aboutModal .about-title {
             font-family: "Pacifico", cursive;
-            font-size: 22px;
-            margin-bottom: 8px;
+            font-size: 24px;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-bottom: 14px;
+        }
+
+        #aboutModal p {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            line-height: 1.55;
+            color: var(--text);
+        }
+
+        #aboutModal p:last-of-type {
+            margin-bottom: 0;
         }
 
         #aboutModal a {
@@ -230,100 +269,109 @@
             font-weight: 500;
         }
 
-        #aboutModal button {
-            margin-top: 12px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: #fff;
-            cursor: pointer;
-            font-weight: 600;
+        #aboutModal a:hover {
+            text-decoration: underline;
         }
 
-        @media (max-width: 640px) {
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
 
+        @media (max-width: 640px) {
+            .versions {
+                gap: 8px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="page">
-        <header class="topbar">
-            <button class="brand" id="titleLink" type="button">Chord Canvas</button>
-        </header>
         <main>
             <section class="hero">
                 <h1>Write chords. Hear them instantly.</h1>
                 <p></p>
             </section>
-            <section class="versions">
-                <div class="section-header">
-                    <h2>Versions</h2>
+            <section class="versions-wrap">
+                <div class="versions-brand">
+                    <button class="brand" id="titleLink" type="button">Chord Canvas</button>
                 </div>
-                <div class="version-grid">
-                    <a class="version-card pulse" href="v1_56/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.56</strong>
-                        <span>We can export WAV with synth sounds!</span>
-                    </a>                       
-                    <a class="version-card" href="v1_55/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.55</strong>
-                        <span>We can do multiple sequences!</span>
-                    </a>   
-                    <a class="version-card" href="v1_54/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.54</strong>
-                        <span>Stable update</span>
-                    </a>                    
-                    <a class="version-card" href="v1_53/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.53</strong>
-                        <span>We can export MIDI now!</span>
-                    </a>
-                    <a class="version-card" href="v1_51/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.51</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_5/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.5</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_4/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.4</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_3/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.3</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_2/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.2</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_1/index.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.1</strong>
-                        <span>Legacy build</span>
-                    </a>
-                    <a class="version-card" href="v1_0.html" target="_blank" rel="noopener noreferrer">
-                        <strong>V1.0</strong>
-                        <span>First release</span>
-                    </a>
+                <div class="versions">
+                    <span class="version-picker">
+                        <span class="version-label">Version</span>
+                        <select id="versionSelect"></select>
+                    </span>
+                    <button type="button" class="launch-btn" id="launchBtn">Launch</button>
                 </div>
+                <div class="version-desc" id="versionDesc"></div>
             </section>
         </main>
     </div>
     <div id="aboutModal" aria-hidden="true">
         <div>
-            <div>Chord Canvas</div>
-            <div>Developed by <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a></div>
-            <div>If you enjoy using this, you can <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">support its development.</a></div>
-            <button id="aboutClose" type="button">Close</button>
+            <div class="about-title">Chord Canvas</div>
+            <p><strong>Chord Canvas</strong> is an <a href="https://github.com/beatsaway/chordcanvas" target="_blank" rel="noopener noreferrer">open source project</a> under the MIT License. If you like it, <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">buy me a coffee</a> so I can keep developing music and art tools.</p>
+            <p>I'm <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>, a music producer and sound designer. I started this so you can type any chords and get customisable MIDI or WAV without a DAW or a sound-library subscription.</p>
+            <p>Special thanks to S. Christian Collins: his <a href="https://www.schristiancollins.com/generaluser" target="_blank" rel="noopener noreferrer">GeneralUser GS</a> soundfont (SF2) is converted to WAV and powers many of the instruments here.</p>
         </div>
     </div>
     <script>
+        const VERSIONS = [
+            { label: 'V1.66', path: 'v1_66/index.html', desc: ['Chord, Rhythm & Sound ideas with dice randomise', 'Non-diatonic key modal with solfege', 'Ideas panel'] },
+            { label: 'V1.65', path: 'v1_65/index.html', desc: ['Chord presets and refinements', 'Stable build before the Ideas panel'] },
+            { label: 'V1.64', path: 'v1_64/index.html', desc: ['Refinements to the UI and playback'] },
+            { label: 'V1.63', path: 'v1_63/index.html', desc: ['Tempo and grid behaviour improvements'] },
+            { label: 'V1.62', path: 'v1_62/index.html', desc: ['Instrument and mix options added'] },
+            { label: 'V1.61', path: 'v1_61/index.html', desc: ['Fixes for sequence and chord entry'] },
+            { label: 'V1.60', path: 'v1_60/index.html', desc: ['Export and file-handling fixes'] },
+            { label: 'V1.59', path: 'v1_59/index.html', desc: ['Keyboard and touch behaviour improvements'] },
+            { label: 'V1.58', path: 'v1_58/index.html', desc: ['Layout and styling refinements'] },
+            { label: 'V1.57', path: 'v1_57/index.html', desc: ['Sound and playback refinements following WAV export'] },
+            { label: 'V1.56', path: 'v1_56/index.html', desc: ['WAV export with synth sounds'] },
+            { label: 'V1.55', path: 'v1_55/index.html', desc: ['Multiple sequences in a single session'] },
+            { label: 'V1.54', path: 'v1_54/index.html', desc: ['Performance and stability improvements'] },
+            { label: 'V1.53', path: 'v1_53/index.html', desc: ['MIDI export added'] },
+            { label: 'V1.51', path: 'v1_51/index.html', desc: ['Legacy build'] },
+            { label: 'V1.5', path: 'v1_5/index.html', desc: ['Legacy build'] },
+            { label: 'V1.4', path: 'v1_4/index.html', desc: ['Legacy build'] },
+            { label: 'V1.3', path: 'v1_3/index.html', desc: ['Legacy build'] },
+            { label: 'V1.2', path: 'v1_2/index.html', desc: ['Legacy build'] },
+            { label: 'V1.1', path: 'v1_1/index.html', desc: ['Legacy build'] },
+            { label: 'V1.0', path: 'v1_0.html', desc: ['First release: type chords and hear them with built-in sounds'] }
+        ];
+
+        const versionSelect = document.getElementById('versionSelect');
+        const versionDesc = document.getElementById('versionDesc');
+        const launchBtn = document.getElementById('launchBtn');
+
+        function updateDesc() {
+            const path = versionSelect.value;
+            const v = VERSIONS.find(x => x.path === path);
+            versionDesc.innerHTML = '';
+            if (v && Array.isArray(v.desc) && v.desc.length) {
+                const ul = document.createElement('ul');
+                v.desc.forEach(point => {
+                    const li = document.createElement('li');
+                    li.textContent = point;
+                    ul.appendChild(li);
+                });
+                versionDesc.appendChild(ul);
+            }
+        }
+
+        VERSIONS.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.path;
+            opt.textContent = v.label.replace(/^V/, '');
+            versionSelect.appendChild(opt);
+        });
+
+        versionSelect.addEventListener('change', updateDesc);
+        updateDesc();
+
+        launchBtn.addEventListener('click', () => {
+            const path = versionSelect.value;
+            if (path) window.open(path, '_blank', 'noopener,noreferrer');
+        });
+
         const titleLink = document.getElementById('titleLink');
         const aboutModal = document.getElementById('aboutModal');
-        const aboutClose = document.getElementById('aboutClose');
 
         function openModal() {
             aboutModal.setAttribute('aria-hidden', 'false');
@@ -333,23 +381,8 @@
             aboutModal.setAttribute('aria-hidden', 'true');
         }
 
-        if (titleLink) {
-            titleLink.addEventListener('click', () => {
-                openModal();
-            });
-        }
-
-        if (aboutClose) {
-            aboutClose.addEventListener('click', closeModal);
-        }
-
-        if (aboutModal) {
-            aboutModal.addEventListener('click', (e) => {
-                if (e.target === aboutModal) {
-                    closeModal();
-                }
-            });
-        }
+        if (titleLink) titleLink.addEventListener('click', openModal);
+        if (aboutModal) aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) closeModal(); });
     </script>
 </body>
 </html>

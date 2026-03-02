@@ -115,10 +115,10 @@
             transition: opacity 0.2s ease;
         }
         h1.app-logo.font-loaded {
-            opacity: 1;
+            opacity: 0.33;
         }
         h1.app-logo.font-loaded:hover {
-            opacity: 0.33;
+            opacity: 1;
         }
         .tabs {
             display: flex;
@@ -308,7 +308,7 @@
         /* Info modal tab content: crossfade between panels */
         .info-modal-panels {
             position: relative;
-            min-height: 200px;
+            min-height: 320px;
         }
         [data-role="info-modal"] .info-modal-panels .modal-panel {
             position: absolute;
@@ -1654,23 +1654,25 @@
             </nav>
             <div class="info-modal-panels">
             <section class="modal-panel is-active" data-panel="about">
-                <p><strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65,</strong>
-                    developed by
-                    <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>
+                <p>
+                    
                 </p>
                 <p>
-                    Do you like Chord Canvas?
-                    <a class="modal-link" href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">🤗 Buy me a coffee ☕</a> so I can continue developing music and art related projects!
-                </p>
-                <p>
-                    This is an
+                    <strong><a class="modal-link" href="../index.html">Chord Canvas</a> Version 1.65</strong>
+                    is an
                     <a class="modal-link" href="https://github.com/beatsaway/chordcanvas" target="_blank" rel="noopener noreferrer">open source project</a>
-                    under the MIT License.
+                    under the MIT License. Do you like Chord Canvas?
+                    <a class="modal-link" href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">🤗 Buy me a coffee ☕</a>
+                    so I can continue developing more music and art related projects! </p><p>My name is
+                    <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>, a music producer and sound designer. 
+                    I started this project because I have always wanted to just type in any chords to generate customisable MIDI patterns or quality WAV audio without having to purchase a DAW or subscribe to a sound library.
                 </p>
+                
+                
                 <p>
-                    Credits: WAV instrument samples extracted from the
+                    Special thanks to S. Christian Collins. His
                     <a class="modal-link" href="https://www.schristiancollins.com/generaluser" target="_blank" rel="noopener noreferrer">GeneralUser GS</a>
-                    sf2 by S. Christian Collins.
+                    soundfont project (SF2) is converted into WAV files for providing many of the instruments here.
                 </p>
             </section>
             <section class="modal-panel" data-panel="audio">
@@ -1800,4 +1802,5 @@
     <script src="core.js" defer></script>
     <script src="app.js" defer></script>
 </body>
+</html>
 </html>
