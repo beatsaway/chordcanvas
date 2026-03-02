@@ -39,7 +39,26 @@
         html {
             min-height: 100%;
         }
-        /* Optional: very subtle edge softness (remove to get pure #fff) */
+        /* Background image: blur-up on load (like v1.65), random from chillbg */
+        .bg-img {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            z-index: 0;
+            opacity: 0;
+            filter: blur(24px);
+            transform: scale(1.05);
+            transition: opacity 1.4s ease, filter 2s cubic-bezier(0.25, 0.1, 0.25, 1), transform 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .bg-img.loaded {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
+        /* Optional: very subtle edge softness */
         body::before {
             content: '';
             position: fixed;
@@ -89,7 +108,7 @@
         }
         .main-content-fade {
             opacity: 0;
-            transition: opacity 0.45s ease-out;
+            transition: opacity 0.9s ease-out;
         }
         body.page-ready .main-content-fade {
             opacity: 1;
@@ -102,10 +121,11 @@
             cursor: pointer;
             touch-action: manipulation;
             color: #0f172a;
+            text-shadow: 0 1px 3px rgba(13, 148, 136, 0.35), 0 2px 8px rgba(13, 148, 136, 0.2);
             text-align: center;
             /* Hidden until Pacifico is loaded to avoid font flash (FOUT) */
             opacity: 0;
-            transition: opacity 0.2s ease, color 0.2s ease;
+            transition: opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
         }
         h1.app-logo.font-loaded {
             opacity: 1;
@@ -1361,7 +1381,21 @@
     </style>
 </head>
 <body>
+    <img class="bg-img" id="bg-img" src="" alt="" role="presentation">
     <div class="bg-reveal" id="bg-reveal" aria-hidden="true"></div>
+    <script>
+    (function() {
+        var n = 64;
+        var i = Math.floor(Math.random() * n) + 1;
+        var num = (i < 10 ? '00' : i < 100 ? '0' : '') + i;
+        var url = 'chillbg/bgchill_' + num + '.jpg';
+        var img = document.getElementById('bg-img');
+        if (img) {
+            img.onload = function() { img.classList.add('loaded'); };
+            img.src = url;
+        }
+    })();
+    </script>
     <main>
         <h1 class="app-logo" id="app-logo">Chord Canvas</h1>
 
@@ -2382,7 +2416,7 @@
             });
         }
 
-        // Page load: dark overlay fades out in 1.6s; content fades in
+        // Page load: dark overlay fades out in 1.6s; UI fades in after 2.2s
         document.addEventListener('DOMContentLoaded', function() {
             initIdeasPanel();
             initChordIdeasPane();
@@ -2390,9 +2424,9 @@
                 var bgReveal = document.getElementById('bg-reveal');
                 if (bgReveal) bgReveal.classList.add('revealed');
             });
-            requestAnimationFrame(function() {
+            setTimeout(function() {
                 document.body.classList.add('page-ready');
-            });
+            }, 2200);
         });
         // Logo: show after Pacifico font loads (avoid FOUT)
         var logo = document.getElementById('app-logo');
