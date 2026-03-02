@@ -12,11 +12,11 @@
     <script src="lib/jsmidgen.js"></script>
     <script src="chord-intervals-config.js"></script>
     <style>
-        /* White + teal theme — teal vignette */
+        /* Plain white background */
         :root {
-            --bg-center:     #f0faf9;
-            --bg-mid:        #b8e0dd;
-            --bg-edge:       #5eb5b0;
+            --bg-center:     #ffffff;
+            --bg-mid:        #ffffff;
+            --bg-edge:       #ffffff;
             --surface:       #fafafa;
             --surface-text:  #2c2c2c;
             --surface-muted: #737373;
@@ -39,12 +39,12 @@
         html {
             min-height: 100%;
         }
-        /* Vignette overlay: soft teal tint at edges */
+        /* Optional: very subtle edge softness (remove to get pure #fff) */
         body::before {
             content: '';
             position: fixed;
             inset: 0;
-            background: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, transparent 55%, rgba(15, 118, 110, 0.05) 85%, rgba(15, 118, 110, 0.12) 100%);
+            background: radial-gradient(ellipse 75% 65% at 50% 45%, transparent 0%, transparent 70%, rgba(0, 0, 0, 0.02) 100%);
             pointer-events: none;
             z-index: 0;
         }
@@ -112,6 +112,7 @@
         }
         h1.app-logo.font-loaded:hover {
             color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.25);
         }
         .tabs {
             display: flex;
@@ -1249,10 +1250,9 @@
             padding-bottom: max(8px, env(safe-area-inset-bottom));
             background: transparent;
             border: none;
-            color: #fff;
+            color: var(--accent);
             font-size: 12px;
             cursor: pointer;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
             display: none;
         }
         #ideasPanelReopen.is-visible {
@@ -1871,7 +1871,7 @@
                     
                 </p>
                 <p>
-                    <strong><a class="modal-link" href="../index.html">Chord Canvas</a> (Version 1.66)</strong>
+                    <strong><a class="modal-link" href="../index.html">Chord Canvas</a></strong>
                     is an
                     <a class="modal-link" href="https://github.com/beatsaway/chordcanvas" target="_blank" rel="noopener noreferrer">open source project</a>
                     under the MIT License. Do you like Chord Canvas?

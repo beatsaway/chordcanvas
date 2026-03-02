@@ -30,7 +30,7 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
             color: var(--text);
-            background: radial-gradient(ellipse 80% 70% at 50% 40%, #f0faf9 0%, #b8e0dd 50%, #5eb5b0 100%);
+            background: #ffffff;
             font-size: 14px;
             line-height: 1.6;
             position: relative;
@@ -40,7 +40,7 @@
             content: '';
             position: fixed;
             inset: 0;
-            background: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, transparent 55%, rgba(15, 118, 110, 0.05) 85%, rgba(15, 118, 110, 0.12) 100%);
+            background: radial-gradient(ellipse 75% 65% at 50% 45%, transparent 0%, transparent 70%, rgba(0, 0, 0, 0.02) 100%);
             pointer-events: none;
             z-index: 0;
         }
@@ -222,6 +222,7 @@
         #aboutModal {
             position: fixed;
             inset: 0;
+            z-index: 100;
             background: rgba(15, 23, 42, 0.45);
             display: none;
             align-items: center;
