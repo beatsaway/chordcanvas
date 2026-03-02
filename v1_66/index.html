@@ -101,18 +101,17 @@
             font-family: "Pacifico", cursive;
             cursor: pointer;
             touch-action: manipulation;
-            color: #fff;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.35);
+            color: #0f172a;
             text-align: center;
             /* Hidden until Pacifico is loaded to avoid font flash (FOUT) */
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.2s ease, color 0.2s ease;
         }
         h1.app-logo.font-loaded {
-            opacity: 0.33;
+            opacity: 1;
         }
         h1.app-logo.font-loaded:hover {
-            opacity: 1;
+            color: #fff;
         }
         .tabs {
             display: flex;
