@@ -1,0 +1,2458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
+    <script src="capacitor://localhost/capacitor.js"></script>
+    <script src="lib/jsmidgen.js"></script>
+    <script src="chord-intervals-config.js"></script>
+    <style>
+        /* White + teal theme — sky blue vignette (stronger falloff at edges) */
+        :root {
+            --bg-center:     #f2f8fc;
+            --bg-mid:        #c8dceb;
+            --bg-edge:       #7aa8c4;
+            --surface:       #fafafa;
+            --surface-text:  #2c2c2c;
+            --surface-muted: #737373;
+            --accent:        #0d9488;
+            --accent-hover:  #0f766e;
+            --accent-subtle: rgba(13, 148, 136, 0.12);
+            --control-bg:    #fff;
+            --control-border: rgba(0, 0, 0, 0.12);
+            --control-hover: rgba(0, 0, 0, 0.06);
+            --control-hover-solid: #e0e2e0;
+            --card-bg:       #ffffff;
+            --card-border:   rgba(0, 0, 0, 0.1);
+            --hairline:      rgba(0, 0, 0, 0.06);
+            /* Reusable popup transition (backdrop + card scale/fade) */
+            --popup-backdrop-duration: 0.32s;
+            --popup-card-duration: 0.4s;
+            --popup-card-ease: cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        * { box-sizing: border-box; }
+        html {
+            min-height: 100%;
+        }
+        /* Dim-to-bright overlay: dark on load, fades to reveal bg over ~3.5s */
+        .bg-reveal {
+            position: fixed;
+            inset: 0;
+            background: #0f1416;
+            z-index: 1;
+            opacity: 1;
+            transition: opacity 3.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+            pointer-events: none;
+        }
+        .bg-reveal.revealed {
+            opacity: 0;
+        }
+        /* Background image: blur-up on load (blurred when first shown, then sharpens) */
+        .bg-img {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            z-index: 0;
+            opacity: 0;
+            filter: blur(24px);
+            transform: scale(1.05);
+            transition: opacity 1.4s ease, filter 2s cubic-bezier(0.25, 0.1, 0.25, 1), transform 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .bg-img.loaded {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
+        /* Extra bottom space when ideas panel is open so content stays above it */
+        body.ideas-panel-open main {
+            padding-bottom: 280px;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 16px;
+            padding-top: calc(16px + env(safe-area-inset-top));
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--surface-text);
+            /* Fallback: sky blue vignette (used if JS doesn't set a random image) */
+            background: radial-gradient(ellipse 90% 80% at 50% 45%, var(--bg-center) 0%, var(--bg-mid) 32%, var(--bg-edge) 100%);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            font-size: 16px;
+            line-height: 1.45;
+        }
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+        .main-content-fade {
+            opacity: 0;
+            transition: opacity 2.5s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        body.page-ready .main-content-fade {
+            opacity: 1;
+        }
+        h1.app-logo {
+            margin: 0 0 14px 0;
+            font-size: 36px;
+            font-weight: 400;
+            font-family: "Pacifico", cursive;
+            cursor: pointer;
+            touch-action: manipulation;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.35);
+            text-align: center;
+            /* Hidden until Pacifico is loaded to avoid font flash (FOUT) */
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        h1.app-logo.font-loaded {
+            opacity: 0.33;
+        }
+        h1.app-logo.font-loaded:hover {
+            opacity: 1;
+        }
+        .tabs {
+            display: flex;
+            gap: 0;
+            flex-wrap: wrap;
+            margin-bottom: 0;
+            border-bottom: 0;
+        }
+        .tabs button {
+            background: var(--control-bg);
+            color: var(--surface-muted);
+            border: 1px solid var(--hairline);
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            font-size: 11px;
+            padding: 5px 7px;
+            opacity: 0.66;
+            transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease, opacity 0.22s ease;
+        }
+        .tabs button:hover:not(.active) {
+            background: var(--control-hover-solid);
+            color: var(--surface-text);
+            border-color: var(--hairline);
+            opacity: 1;
+        }
+        .tabs button.active {
+            background: var(--surface);
+            color: var(--accent);
+            border-color: var(--control-border);
+            margin-bottom: -1px;
+            border-bottom: 1px solid var(--surface);
+            opacity: 1;
+        }
+        section {
+            border: 1px solid var(--control-border);
+            border-radius: 0 8px 8px 8px;
+            padding: 4px 12px;
+            margin-bottom: 12px;
+            background-color: var(--card-bg);
+            transition: border-radius 0.28s ease, box-shadow 0.28s ease;
+        }
+
+        .panel-group.is-active section {
+            border-color: var(--control-border);
+            border-style: solid;
+        }
+
+        .panel-group {
+            transition: opacity 0.28s ease, transform 0.28s ease;
+        }
+        .panel-group:not(.is-active) {
+            opacity: 0.33;
+            transform: scale(0.98);
+        }
+        .panel-group.is-active {
+            transform: scale(1);
+        }
+
+        /* Inactive panel: show only chord preview (no textarea, no other tabs), rounded and dimmed */
+        .panel-group:not(.is-active) .tabs {
+            display: none !important;
+        }
+        .panel-group:not(.is-active) [data-role="chordInput"] {
+            display: none !important;
+        }
+        .panel-group:not(.is-active) section:not(.panel-sequence-section) {
+            display: none !important;
+        }
+        .panel-group:not(.is-active) section.panel-sequence-section {
+            display: block !important;
+            border-radius: 8px;
+        }
+        section[hidden] {
+            display: none;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .play-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .play-loop {
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
+            font: inherit;
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 4px;
+            width: auto;
+            min-width: 0;
+            font-size: 12px;
+        }
+        .play-loop option {
+            background: var(--card-bg);
+            color: var(--surface-text);
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal[hidden] {
+            display: none !important;
+        }
+        .modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+        }
+        .modal-card {
+            position: relative;
+            z-index: 1;
+            width: min(520px, 100%);
+            border-radius: 10px;
+            padding: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        /* Info modal (About / Audio / Play / Help): premium open/close transition */
+        [data-role="info-modal"] .modal-backdrop {
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        [data-role="info-modal"].info-modal-visible .modal-backdrop {
+            opacity: 1;
+        }
+        [data-role="info-modal"] .modal-card {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        [data-role="info-modal"].info-modal-visible .modal-card {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .modal-tabs {
+            display: flex;
+            gap: 0;
+            margin: 0;
+            background: var(--surface);
+            border-bottom: 1px solid var(--control-border);
+            border-radius: 10px 10px 0 0;
+        }
+        .modal-tabs button {
+            background: var(--control-bg);
+            color: var(--surface-muted);
+            border: none;
+            border-radius: 6px 6px 0 0;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .modal-tabs button:hover:not(.active) {
+            background: var(--control-hover-solid);
+            color: var(--surface-text);
+        }
+        .modal-tabs button {
+            transition: background 0.22s ease, color 0.22s ease;
+        }
+        .modal-tabs button.active {
+            background: var(--accent-subtle);
+            color: var(--accent);
+        }
+        .modal-panel {
+            font-size: 15px;
+            border: none;
+            border-radius: 0 0 10px 10px;
+            padding: 14px;
+            margin: 0;
+            background: var(--card-bg);
+        }
+        .modal-panel:not([hidden]) {
+            border-style: none;
+        }
+        /* Info modal tab content: crossfade between panels */
+        .info-modal-panels {
+            position: relative;
+            min-height: 320px;
+        }
+        [data-role="info-modal"] .info-modal-panels .modal-panel {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            overflow: auto;
+        }
+        [data-role="info-modal"] .info-modal-panels .modal-panel.is-active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-panel p {
+            margin: 0 0 14px;
+            color: var(--surface-muted);
+        }
+        .modal-link {
+            display: inline-block;
+            text-decoration: none;
+            color: var(--accent);
+        }
+        .modal-link:hover { color: var(--accent-hover); }
+        #helpModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 16px;
+            z-index: 30;
+        }
+        #helpModal[aria-hidden="false"] {
+            display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #helpModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #helpModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #helpModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        #helpModal > div {
+            background: var(--card-bg);
+            border-radius: 12px 12px 6px 6px;
+            padding: 18px;
+            max-width: 520px;
+            width: 100%;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        #helpModal p {
+            margin: 0 0 14px;
+            font-size: 15px;
+            color: var(--surface-text);
+        }
+        #helpModal a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        #helpModal .help-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+        #helpModal .help-controls button {
+            padding: 6px 11px;
+            font-size: 13px;
+        }
+        #contactModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 16px;
+            z-index: 30;
+        }
+        #contactModal[aria-hidden="false"] {
+            display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #contactModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #contactModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #contactModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        #contactModal > div {
+            background: var(--card-bg);
+            border-radius: 12px 12px 6px 6px;
+            padding: 16px;
+            max-width: 560px;
+            width: 100%;
+            border: 1px solid var(--card-border);
+            font-size: 15px;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        #contactModal {
+            color: var(--surface-muted);
+        }
+        #contactModal a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        #presetsModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 30;
+        }
+        #presetsModal[aria-hidden="false"] {
+            display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #presetsModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #presetsModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #presetsModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        #presetsModal > div {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 12px;
+            max-width: 520px;
+            width: 100%;
+            border: 1px solid var(--card-border);
+            max-height: 70vh;
+            overflow: auto;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        #presetsModal h2 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            color: var(--surface-text);
+        }
+        #presetsModal .help-controls {
+            margin-top: 8px;
+        }
+        #chordTypesModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 30;
+        }
+        #chordTypesModal[aria-hidden="false"] {
+            display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        #chordTypesModal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        #chordTypesModal[aria-hidden="false"] > div {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        #chordTypesModal[aria-hidden="false"].popup-visible > div {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        #chordTypesModal > div {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 12px 14px;
+            max-width: 480px;
+            width: 100%;
+            max-height: 80vh;
+            overflow: auto;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        #chordTypesModal h2 {
+            margin: 0 0 8px;
+            font-size: 16px;
+            color: var(--surface-text);
+        }
+        #chordTypesModal p.chord-types-desc {
+            font-size: 12px;
+            color: var(--surface-muted);
+            margin: 0 0 10px;
+            line-height: 1.35;
+        }
+        #chordTypesList {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 14px;
+            font-size: 11px;
+            color: var(--surface-text);
+        }
+        #chordTypesList .chord-type-item {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            min-width: 0;
+        }
+        #chordTypesList .chord-type-name {
+            color: var(--surface-muted);
+            flex-shrink: 0;
+        }
+        #chordTypesList .chord-type-example {
+            font-family: ui-monospace, monospace;
+            color: var(--surface-text);
+            flex-shrink: 0;
+        }
+        #chordTypesModal .help-controls {
+            margin-top: 10px;
+        }
+        #chordTypesModal .help-controls button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .add-chord-card {
+            max-width: 360px;
+        }
+        .add-chord-step {
+            margin-bottom: 14px;
+        }
+        .add-chord-step:last-child {
+            margin-bottom: 0;
+        }
+        .add-chord-step-hint {
+            font-size: 12px;
+            color: var(--surface-muted);
+            margin: 0 0 8px;
+            line-height: 1.35;
+        }
+        .add-chord-root-btn.selected,
+        .add-chord-type-list .add-chord-type-btn.selected {
+            background: var(--accent-subtle);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .add-chord-confirm-btn {
+            margin-top: 12px;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .add-chord-root-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .add-chord-root-btn {
+            min-width: 36px;
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+        .add-chord-spelling-row {
+            margin-bottom: 10px;
+        }
+        .add-chord-spelling-label {
+            font-size: 12px;
+            color: var(--surface-muted);
+            margin-right: 8px;
+        }
+        .add-chord-spelling-select {
+            padding: 5px 8px;
+            font-size: 12px;
+            background: var(--control-bg);
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            color: var(--surface-text);
+        }
+        .add-chord-type-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .add-chord-type-list.add-chord-preview-items .add-chord-type-btn {
+            border-radius: 999px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .add-chord-type-list.add-chord-preview-items .add-chord-type-btn:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .add-chord-type-btn {
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+        .add-chord-preview-name {
+            font-size: 18px;
+            font-family: ui-monospace, monospace;
+            color: var(--surface-text);
+            margin: 0 0 12px;
+        }
+        .add-chord-selected-name {
+            font-size: 16px;
+            font-family: ui-monospace, monospace;
+            color: var(--surface-text);
+            margin: 0 0 10px;
+        }
+        .add-chord-preview-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .preset-list {
+            display: grid;
+            gap: 6px;
+        }
+        .preset-item {
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 8px;
+            display: grid;
+            gap: 4px;
+            background: var(--surface);
+        }
+        .preset-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .preset-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--surface-text);
+        }
+        .preset-tag {
+            font-size: 12px;
+            color: var(--surface-muted);
+        }
+        .preset-chords {
+            font-size: 14px;
+            color: var(--surface-text);
+        }
+        .notes-info {
+            font-size: 11px;
+            color: var(--surface-muted);
+            margin-top: 6px;
+        }
+        .preset-use {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        @media (min-width: 700px) {
+            .preset-list {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        .tour-highlight {
+            position: relative;
+            z-index: 3;
+            outline: 2px solid var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-subtle);
+            border-radius: 6px;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 9px;
+            color: var(--surface-muted);
+        }
+        textarea {
+            width: 100%;
+            min-height: 56px;
+            border: none;
+            padding: 6px;
+            font-size: 15px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            resize: vertical;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border-radius: 6px;
+        }
+        textarea:focus {
+            outline: none;
+        }
+        .bpm-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .bpm-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .bpm-controls input {
+            width: 4ch;
+            min-width: 0;
+        }
+        .bpm-step-btn {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            font-size: 18px;
+            line-height: 1;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-muted);
+            cursor: pointer;
+        }
+        .bpm-step-btn:hover {
+            background: var(--control-hover-solid);
+            color: var(--accent);
+        }
+        section > div {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        
+        button {
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
+            padding: 6px 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        button:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--control-border);
+            color: var(--surface-text);
+        }
+        input[type="number"] {
+            width: 90px;
+            padding: 6px;
+            font-size: 13px;
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+        }
+        select {
+            padding: 5px 8px;
+            font-size: 13px;
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            line-height: 1.3;
+        }
+        select:hover, select:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+        #chordPreview {
+            margin-top: 8px;
+            padding: 4px;
+            min-height: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+        .chord-preview-item {
+            padding: 3px 8px;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--surface-text);
+            cursor: pointer;
+        }
+        .chord-preview-item.playing {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-subtle);
+        }
+        .chord-preview-item.caret-chord {
+            color: #c026d3;
+        }
+        .chord-preview-empty {
+            font-size: 12px;
+            color: var(--surface-muted);
+        }
+        .random-by-key-preview {
+            margin-top: 8px;
+            padding: 8px 0;
+            min-height: 44px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .random-by-key-preview:empty::before {
+            content: 'Generate to see chords here';
+            font-size: 12px;
+            color: var(--surface-muted);
+        }
+        .random-by-key-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .random-by-key-row .random-by-key-label {
+            font-size: 12px;
+            color: var(--surface-muted);
+            flex-shrink: 0;
+        }
+        .random-by-key-row .play-options-select {
+            min-width: 0;
+            width: auto;
+        }
+        .random-by-key-intro {
+            font-size: 12px;
+            color: var(--surface-muted);
+            line-height: 1.35;
+            margin: 0;
+        }
+        #randomByKeyPlayBtn {
+            text-align: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .synth-controls {
+            display: grid;
+            gap: 10px;
+        }
+        .control-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .control-pair {
+            display: flex;
+            flex-direction: row;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .synth-block {
+            border: 0;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 8px;
+        }
+        .synth-block h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--surface-text);
+        }
+        .synth-info-btn {
+            min-width: 32px;
+            padding: 4px 8px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 6px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
+        }
+        .synth-info-btn:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .play-label-inline {
+            font-size: 13px;
+            color: var(--surface-text);
+        }
+        .play-options-trigger {
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 6px;
+        }
+        .options-desc {
+            font-size: 14px;
+            color: var(--surface-muted);
+        }
+        .play-options-select {
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
+            min-width: 0;
+        }
+        .options-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.28);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 30;
+        }
+        .options-modal[aria-hidden="false"] {
+            display: flex;
+            opacity: 0;
+            transition: opacity var(--popup-backdrop-duration) ease;
+        }
+        .options-modal[aria-hidden="false"].popup-visible {
+            opacity: 1;
+        }
+        .options-modal[aria-hidden="false"] .options-card,
+        .options-modal[aria-hidden="false"] .synth-info-card,
+        .options-modal[aria-hidden="false"] .treble-notes-card {
+            opacity: 0;
+            transform: scale(0.96) translateY(16px);
+            transition: transform var(--popup-card-duration) var(--popup-card-ease), opacity 0.35s ease;
+        }
+        .options-modal[aria-hidden="false"].popup-visible .options-card,
+        .options-modal[aria-hidden="false"].popup-visible .synth-info-card,
+        .options-modal[aria-hidden="false"].popup-visible .treble-notes-card {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .options-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 14px;
+            width: min(360px, 100%);
+            border: 1px solid var(--card-border);
+            display: grid;
+            gap: 10px;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+        .options-card h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--surface-text);
+        }
+        .options-actions {
+            display: grid;
+            gap: 8px;
+        }
+        .chord-item-options-card {
+            gap: 0;
+            padding-top: 10px;
+        }
+        .chord-item-tabs {
+            display: flex;
+            gap: 0;
+            margin: 0 0 4px 0;
+            border-bottom: 1px solid var(--control-border);
+        }
+        .chord-item-tab {
+            padding: 8px 12px;
+            font-size: 13px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            color: var(--surface-muted);
+            cursor: pointer;
+        }
+        .chord-item-tab:hover { color: var(--surface-text); }
+        .chord-item-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .chord-item-panel { display: none; }
+        .chord-item-panel.is-active { display: block; }
+        #chordItemPanelType {
+            padding-top: 0;
+        }
+        #chordItemPanelType .options-actions {
+            margin-top: 14px;
+        }
+        .chord-item-replace-btn {
+            color: #c026d3;
+            border-color: #c026d3;
+        }
+        .chord-item-replace-btn:hover {
+            background: rgba(192, 38, 211, 0.1);
+            color: #c026d3;
+            border-color: #c026d3;
+        }
+        .synth-info-card {
+            width: min(380px, 100%);
+        }
+        .synth-info-title {
+            margin: 0 0 8px 0;
+            color: var(--surface-text);
+        }
+        .synth-info-text {
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            white-space: pre-wrap;
+            margin: 0 0 12px 0;
+            padding: 10px 12px;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--surface-text);
+            max-height: 40vh;
+            overflow: auto;
+        }
+        .options-cancel {
+            background: var(--surface);
+            color: var(--surface-muted);
+            border: 1px solid var(--control-border);
+        }
+        .options-cancel:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .treble-notes-card {
+            width: min(420px, 100%);
+        }
+        .treble-notes-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-height: 36px;
+            padding: 8px 0;
+        }
+        .treble-note-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px;
+            background: var(--surface);
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--surface-text);
+        }
+        .treble-note-pill button {
+            background: var(--control-bg);
+            border: 0;
+            color: var(--surface-muted);
+            cursor: pointer;
+            padding: 0 2px;
+            font-size: 12px;
+            line-height: 1;
+            border-radius: 3px;
+        }
+        .treble-note-pill button:hover {
+            background: var(--control-hover-solid);
+            color: var(--accent);
+        }
+        .treble-notes-add-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .treble-add-note-btn {
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .treble-add-note-btn:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .treble-notes-input {
+            flex: 1;
+            min-width: 100px;
+            padding: 5px 8px;
+            font-size: 12px;
+            border: 1px solid var(--control-border);
+            border-radius: 6px;
+            background: var(--control-bg);
+            color: var(--surface-text);
+        }
+        .treble-recommendations {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 0;
+        }
+        .treble-recommendations button {
+            background: var(--control-bg);
+            color: var(--surface-text);
+            border: 1px solid var(--control-border);
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .treble-recommendations button:hover {
+            background: var(--control-hover-solid);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .treble-notes-error {
+            font-size: 13px;
+            color: #b91c1c;
+            margin-top: 4px;
+        }
+        .chord-add-btn {
+            background: var(--accent-subtle);
+            color: var(--accent);
+            border: 1px solid rgba(13, 148, 136, 0.25);
+            border-radius: 6px;
+            padding: 6px 11px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .chord-add-btn:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+        .panel-group:not(.is-active) .chord-add-btn {
+            background: var(--surface);
+            color: var(--surface-muted);
+            border-color: var(--control-border);
+        }
+        .panel-group:not(.is-active) .chord-add-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        input[type="range"] {
+            accent-color: var(--accent);
+        }
+
+        /* Ideas panel: full-width bottom panel, shown when a textarea is focused */
+        #ideasPanel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 20;
+            background: var(--card-bg);
+            border-top: 1px solid var(--control-border);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+            padding-bottom: env(safe-area-inset-bottom);
+            transform: translateY(100%);
+            visibility: hidden;
+            transition: transform 0.55s var(--popup-card-ease), visibility 0.55s;
+        }
+        #ideasPanel.is-visible {
+            transform: translateY(0);
+            visibility: visible;
+        }
+        #ideasPanel .ideas-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            border-bottom: 1px solid var(--hairline);
+            padding: 4px 12px 0;
+            padding-left: max(12px, env(safe-area-inset-left));
+            padding-right: max(12px, env(safe-area-inset-right));
+        }
+        #ideasPanel .ideas-panel-tabs {
+            display: flex;
+            gap: 0;
+        }
+        #ideasPanel .ideas-panel-tabs button {
+            border: none;
+            border-radius: 6px 6px 0 0;
+            padding: 5px 10px;
+            font-size: 12px;
+            background: var(--control-bg);
+            color: var(--surface-muted);
+            cursor: pointer;
+            transition: background 0.22s ease, color 0.22s ease;
+        }
+        #ideasPanel .ideas-panel-tabs button:hover:not(.active) {
+            background: var(--control-hover-solid);
+            color: var(--surface-text);
+        }
+        #ideasPanel .ideas-panel-tabs button.active {
+            background: var(--accent-subtle);
+            color: var(--accent);
+        }
+        #ideasPanel .ideas-panel-fold {
+            flex-shrink: 0;
+            padding: 4px 6px;
+            font-size: 12px;
+            color: var(--surface-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+        #ideasPanel .ideas-panel-fold:hover {
+            color: var(--accent);
+        }
+        #ideasPanelReopen {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            z-index: 20;
+            padding: 8px 14px;
+            padding-right: max(14px, env(safe-area-inset-right));
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            display: none;
+        }
+        #ideasPanelReopen.is-visible {
+            display: block;
+        }
+        #ideasPanel .ideas-panel-content {
+            min-height: 120px;
+            padding: 16px;
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+        #ideasPanel .ideas-panel-pane {
+            display: none;
+        }
+        #ideasPanel .ideas-panel-pane.is-active {
+            display: block;
+        }
+        .ideas-chord-key-and-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .ideas-chord-key-and-actions label {
+            font-size: 12px;
+        }
+        .ideas-chord-key-and-actions select {
+            padding: 3px 6px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: var(--surface-text);
+        }
+        .ideas-chord-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+        }
+        #ideasPanel .ideas-chord-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        #ideasPanel .ideas-chord-btn,
+        #ideasPanel .ideas-non-diatonic-next .ideas-non-diatonic-chords button {
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--control-border);
+            color: var(--surface-text);
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        #ideasPanel .ideas-chord-btn {
+            background: var(--surface);
+        }
+        #ideasPanel .ideas-non-diatonic-next .ideas-non-diatonic-chords button {
+            background: var(--control-hover-solid);
+        }
+        #ideasPanel .ideas-chord-btn:hover,
+        #ideasPanel .ideas-non-diatonic-next .ideas-non-diatonic-chords button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        #ideasPanel .ideas-chord-btn.selected,
+        #ideasPanel .ideas-non-diatonic-next .ideas-non-diatonic-chords button.selected {
+            background: var(--accent-subtle);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .ideas-non-diatonic-next {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        .ideas-non-diatonic-next .ideas-non-diatonic-chords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        .ideas-chord-actions {
+            display: none;
+            gap: 6px;
+        }
+        .ideas-chord-actions.is-visible {
+            display: flex;
+        }
+        .ideas-chord-actions .ideas-action-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+            border: 1px solid var(--control-border);
+            background: var(--control-bg);
+            color: #c026d3;
+            cursor: pointer;
+        }
+        .ideas-chord-actions .ideas-action-btn:hover {
+            background: var(--control-hover-solid);
+            border-color: #c026d3;
+            color: #c026d3;
+        }
+    </style>
+</head>
+<body>
+    <img class="bg-img" id="bg-img" src="" alt="" role="presentation">
+    <div class="bg-reveal" id="bg-reveal" aria-hidden="true"></div>
+    <script>
+    (function() {
+        var n = 222;
+        var i = Math.floor(Math.random() * n) + 1;
+        var num = (i < 10 ? '00' : i < 100 ? '0' : '') + i;
+        var url = 'chillbg/bgchill_' + num + '.jpg';
+        var img = document.getElementById('bg-img');
+        if (img) {
+            img.onload = function() { img.classList.add('loaded'); };
+            img.src = url;
+        }
+    })();
+    </script>
+    <main>
+        <h1 class="app-logo" id="app-logo">Chord Canvas</h1>
+
+        <div class="main-content-fade">
+        <div id="panelGroup" class="panel-group">
+            <nav class="tabs">
+                <button type="button" data-panel="panel-sequence" class="active">Sequence</button>
+                <button type="button" data-panel="panel-rhythm">Rhythms</button>
+                <button type="button" data-panel="panel-pattern">Notes</button>
+                <button type="button" data-panel="panel-humanmod">Human</button>
+                <button type="button" data-panel="panel-synth">Sound</button>
+            </nav>
+
+            <section id="panel-sequence" class="panel-sequence-section">
+                <textarea id="chordInput" data-role="chordInput" placeholder="e.g. C, Dm, G7, Am"></textarea>
+                <div id="chordPreview" data-role="chordPreview"></div>
+                <div id="currentHighNotes" class="notes-info" data-role="currentHighNotes"></div>
+            </section>
+
+            <section id="panel-rhythm" hidden>
+                <div>    
+                    <label for="bassRhythmSelect">Bass</label>
+                    <select id="bassRhythmSelect" data-role="bassRhythmSelect"></select>
+                    <label for="highRhythmSelect">Treble </label>
+                    <select id="highRhythmSelect" data-role="highRhythmSelect"></select>
+                </div>
+                <div class="bpm-row">
+                    <label for="bpmInput">BPM</label>
+                    <div class="bpm-controls">
+                        <button type="button" class="bpm-step-btn" data-role="bpmDownBtn" title="Decrease BPM" aria-label="Decrease BPM">−</button>
+                        <input id="bpmInput" data-role="bpmInput" type="number" min="33" max="888" value="120">
+                        <button type="button" class="bpm-step-btn" data-role="bpmUpBtn" title="Increase BPM" aria-label="Increase BPM">+</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="panel-pattern" hidden>
+                <div>
+                    <label for="patternSelect">Pattern</label>
+                    <select id="patternSelect" data-role="patternSelect">
+                        <option value="normal" selected>normal</option>
+                        <option value="ascend">ascend</option>
+                        <option value="descend">descend</option>
+                        <option value="ascend2">ascend2</option>
+                        <option value="descend2">descend2</option>
+                    </select>
+
+                    <select id="doubleHighNotes" data-role="doubleHighNotes">
+                        <option value="1" selected>1 Octave</option>
+                        <option value="2">Double</option>
+                    </select>
+                
+                </div>
+                
+                
+                <div>
+                    <label for="skipSelect">Skip every</label>
+                    <select id="skipSelect" data-role="skipSelect">
+                        <option value="0" selected>none</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">5th</option>
+                        <option value="6">6th</option>
+                        <option value="7">7th</option>
+                        <option value="8">8th</option>
+                    </select>
+                    <select id="skipSelect2" data-role="skipSelect2">
+                        <option value="0" selected>none</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">5th</option>
+                        <option value="6">6th</option>
+                        <option value="7">7th</option>
+                        <option value="8">8th</option>
+                    </select>
+                    <select id="skipSelect3" data-role="skipSelect3">
+                        <option value="0" selected>none</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">5th</option>
+                        <option value="6">6th</option>
+                        <option value="7">7th</option>
+                        <option value="8">8th</option>
+                    </select>
+                </div>
+            </section>
+
+            <section id="panel-humanmod" hidden>
+                <div>
+                    <label for="delayModSelect">Play like a</label>
+                    <select id="delayModSelect" data-role="delayModSelect">
+                        <option value="none">metronome</option>
+                        <option value="human">human</option>
+                        <option value="drunk" selected>drunk</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="bassVolumeModSelect" class="every-bar-label" data-every-bar="humanBass" title="Click to set intensity">Bass every bar</label>
+                    <select id="bassVolumeModSelect" data-role="bassVolumeModSelect">
+                        <option value="none">none</option>
+                        <option value="uphill" selected>uphill</option>
+                        <option value="downhill">downhill</option>
+                        <option value="valley">valley</option>
+                        <option value="hill">hill</option>
+                        <option value="2valley">2valley</option>
+                        <option value="3valley">3valley</option>
+                        <option value="4valley">4valley</option>
+                        <option value="5valley">5valley</option>
+                        <option value="6valley">6valley</option>
+                        <option value="7valley">7valley</option>
+                        <option value="8valley">8valley</option>
+                        <option value="2hill">2hill</option>
+                        <option value="3hill">3hill</option>
+                        <option value="4hill">4hill</option>
+                        <option value="5hill">5hill</option>
+                        <option value="6hill">6hill</option>
+                        <option value="7hill">7hill</option>
+                        <option value="8hill">8hill</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="trebleVolumeModSelect" class="every-bar-label" data-every-bar="humanTreble" title="Click to set intensity">Treble every bar</label>
+                    <select id="trebleVolumeModSelect" data-role="trebleVolumeModSelect">
+                        <option value="none">none</option>
+                        <option value="uphill" selected>uphill</option>
+                        <option value="downhill">downhill</option>
+                        <option value="valley">valley</option>
+                        <option value="hill">hill</option>
+                        <option value="2valley">2valley</option>
+                        <option value="3valley">3valley</option>
+                        <option value="4valley">4valley</option>
+                        <option value="5valley">5valley</option>
+                        <option value="6valley">6valley</option>
+                        <option value="7valley">7valley</option>
+                        <option value="8valley">8valley</option>
+                        <option value="2hill">2hill</option>
+                        <option value="3hill">3hill</option>
+                        <option value="4hill">4hill</option>
+                        <option value="5hill">5hill</option>
+                        <option value="6hill">6hill</option>
+                        <option value="7hill">7hill</option>
+                        <option value="8hill">8hill</option>
+                    </select>
+                </div>
+            </section>
+
+            <section id="panel-synth" hidden>
+                <div class="synth-controls">
+                    <div class="synth-block">
+                        <div class="control-row">
+                            
+                            <div class="control-pair">
+                                <label for="synthBassPreset">Bass</label>
+                                <select id="synthBassPreset" data-role="synthBassPreset">
+                                    <option value="warmPad">Warm Pad</option>
+                                    <option value="brightLead">Bright Lead</option>
+                                    <option value="softPiano">Soft Piano</option>
+                                    <option value="piano">Piano</option>
+                                    <option value="guitar">Guitar</option>
+                                    <option value="epiano">E. Piano</option>
+                                    <option value="bell">Bell</option>
+                                    <option value="string">Strings</option>
+                                    <option value="bass" selected>Bass</option>
+                                    <option value="pluck">Pluck</option>
+                                    <option value="organ">Organ</option>
+                                </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthBassVolumeMod" class="every-bar-label" data-every-bar="synthBass" title="Click to set intensity">Every bar</label>
+                                <select id="synthBassVolumeMod" data-role="synthBassVolumeMod">
+                                    <option value="none">none</option>
+                                    <option value="uphill">uphill</option>
+                                    <option value="downhill">downhill</option>
+                                    <option value="valley" selected>valley</option>
+                                    <option value="hill">hill</option>
+                                    <option value="2valley">2valley</option>
+                                    <option value="3valley">3valley</option>
+                                    <option value="4valley">4valley</option>
+                                    <option value="5valley">5valley</option>
+                                    <option value="6valley">6valley</option>
+                                    <option value="7valley">7valley</option>
+                                    <option value="8valley">8valley</option>
+                                    <option value="2hill">2hill</option>
+                                    <option value="3hill">3hill</option>
+                                    <option value="4hill">4hill</option>
+                                    <option value="5hill">5hill</option>
+                                    <option value="6hill">6hill</option>
+                                    <option value="7hill">7hill</option>
+                                    <option value="8hill">8hill</option>
+                                </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthBassOutput">Volume</label>
+                                <input id="synthBassOutput" data-role="synthBassOutput" type="range" min="0" max="100" value="40">
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-pair">
+                                <label for="synthBassDelay">Delay</label>
+                            <select id="synthBassDelay" data-role="synthBassDelay">
+                                <option value="0" selected>none</option>
+                                <option value="25">subtle</option>
+                                <option value="50">less</option>
+                                <option value="75">more</option>
+                                <option value="100">full on</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthBassReverb">Reverb</label>
+                            <select id="synthBassReverb" data-role="synthBassReverb">
+                                <option value="0">none</option>
+                                <option value="25">subtle</option>
+                                <option value="50" selected>less</option>
+                                <option value="75">more</option>
+                                <option value="100">full on</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthBassMidEq">Stereo</label>
+                            <select id="synthBassMidEq" data-role="synthBassMidEq">
+                                <option value="-100">full on</option>
+                                <option value="-75" selected>more</option>
+                                <option value="-50">less</option>
+                                <option value="-25">subtle</option>
+                                <option value="0">weak</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthBassSemitone">Semitone</label>
+                                <input id="synthBassSemitone" data-role="synthBassSemitone" type="range" min="-12" max="12" value="0" title="Pitch shift in semitones">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="synth-block">
+                        <div class="control-row">
+                            <div class="control-pair">
+                                <label for="synthTreblePreset">Treble</label>
+                                <select id="synthTreblePreset" data-role="synthTreblePreset">
+                                    <option value="warmPad">Warm Pad</option>
+                                    <option value="brightLead">Bright Lead</option>
+                                    <option value="softPiano">Soft Piano</option>
+                                    <option value="piano">Piano</option>
+                                    <option value="guitar">Guitar</option>
+                                    <option value="epiano">E. Piano</option>
+                                    <option value="bell">Bell</option>
+                                    <option value="string">Strings</option>
+                                    <option value="bass">Bass</option>
+                                    <option value="pluck" selected>Pluck</option>
+                                    <option value="organ">Organ</option>
+                                </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthTrebleVolumeMod" class="every-bar-label" data-every-bar="synthTreble" title="Click to set intensity">Every bar</label>
+                                <select id="synthTrebleVolumeMod" data-role="synthTrebleVolumeMod">
+                                    <option value="none">none</option>
+                                    <option value="uphill">uphill</option>
+                                    <option value="downhill">downhill</option>
+                                    <option value="valley">valley</option>
+                                    <option value="hill">hill</option>
+                                    <option value="2valley">2valley</option>
+                                    <option value="3valley">3valley</option>
+                                    <option value="4valley">4valley</option>
+                                    <option value="5valley">5valley</option>
+                                    <option value="6valley">6valley</option>
+                                    <option value="7valley">7valley</option>
+                                    <option value="8valley">8valley</option>
+                                    <option value="2hill">2hill</option>
+                                    <option value="3hill" selected>3hill</option>
+                                    <option value="4hill">4hill</option>
+                                    <option value="5hill">5hill</option>
+                                    <option value="6hill">6hill</option>
+                                    <option value="7hill">7hill</option>
+                                    <option value="8hill">8hill</option>
+                                </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthTrebleOutput">Volume</label>
+                                <input id="synthTrebleOutput" data-role="synthTrebleOutput" type="range" min="0" max="100" value="60">
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-pair">
+                                <label for="synthTrebleDelay">Delay</label>
+                            <select id="synthTrebleDelay" data-role="synthTrebleDelay">
+                                <option value="0" selected>none</option>
+                                <option value="25">subtle</option>
+                                <option value="50">less</option>
+                                <option value="75">more</option>
+                                <option value="100">full on</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthTrebleReverb">Reverb</label>
+                            <select id="synthTrebleReverb" data-role="synthTrebleReverb">
+                                <option value="0">none</option>
+                                <option value="25">subtle</option>
+                                <option value="50" selected>less</option>
+                                <option value="75">more</option>
+                                <option value="100">full on</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthTrebleMidEq">Stereo</label>
+                            <select id="synthTrebleMidEq" data-role="synthTrebleMidEq">
+                                <option value="-100">full on</option>
+                                <option value="-75" selected>more</option>
+                                <option value="-50">less</option>
+                                <option value="-25">subtle</option>
+                                <option value="0">weak</option>
+                            </select>
+                            </div>
+                            <div class="control-pair">
+                                <label for="synthTrebleSemitone">Semitone</label>
+                                <input id="synthTrebleSemitone" data-role="synthTrebleSemitone" type="range" min="-12" max="12" value="0" title="Pitch shift in semitones">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="actionButtons" class="action-buttons">
+            <button id="previewToggle" class="play-btn" type="button">
+                <span class="play-label">Play</span>
+            </button>
+            <button id="downloadBtn" type="button">Download</button>
+        </div>
+        </div>
+    </main>
+
+    <div id="downloadOptionsModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="options-actions">
+                <button id="downloadMidiBtn" type="button">MIDI</button>
+                <button id="downloadWavBtn" type="button">WAV</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addOptionsModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="options-actions">
+                <button id="addPresetsBtn" type="button">Presets</button>
+                <button id="addRandomByKeyBtn" type="button">Random Chords</button>
+                <button id="addPanelBtn" type="button">Next Sequence</button>
+                <button id="duplicatePanelBtn" type="button">Duplicate Sequence</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addChordModal" class="options-modal" aria-hidden="true">
+        <div class="options-card add-chord-card">
+            <div id="addChordStep1" class="add-chord-step">
+                <p class="add-chord-step-hint">Choose a <select id="addChordSpellingSelect" class="add-chord-spelling-select">
+                    <option value="">Natural</option>
+                    <option value="#">Sharp</option>
+                    <option value="b">Flat</option>
+                </select> root note.</p>
+                <div class="add-chord-root-btns" id="addChordRootBtns"></div>
+                <button type="button" id="addChordConfirm1" class="add-chord-confirm-btn">Confirm</button>
+            </div>
+            <div id="addChordStep2" class="add-chord-step" hidden>
+                
+                <p id="addChordSelectedName" class="add-chord-selected-name" aria-live="polite">Chord: —</p>
+                <div id="addChordTypeList" class="add-chord-type-list add-chord-preview-items"></div>
+                <div class="add-chord-preview-actions">
+                    <button type="button" id="addChordKeepBtn">Confirm</button>
+                    <button type="button" id="addChordCancelBtn" class="options-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="randomByKeyModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="random-by-key-row">
+                <label for="randomByKeyStyleSelect" class="random-by-key-label">Style</label>
+                <select id="randomByKeyStyleSelect" class="play-options-select"></select>
+            </div>
+            <p id="randomByKeyStyleIntro" class="random-by-key-intro" aria-live="polite"></p>
+            <div class="random-by-key-row">
+                <label for="randomByKeySelect" class="random-by-key-label">Key</label>
+                <select id="randomByKeySelect" class="play-options-select">
+                    <option value="C">C</option>
+                    <option value="C#">C#</option>
+                    <option value="D">D</option>
+                    <option value="Eb">Eb</option>
+                    <option value="E">E</option>
+                    <option value="F">F</option>
+                    <option value="F#">F#</option>
+                    <option value="G">G</option>
+                    <option value="Ab">Ab</option>
+                    <option value="A">A</option>
+                    <option value="Bb">Bb</option>
+                    <option value="B">B</option>
+                </select>
+                <label for="randomByKeyCount" class="random-by-key-label">Number of chords</label>
+                <select id="randomByKeyCount" class="play-options-select">
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8" selected>8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                </select>
+            </div>
+            <div class="random-by-key-row">
+                <label for="randomByKeyModulationSelect" class="random-by-key-label">Modulation</label>
+                <select id="randomByKeyModulationSelect" class="play-options-select">
+                    <option value="none" selected>None</option>
+                    <option value="toIV">To IV</option>
+                    <option value="toV">To V</option>
+                    <option value="toRelativeMinor">To relative minor</option>
+                    <option value="toRelativeMajor">To relative major</option>
+                    <option value="tobVII">To bVII</option>
+                    <option value="tobVI">To bVI</option>
+                    <option value="toIII">To III</option>
+                    <option value="toii">To ii (whole step)</option>
+                    <option value="tobII">To bII</option>
+                    <option value="tobIII">To bIII</option>
+                </select>
+            </div>
+            <div id="randomByKeyPreview" class="random-by-key-preview" aria-label="Generated chord preview"></div>
+            <div class="options-actions">
+                <button id="randomByKeyPlayBtn" type="button" class="play-btn">Play</button>
+                <button id="randomByKeyApplyBtn" type="button">Generate</button>
+                <button id="randomByKeyCancelBtn" type="button" class="options-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chordItemOptionsModal" class="options-modal" aria-hidden="true">
+        <div class="options-card chord-item-options-card">
+            <nav class="chord-item-tabs" role="tablist">
+                <button type="button" role="tab" id="chordItemTabType" class="chord-item-tab active" aria-selected="true" aria-controls="chordItemPanelType">Change chord type</button>
+                <button type="button" role="tab" id="chordItemTabTreble" class="chord-item-tab" aria-selected="false" aria-controls="chordItemPanelTreble">Customise treble notes</button>
+            </nav>
+            <div id="chordItemPanelType" class="chord-item-panel is-active" role="tabpanel">
+                <div id="chordItemTypeList" class="add-chord-type-list add-chord-preview-items"></div>
+                <div class="options-actions">
+                    <button type="button" id="chordItemTypeConfirmBtn" class="chord-item-replace-btn">Replace</button>
+                </div>
+            </div>
+            <div id="chordItemPanelTreble" class="chord-item-panel" role="tabpanel" hidden>
+                <h3 id="trebleNotesModalTitle">Customise treble</h3>
+                <div class="treble-notes-list" id="trebleNotesList"></div>
+                <div class="treble-notes-add-row">
+                    <input type="text" id="trebleNotesInput" placeholder="e.g. G4, Bb5" class="treble-notes-input" />
+                    <button type="button" id="trebleNotesAddBtn" class="treble-add-note-btn">+ Add note</button>
+                </div>
+                <div id="trebleNotesRecommendations" class="treble-recommendations" hidden></div>
+                <div id="trebleNotesError" class="treble-notes-error" hidden></div>
+                <div class="options-actions">
+                    <button type="button" id="trebleNotesUseDefaultBtn" class="options-cancel">Use default</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="everyBarIntensityModal" class="options-modal" aria-hidden="true">
+        <div class="options-card">
+            <div class="control-row">
+                <label for="everyBarIntensitySlider">Filter</label>
+                <input type="range" id="everyBarIntensitySlider" min="0" max="100" value="76" class="every-bar-intensity-slider">
+                <span id="everyBarIntensityValue">76%</span>
+            </div>
+        </div>
+    </div>
+    <div id="trebleNotesModal" class="options-modal" aria-hidden="true">
+        <div class="options-card treble-notes-card" style="display: none;"><!-- Treble UI lives in chordItemOptionsModal tab 2 --></div>
+    </div>
+
+    <div id="synthInfoModal" class="options-modal" aria-hidden="true">
+        <div class="options-card synth-info-card">
+            <h3 id="synthInfoTitle" class="synth-info-title">Synth settings</h3>
+            <pre id="synthInfoText" class="synth-info-text" readonly aria-label="Synth settings text"></pre>
+            <div class="options-actions">
+                <button type="button" id="synthInfoCloseBtn" class="options-cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" data-role="info-modal" hidden>
+        <div class="modal-backdrop" data-role="modal-close"></div>
+        <div class="modal-card" role="dialog" aria-modal="true">
+            <nav class="modal-tabs" data-role="info-tabs">
+                <button type="button" class="active" data-role="info-tab" data-panel="about">About</button>
+                <button type="button" data-role="info-tab" data-panel="audio">Audio</button>
+                <button type="button" data-role="info-tab" data-panel="play">Play</button>
+                <button type="button" data-role="info-tab" data-panel="help">Help</button>
+            </nav>
+            <div class="info-modal-panels">
+            <section class="modal-panel is-active" data-panel="about">
+                <p>
+                    
+                </p>
+                <p>
+                    <strong><a class="modal-link" href="../index.html">Chord Canvas</a> (Version 1.66)</strong>
+                    is an
+                    <a class="modal-link" href="https://github.com/beatsaway/chordcanvas" target="_blank" rel="noopener noreferrer">open source project</a>
+                    under the MIT License. Do you like Chord Canvas?
+                    <a class="modal-link" href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">🤗 Buy me a coffee ☕</a>
+                    so I can continue developing more music and art related projects! </p><p>My name is
+                    <a class="modal-link" href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>, a music producer and sound designer. 
+                    I started this project because I have always wanted to just type in any chords to generate customisable MIDI patterns or quality WAV audio without having to purchase a DAW or subscribe to a sound library.
+                </p>
+                
+                
+                <p>
+                    Special thanks to S. Christian Collins. His
+                    <a class="modal-link" href="https://www.schristiancollins.com/generaluser" target="_blank" rel="noopener noreferrer">GeneralUser GS</a>
+                    soundfont project (SF2) is converted into WAV files for providing many of the instruments here.
+                </p>
+            </section>
+            <section class="modal-panel" data-panel="audio">
+                <div class="control-row">
+                    <label for="masterVolume">Master volume</label>
+                    <input id="masterVolume" type="range" min="0" max="800" value="800">
+                </div>
+                <div class="control-row">
+                    <label for="bassVolumeSlider">Bass playback</label>
+                    <input id="bassVolumeSlider" type="range" min="0" max="100" value="100">
+                </div>
+                <div class="control-row">
+                    <label for="highVolumeSlider">Treble playback</label>
+                    <input id="highVolumeSlider" type="range" min="0" max="100" value="100">
+                </div>
+            </section>
+            <section class="modal-panel" data-panel="play">
+                <div class="control-row">
+                    <label for="playOptionsLoopSelect">Loop</label>
+                    <select id="playOptionsLoopSelect" class="play-options-select">
+                        <option value="all">ALL sequences</option>
+                        <option value="this">THIS sequence only</option>
+                    </select>
+                </div>
+                <div class="control-row">
+                    <label for="playOptionsPlaybackSelect">Playback</label>
+                    <select id="playOptionsPlaybackSelect" class="play-options-select">
+                        <option value="synth">Synth (quality)</option>
+                        <option value="midi">MIDI (CPU friendly)</option>
+                    </select>
+                </div>
+            </section>
+            <section class="modal-panel" data-panel="help">
+                <div class="options-actions">
+                    <button id="quickGuideBtn" type="button">Tutorial</button>
+                    <button id="quickHelpBtn" type="button">Contact</button>
+                </div>
+            </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" aria-hidden="true">
+        <div>
+            <p id="helpText"></p>
+            <div class="help-controls">
+                <button id="helpPrev" type="button">Back</button>
+                <button id="helpNext" type="button">Next</button>
+                <button id="helpClose" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="presetsModal" aria-hidden="true">
+        <div>
+            <h2>Chord Presets</h2>
+            <div class="preset-list" id="presetsList"></div>
+            <div class="help-controls">
+                <button id="presetsClose" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="contactModal" aria-hidden="true">
+        <div>
+            <p>Link to this web app: <a href="https://chordcanvas.netlify.app/" target="_blank" rel="noopener noreferrer">chordcanvas.netlify.app</a></p>
+            <p>Have fun! If you have any suggestions/questions, please message <a href="https://www.instagram.com/beats.away" target="_blank" rel="noopener noreferrer">instagram.com/beats.away</a>.</p>
+            <div class="help-controls">
+                <button id="contactClose" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chordTypesModal" aria-hidden="true">
+        <div>
+            <h2>Chord types</h2>
+            <p class="chord-types-desc">Enter a root note (C, D, F#, Bb, etc.) plus the suffix below. Example: Cmaj7, Fm, G7.</p>
+            <div id="chordTypesList"></div>
+        </div>
+    </div>
+
+    <div id="ideasPanel" class="ideas-panel" aria-label="Ideas panel">
+        <div class="ideas-panel-header">
+            <nav class="ideas-panel-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected="true" aria-controls="ideas-pane-chord" id="ideas-tab-chord" class="active">Chord ideas</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="ideas-pane-rhythm" id="ideas-tab-rhythm">Rhythm ideas</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="ideas-pane-sound" id="ideas-tab-sound">Sound ideas</button>
+            </nav>
+            <button type="button" class="ideas-panel-fold" id="ideasPanelFoldBtn" aria-label="Fold panel">▼</button>
+        </div>
+        <div class="ideas-panel-content">
+            <div id="ideas-pane-chord" class="ideas-panel-pane is-active" role="tabpanel" aria-labelledby="ideas-tab-chord">
+                <div class="ideas-chord-row">
+                    <div id="ideasChordList" class="ideas-chord-list" aria-label="Diatonic chords"></div>
+                    <div id="ideasNonDiatonicNext" class="ideas-non-diatonic-next" aria-label="Non-diatonic next chords" hidden></div>
+                </div>
+                <div class="ideas-chord-key-and-actions">
+                    <div class="ideas-chord-actions">
+                        <button type="button" id="ideasReplaceBtn" class="ideas-action-btn">Replace</button>
+                        <button type="button" id="ideasAddBtn" class="ideas-action-btn">Append</button>
+                    </div>
+                    <label for="ideasChordKeySelect">Current Key</label>
+                    <select id="ideasChordKeySelect" aria-label="Key for chord ideas"></select>
+                </div>
+            </div>
+            <div id="ideas-pane-rhythm" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-rhythm">
+                <button type="button" id="rhythmIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 14px; font-size: 14px;" aria-label="Randomise all rhythm and sound settings">🎲 Randomise</button>
+            </div>
+            <div id="ideas-pane-sound" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-sound">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 14px; font-size: 14px;" aria-label="Randomise bass and treble presets">🎲 Randomise</button>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                        <input type="checkbox" id="soundIdeasAlsoRhythmCheckbox" aria-label="Also randomise rhythm when clicking Randomise">
+                        with rhythm
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" id="ideasPanelReopen" aria-label="Open ideas panel">▲ ideas</button>
+
+    <div id="nonDiatonicKeyModal" class="modal" role="dialog" aria-labelledby="nonDiatonicKeyModalTitle" aria-modal="true" hidden>
+        <div class="modal-backdrop" id="nonDiatonicKeyModalBackdrop"></div>
+        <div class="modal-card" style="max-width: 360px; padding: 16px;">
+            <h2 id="nonDiatonicKeyModalTitle" style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">Non-diatonic chord</h2>
+            <p id="nonDiatonicKeyModalMessage" style="margin: 0 0 12px 0; font-size: 12px; color: var(--surface-muted);"></p>
+            <div id="nonDiatonicKeyModalOptions" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        // Ideas panel: show only when a chord preview item turns magenta for the first time (caret in a chord); "▲ ideas" reopens if folded
+        function initIdeasPanel() {
+            var panel = document.getElementById('ideasPanel');
+            var foldBtn = document.getElementById('ideasPanelFoldBtn');
+            var reopenBtn = document.getElementById('ideasPanelReopen');
+            var tabButtons = panel ? panel.querySelectorAll('.ideas-panel-tabs button') : [];
+            var panes = panel ? panel.querySelectorAll('.ideas-panel-pane') : [];
+            var hasShownForCaretChord = false;
+
+            function showPanel() {
+                if (panel) {
+                    panel.classList.add('is-visible');
+                    document.body.classList.add('ideas-panel-open');
+                    if (reopenBtn) reopenBtn.classList.remove('is-visible');
+                }
+            }
+            function hidePanel() {
+                if (panel) {
+                    panel.classList.remove('is-visible');
+                    document.body.classList.remove('ideas-panel-open');
+                    if (reopenBtn) reopenBtn.classList.add('is-visible');
+                }
+            }
+
+            window.showIdeasPanelIfFirstCaretChord = function() {
+                if (!hasShownForCaretChord && panel) {
+                    hasShownForCaretChord = true;
+                    showPanel();
+                }
+            };
+
+            if (foldBtn) foldBtn.addEventListener('click', hidePanel);
+            if (reopenBtn) reopenBtn.addEventListener('click', showPanel);
+
+            for (var i = 0; i < tabButtons.length; i++) {
+                (function(idx) {
+                    tabButtons[idx].addEventListener('click', function() {
+                        for (var j = 0; j < tabButtons.length; j++) {
+                            tabButtons[j].classList.toggle('active', j === idx);
+                            tabButtons[j].setAttribute('aria-selected', j === idx ? 'true' : 'false');
+                            panes[j].classList.toggle('is-active', j === idx);
+                        }
+                    });
+                })(i);
+            }
+        }
+
+        // Chord ideas: diatonic chords per key (I, ii, iii, IV, V, vi, vii°)
+        var IDEAS_KEY_CHORDS = {
+            'C':  ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim'],
+            'G':  ['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#dim'],
+            'D':  ['D', 'Em', 'F#m', 'G', 'A', 'Bm', 'C#dim'],
+            'A':  ['A', 'Bm', 'C#m', 'D', 'E', 'F#m', 'G#dim'],
+            'E':  ['E', 'F#m', 'G#m', 'A', 'B', 'C#m', 'D#dim'],
+            'B':  ['B', 'C#m', 'D#m', 'E', 'F#', 'G#m', 'A#dim'],
+            'F#': ['F#', 'G#m', 'A#m', 'B', 'C#', 'D#m', 'Fdim'],
+            'F':  ['F', 'Gm', 'Am', 'Bb', 'C', 'Dm', 'Edim'],
+            'Bb': ['Bb', 'Cm', 'Dm', 'Eb', 'F', 'Gm', 'Adim'],
+            'Eb': ['Eb', 'Fm', 'Gm', 'Ab', 'Bb', 'Cm', 'Ddim'],
+            'Ab': ['Ab', 'Bbm', 'Cm', 'Db', 'Eb', 'Fm', 'Gdim'],
+            'Db': ['Db', 'Ebm', 'Fm', 'Gb', 'Ab', 'Bbm', 'Cdim']
+        };
+        var IDEAS_KEY_LABELS = {
+            'C': 'C major / A minor', 'G': 'G major / E minor', 'D': 'D major / B minor',
+            'A': 'A major / F♯ minor', 'E': 'E major / C♯ minor', 'B': 'B major / G♯ minor',
+            'F#': 'F♯ major / D♯ minor', 'F': 'F major / D minor', 'Bb': 'B♭ major / G minor',
+            'Eb': 'E♭ major / C minor', 'Ab': 'A♭ major / F minor', 'Db': 'D♭ major / B♭ minor'
+        };
+
+        // Non-diatonic next chords (triads) per diatonic degree in C. Universal: transpose by key.
+        var IDEAS_NON_DIATONIC_NEXT_IN_C = [
+            ['Bb', 'Fm', 'D', 'E', 'A', 'Cm', 'Eb', 'Ab'],   // I (C)
+            ['D', 'Bb', 'A', 'Fm', 'Eb'],                     // ii (Dm)
+            ['E', 'Bb', 'B', 'Ab'],                            // iii (Em)
+            ['Bb', 'Fm', 'D', 'Ab', 'Eb', 'A'],               // IV (F)
+            ['Bb', 'Eb', 'Ab', 'D', 'Cm', 'Fm'],              // V (G)
+            ['E', 'Bb', 'D', 'Ab', 'A'],                      // vi (Am)
+            ['Bb', 'Ab', 'Cm', 'Eb', 'Fm']                    // vii° (Bdim)
+        ];
+
+        var NOTE_TO_SEMITONE = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
+        var KEY_ROOT_SEMITONE = { 'C': 0, 'G': 7, 'D': 2, 'A': 9, 'E': 4, 'B': 11, 'F#': 6, 'F': 5, 'Bb': 10, 'Eb': 3, 'Ab': 8, 'Db': 1 };
+        var SEMITONE_TO_NOTE_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        var SEMITONE_TO_NOTE_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        var FLAT_KEYS = { 'F': 1, 'Bb': 1, 'Eb': 1, 'Ab': 1, 'Db': 1 };
+
+        function parseTriadChord(str) {
+            var m = (str || '').match(/^([A-Ga-g][#b]?)(m|dim|)$/i);
+            if (!m) return null;
+            var root = m[1].charAt(0).toUpperCase() + (m[1].slice(1) || '');
+            if (!NOTE_TO_SEMITONE.hasOwnProperty(root)) return null;
+            return { root: root, semitone: NOTE_TO_SEMITONE[root], quality: (m[2] || '').toLowerCase() };
+        }
+
+        function transposeTriadChordFromC(chordStr, key) {
+            var parsed = parseTriadChord(chordStr);
+            if (!parsed) return chordStr;
+            var keyRoot = KEY_ROOT_SEMITONE[key];
+            if (keyRoot === undefined) keyRoot = 0;
+            var s = (parsed.semitone + keyRoot) % 12;
+            if (s < 0) s += 12;
+            var useFlat = FLAT_KEYS[key];
+            var note = useFlat ? SEMITONE_TO_NOTE_FLAT[s] : SEMITONE_TO_NOTE_SHARP[s];
+            var q = parsed.quality === 'dim' ? 'dim' : parsed.quality === 'm' ? 'm' : '';
+            return note + q;
+        }
+
+        function updateIdeasCurrentChordAndNonDiatonic(triadKey, chordIndex, totalCount) {
+            var nonDiatonicEl = document.getElementById('ideasNonDiatonicNext');
+            var keySelect = document.getElementById('ideasChordKeySelect');
+            if (!nonDiatonicEl || !keySelect) return;
+            if (chordIndex != null && totalCount != null) {
+                window.__ideasCurrentChordIndex = chordIndex;
+                window.__ideasCurrentChordTotal = totalCount;
+            }
+            var key = keySelect.value || 'C';
+            var diatonic = IDEAS_KEY_CHORDS[key] || IDEAS_KEY_CHORDS['C'];
+            if (!triadKey || triadKey === '') {
+                nonDiatonicEl.hidden = true;
+                nonDiatonicEl.innerHTML = '';
+                return;
+            }
+            var degreeIndex = diatonic.indexOf(triadKey);
+            if (degreeIndex === -1) {
+                nonDiatonicEl.hidden = true;
+                nonDiatonicEl.innerHTML = '';
+                return;
+            }
+            var nextInC = IDEAS_NON_DIATONIC_NEXT_IN_C[degreeIndex];
+            if (!nextInC || nextInC.length === 0) {
+                nonDiatonicEl.hidden = true;
+                nonDiatonicEl.innerHTML = '';
+                return;
+            }
+            var transposed = nextInC.map(function(c) { return transposeTriadChordFromC(c, key); });
+            nonDiatonicEl.hidden = false;
+            nonDiatonicEl.innerHTML = '<div class="ideas-non-diatonic-chords"></div>';
+            var container = nonDiatonicEl.querySelector('.ideas-non-diatonic-chords');
+            transposed.forEach(function(ch) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'ideas-non-diatonic-btn';
+                btn.textContent = ch;
+                btn.setAttribute('aria-label', 'Play ' + ch);
+                btn.setAttribute('aria-pressed', 'false');
+                btn.addEventListener('click', function() {
+                    if (typeof window.clearAllChordIdeaSelection === 'function') window.clearAllChordIdeaSelection();
+                    this.classList.add('selected');
+                    this.setAttribute('aria-pressed', 'true');
+                    var actions = document.querySelector('.ideas-chord-actions');
+                    if (actions) actions.classList.add('is-visible');
+                    if (typeof window.playIdeasChord === 'function') window.playIdeasChord(ch);
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        function initChordIdeasPane() {
+            var keySelect = document.getElementById('ideasChordKeySelect');
+            var listEl = document.getElementById('ideasChordList');
+            if (!keySelect || !listEl) return;
+
+            function clearAllChordIdeaSelection() {
+                var pane = document.getElementById('ideas-pane-chord');
+                if (!pane) return;
+                pane.querySelectorAll('.ideas-chord-btn, .ideas-non-diatonic-next .ideas-non-diatonic-chords button').forEach(function(b) {
+                    b.classList.remove('selected');
+                    b.setAttribute('aria-pressed', 'false');
+                });
+            }
+            window.clearAllChordIdeaSelection = clearAllChordIdeaSelection;
+
+            function renderChords(key) {
+                var chords = IDEAS_KEY_CHORDS[key] || IDEAS_KEY_CHORDS['C'];
+                listEl.innerHTML = '';
+                for (var i = 0; i < chords.length; i++) {
+                    var chord = chords[i];
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'ideas-chord-btn';
+                    btn.dataset.chord = chord;
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.textContent = chord;
+                    btn.addEventListener('click', function() {
+                        var chordName = this.dataset.chord;
+                        clearAllChordIdeaSelection();
+                        this.classList.add('selected');
+                        this.setAttribute('aria-pressed', 'true');
+                        var actions = document.querySelector('.ideas-chord-actions');
+                        if (actions) actions.classList.add('is-visible');
+                        if (typeof window.playIdeasChord === 'function') window.playIdeasChord(chordName);
+                    });
+                    listEl.appendChild(btn);
+                }
+                document.querySelector('.ideas-chord-actions')?.classList.remove('is-visible');
+                updateIdeasCurrentChordAndNonDiatonic(window.__ideasCurrentTriadKey || null, window.__ideasCurrentChordIndex, window.__ideasCurrentChordTotal);
+            }
+
+            var keys = Object.keys(IDEAS_KEY_CHORDS);
+            for (var k = 0; k < keys.length; k++) {
+                var key = keys[k];
+                var opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = IDEAS_KEY_LABELS[key] || key + ' major';
+                keySelect.appendChild(opt);
+            }
+            keySelect.value = 'C';
+            renderChords('C');
+            keySelect.addEventListener('change', function() { renderChords(this.value); });
+
+            window.updateIdeasCurrentChord = function(triadKey, chordIndex, totalCount) {
+                window.__ideasCurrentTriadKey = triadKey || null;
+                updateIdeasCurrentChordAndNonDiatonic(triadKey || null, chordIndex, totalCount);
+            };
+
+            function getSelectedIdeasChord() {
+                var pane = document.getElementById('ideas-pane-chord');
+                if (!pane) return null;
+                var sel = pane.querySelector('.ideas-chord-btn.selected, .ideas-non-diatonic-next .ideas-non-diatonic-chords button.selected');
+                return sel ? (sel.dataset.chord || sel.textContent || '').trim() : null;
+            }
+
+            var ENHARMONIC_ROOT = { 'G#': 'Ab', 'Ab': 'G#', 'D#': 'Eb', 'Eb': 'D#', 'A#': 'Bb', 'Bb': 'A#', 'C#': 'Db', 'Db': 'C#', 'F#': 'Gb', 'Gb': 'F#' };
+
+            function getChordEnharmonicVariants(chord) {
+                var m = (chord || '').match(/^([A-Ga-g][#b]?)(.*)$/i);
+                if (!m) return [chord];
+                var root = m[1].charAt(0).toUpperCase() + (m[1].slice(1) || '');
+                var suffix = m[2] || '';
+                var variants = [chord];
+                if (ENHARMONIC_ROOT[root]) variants.push(ENHARMONIC_ROOT[root] + suffix);
+                return variants;
+            }
+
+            var DEGREE_SOLFEGE = ['do', 're', 'mi', 'fa', 'so', 'la', 'ti'];
+
+            function getDegreeInKey(chord, key) {
+                var diatonic = IDEAS_KEY_CHORDS[key] || IDEAS_KEY_CHORDS['C'];
+                var variants = getChordEnharmonicVariants(chord);
+                for (var v = 0; v < variants.length; v++) {
+                    var idx = diatonic.indexOf(variants[v]);
+                    if (idx !== -1) return idx;
+                }
+                return -1;
+            }
+
+            function getKeysWhereChordIsDiatonic(chord) {
+                var out = [];
+                var keys = Object.keys(IDEAS_KEY_CHORDS);
+                var variants = getChordEnharmonicVariants(chord);
+                for (var i = 0; i < keys.length; i++) {
+                    var k = keys[i];
+                    var diatonic = IDEAS_KEY_CHORDS[k];
+                    for (var v = 0; v < variants.length; v++) {
+                        if (diatonic.indexOf(variants[v]) !== -1) {
+                            out.push(k);
+                            break;
+                        }
+                    }
+                }
+                return out;
+            }
+
+            function isChordDiatonicInKey(chord, key) {
+                var diatonic = IDEAS_KEY_CHORDS[key] || IDEAS_KEY_CHORDS['C'];
+                var variants = getChordEnharmonicVariants(chord);
+                for (var i = 0; i < variants.length; i++) {
+                    if (diatonic.indexOf(variants[i]) !== -1) return true;
+                }
+                return false;
+            }
+
+            function spellChordForKey(chord, key) {
+                var m = (chord || '').match(/^([A-Ga-g][#b]?)(.*)$/i);
+                if (!m) return chord;
+                var root = m[1].charAt(0).toUpperCase() + (m[1].slice(1) || '');
+                var suffix = m[2] || '';
+                if (!ENHARMONIC_ROOT[root]) return chord;
+                var useFlat = FLAT_KEYS[key];
+                if (useFlat && root.indexOf('#') !== -1) return ENHARMONIC_ROOT[root] + suffix;
+                if (!useFlat && root.indexOf('b') !== -1) return ENHARMONIC_ROOT[root] + suffix;
+                return chord;
+            }
+
+            function runReplaceOrAdd(action, ch) {
+                if (action === 'replace' && typeof window.replaceCaretChordWith === 'function') window.replaceCaretChordWith(ch);
+                else if (action === 'add' && typeof window.addChordAfterCaret === 'function') window.addChordAfterCaret(ch);
+                clearAllChordIdeaSelection();
+                document.querySelector('.ideas-chord-actions')?.classList.remove('is-visible');
+            }
+
+            function showNonDiatonicKeyModal(chord, action, currentKey) {
+                var modal = document.getElementById('nonDiatonicKeyModal');
+                var msgEl = document.getElementById('nonDiatonicKeyModalMessage');
+                var optionsEl = document.getElementById('nonDiatonicKeyModalOptions');
+                if (!modal || !msgEl || !optionsEl) return;
+                var currentKeyLabel = IDEAS_KEY_LABELS[currentKey] || currentKey + ' major';
+                var otherKeys = getKeysWhereChordIsDiatonic(chord);
+                msgEl.textContent = chord + ' is non-diatonic in ' + currentKeyLabel + '. Stay in this key or switch to a key where it is diatonic?';
+                optionsEl.innerHTML = '';
+                var stayBtn = document.createElement('button');
+                stayBtn.type = 'button';
+                stayBtn.className = 'ideas-action-btn';
+                stayBtn.style.cssText = 'color: #c026d3; padding: 6px 10px; text-align: left;';
+                stayBtn.textContent = 'Stay in ' + currentKeyLabel;
+                stayBtn.addEventListener('click', function() {
+                    modal.hidden = true;
+                    runReplaceOrAdd(action, chord);
+                });
+                optionsEl.appendChild(stayBtn);
+                for (var i = 0; i < otherKeys.length; i++) {
+                    var k = otherKeys[i];
+                    if (k === currentKey) continue;
+                    var lbl = IDEAS_KEY_LABELS[k] || k + ' major';
+                    var degree = getDegreeInKey(chord, k);
+                    if (degree >= 0 && degree < DEGREE_SOLFEGE.length) lbl = lbl + ' (' + DEGREE_SOLFEGE[degree] + ')';
+                    var keyBtn = document.createElement('button');
+                    keyBtn.type = 'button';
+                    keyBtn.className = 'ideas-action-btn';
+                    keyBtn.style.cssText = 'color: #c026d3; padding: 6px 10px; text-align: left;';
+                    keyBtn.textContent = lbl;
+                    keyBtn.addEventListener('click', (function(key) {
+                        return function() {
+                            modal.hidden = true;
+                            keySelect.value = key;
+                            renderChords(key);
+                            runReplaceOrAdd(action, spellChordForKey(chord, key));
+                        };
+                    })(k));
+                    optionsEl.appendChild(keyBtn);
+                }
+                modal.hidden = false;
+            }
+
+            var replaceBtn = document.getElementById('ideasReplaceBtn');
+            var addBtn = document.getElementById('ideasAddBtn');
+            if (replaceBtn) replaceBtn.addEventListener('click', function() {
+                var ch = getSelectedIdeasChord();
+                if (!ch) return;
+                var currentKey = keySelect.value || 'C';
+                if (isChordDiatonicInKey(ch, currentKey)) {
+                    runReplaceOrAdd('replace', ch);
+                } else {
+                    showNonDiatonicKeyModal(ch, 'replace', currentKey);
+                }
+            });
+            if (addBtn) addBtn.addEventListener('click', function() {
+                var ch = getSelectedIdeasChord();
+                if (!ch) return;
+                var currentKey = keySelect.value || 'C';
+                if (isChordDiatonicInKey(ch, currentKey)) {
+                    runReplaceOrAdd('add', ch);
+                } else {
+                    showNonDiatonicKeyModal(ch, 'add', currentKey);
+                }
+            });
+
+            var nonDiatonicKeyModalBackdrop = document.getElementById('nonDiatonicKeyModalBackdrop');
+            if (nonDiatonicKeyModalBackdrop) nonDiatonicKeyModalBackdrop.addEventListener('click', function() {
+                document.getElementById('nonDiatonicKeyModal').hidden = true;
+            });
+        }
+
+        // Page load: dim-to-bright immediately; UI fades in after 1s (premium brand feel)
+        document.addEventListener('DOMContentLoaded', function() {
+            initIdeasPanel();
+            initChordIdeasPane();
+            requestAnimationFrame(function() {
+                var bgReveal = document.getElementById('bg-reveal');
+                if (bgReveal) bgReveal.classList.add('revealed');
+            });
+            setTimeout(function() {
+                document.body.classList.add('page-ready');
+            }, 3000);
+        });
+        // Logo: show after Pacifico font loads (avoid FOUT)
+        var logo = document.getElementById('app-logo');
+        if (logo) {
+            if (document.fonts && document.fonts.load) {
+                document.fonts.load('1em Pacifico').then(function() {
+                    logo.classList.add('font-loaded');
+                }).catch(function() {
+                    logo.classList.add('font-loaded');
+                });
+                setTimeout(function() { logo.classList.add('font-loaded'); }, 2500);
+            } else {
+                logo.classList.add('font-loaded');
+            }
+        }
+    })();
+    </script>
+    <script src="chord-presets.js"></script>
+    <script src="chordran-styles.js"></script>
+    <script src="chordran.js"></script>
+    <script src="chordran-modulation.js"></script>
+    <script src="adsrguess.js" defer></script>
+    <script src="instrument-warm-pad.js" defer></script>
+    <script src="instrument-bright-lead.js" defer></script>
+    <script src="instrument-soft-piano.js" defer></script>
+    <script src="instrument-bass.js" defer></script>
+    <script src="instrument-pluck.js" defer></script>
+    <script src="instrument-organ.js" defer></script>
+    <script src="instrument-epiano.js" defer></script>
+    <script src="instrument-bell.js" defer></script>
+    <script src="instrument-string.js" defer></script>
+    <script src="instruments/instruhandle.js" defer></script>
+    <script src="harmonics.js" defer></script>
+    <script src="premiumsound.js" defer></script>
+    <script src="core.js" defer></script>
+    <script src="app.js" defer></script>
+</body>
+</html>
