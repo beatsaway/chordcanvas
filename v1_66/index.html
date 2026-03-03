@@ -121,7 +121,7 @@
             cursor: pointer;
             touch-action: manipulation;
             color: #0f172a;
-            text-shadow: 0 1px 3px rgba(13, 148, 136, 0.35), 0 2px 8px rgba(13, 148, 136, 0.2);
+            text-shadow: 0 1px 3px rgba(0, 188, 212, 0.35), 0 2px 8px rgba(0, 188, 212, 0.2);
             text-align: center;
             /* Hidden until Pacifico is loaded to avoid font flash (FOUT) */
             opacity: 0;
@@ -215,6 +215,19 @@
             flex-wrap: wrap;
             align-items: center;
             justify-content: flex-start;
+        }
+        .chord-transpose-btn {
+            background: none;
+            border: none;
+            color: var(--surface-muted);
+            font-size: 14px;
+            line-height: 1;
+            padding: 4px 4px;
+            cursor: pointer;
+        }
+        .chord-transpose-btn:hover {
+            color: var(--accent);
+            background: none;
         }
         .play-btn {
             display: inline-flex;
@@ -1222,7 +1235,7 @@
             justify-content: space-between;
             gap: 6px;
             border-bottom: 1px solid var(--hairline);
-            padding: 4px 12px 0;
+            padding: 0;
             padding-left: max(12px, env(safe-area-inset-left));
             padding-right: max(12px, env(safe-area-inset-right));
         }
@@ -1280,7 +1293,7 @@
         }
         #ideasPanel .ideas-panel-content {
             min-height: 120px;
-            padding: 16px;
+            padding: 8px 16px 16px;
             padding-left: max(16px, env(safe-area-inset-left));
             padding-right: max(16px, env(safe-area-inset-right));
         }
@@ -1313,7 +1326,7 @@
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
         #ideasPanel .ideas-chord-list {
             display: flex;
@@ -1379,8 +1392,54 @@
             border-color: #c026d3;
             color: #c026d3;
         }
+        @keyframes imagine-hue {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+        #ideasPanel .ideas-imagine-btn {
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 28%);
+            border: none;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+        #ideasPanel .ideas-imagine-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #b88ae0 0%, #7aa8e8 35%, #5dd0d0 70%, #48b8b8 100%);
+            animation: imagine-hue 12s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+        #ideasPanel .ideas-imagine-btn:hover::before {
+            animation-duration: 1.2s;
+        }
+        #ideasPanel .ideas-info-btn {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            min-height: 24px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
         .ideas-action-btn.is-imagining {
             color: var(--accent);
+        }
+        #ideasPanel .ideas-imagine-btn {
+            transition: box-shadow 0.12s ease-out;
+        }
+        #ideasPanel .ideas-imagine-btn.is-imagining {
+            box-shadow: inset 0 0 0 999px rgba(255,255,255,0.75);
+            color: #fff;
         }
     </style>
 </head>
@@ -2018,6 +2077,7 @@
         <div class="ideas-panel-content">
             <div id="ideas-pane-chord" class="ideas-panel-pane is-active" role="tabpanel" aria-labelledby="ideas-tab-chord">
                 <div class="ideas-chord-row">
+                    <button type="button" id="chordIdeasImagineBtn" class="ideas-action-btn ideas-imagine-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Imagine 8 chords from current key (emo producer flavour)">✦ imagine</button>
                     <div id="ideasChordList" class="ideas-chord-list" aria-label="Diatonic chords"></div>
                     <div id="ideasNonDiatonicNext" class="ideas-non-diatonic-next" aria-label="Non-diatonic next chords" hidden></div>
                 </div>
@@ -2028,19 +2088,22 @@
                     </div>
                     <label for="ideasChordKeySelect">Current Key</label>
                     <select id="ideasChordKeySelect" aria-label="Key for chord ideas"></select>
-                    <button type="button" id="chordIdeasImagineBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Imagine 8 chords from current key (emo producer flavour)">✦ imagine</button>
                 </div>
             </div>
             <div id="ideas-pane-rhythm" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-rhythm">
-                <button type="button" id="rhythmIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise all rhythm and sound settings">✦ imagine</button>
+                <button type="button" id="rhythmIdeasDiceBtn" class="ideas-action-btn ideas-imagine-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise all rhythm and sound settings">✦ imagine</button>
             </div>
             <div id="ideas-pane-sound" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-sound">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise bass and treble presets">✦ imagine</button>
-                    <button type="button" id="soundIdeasInfoBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 14px; font-weight: 600;" aria-label="Show current sound ideas settings">i</button>
+                    <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn ideas-imagine-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise bass and treble presets">✦ imagine</button>
+                    <button type="button" id="soundIdeasInfoBtn" class="ideas-action-btn ideas-info-btn" aria-label="Show current sound ideas settings">i</button>
                     <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
-                        <input type="checkbox" id="soundIdeasAlsoRhythmCheckbox" aria-label="Also randomise rhythm when clicking Randomise">
+                        <input type="checkbox" id="soundIdeasAlsoRhythmCheckbox" aria-label="Also randomise rhythm when clicking imagine">
                         with rhythm
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                        <input type="checkbox" id="soundIdeasAlsoChordCheckbox" aria-label="Also imagine 8 chords when clicking imagine">
+                        with chord
                     </label>
                 </div>
             </div>
@@ -2085,8 +2148,8 @@
                     el.classList.add('is-imagining');
                     setTimeout(function () {
                         el.classList.remove('is-imagining');
-                    }, 180);
-                });
+                    }, 280);
+                }, true);
             }
 
             function showPanel() {
@@ -2388,6 +2451,7 @@
             }
             var chordImagineBtn = document.getElementById('chordIdeasImagineBtn');
             if (chordImagineBtn) chordImagineBtn.addEventListener('click', runChordIdeasImagine);
+            window.runChordIdeasImagine = runChordIdeasImagine;
 
             window.updateIdeasCurrentChord = function(triadKey, chordIndex, totalCount) {
                 window.__ideasCurrentTriadKey = triadKey || null;
@@ -2578,7 +2642,9 @@
             lines.push('<li>Bass reverb: ' + getSel(document.getElementById('synthBassReverb')) + '</li>');
             lines.push('<li>Treble reverb: ' + getSel(document.getElementById('synthTrebleReverb')) + '</li>');
             var withRhythm = document.getElementById('soundIdeasAlsoRhythmCheckbox');
+            var withChord = document.getElementById('soundIdeasAlsoChordCheckbox');
             lines.push('<li>With rhythm: ' + (withRhythm && withRhythm.checked ? 'Yes' : 'No') + '</li>');
+            lines.push('<li>With chord: ' + (withChord && withChord.checked ? 'Yes' : 'No') + '</li>');
             listEl.innerHTML = lines.join('');
             modal.hidden = false;
         }

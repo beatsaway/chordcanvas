@@ -538,6 +538,33 @@ function updateChordPreview(group) {
         openModal(addOptionsModal);
     });
     group.chordPreview.appendChild(addButton);
+
+    if (group.chordSequence.length > 0) {
+        const transposeUpBtn = document.createElement('button');
+        transposeUpBtn.type = 'button';
+        transposeUpBtn.className = 'chord-transpose-btn';
+        transposeUpBtn.textContent = '△';
+        transposeUpBtn.setAttribute('aria-label', 'Transpose up half step');
+        transposeUpBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            setActiveGroup(group);
+            transposeSequenceBySemitone(1);
+        });
+
+        const transposeDownBtn = document.createElement('button');
+        transposeDownBtn.type = 'button';
+        transposeDownBtn.className = 'chord-transpose-btn';
+        transposeDownBtn.textContent = '▽';
+        transposeDownBtn.setAttribute('aria-label', 'Transpose down half step');
+        transposeDownBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            setActiveGroup(group);
+            transposeSequenceBySemitone(-1);
+        });
+
+        group.chordPreview.appendChild(transposeUpBtn);
+        group.chordPreview.appendChild(transposeDownBtn);
+    }
 }
 
 function setChordPreviewPlaying(group, index) {
@@ -2332,6 +2359,7 @@ window.setActiveGroupChordSequenceFromIdeas = function (chordString) {
         if (isSynthEnabled()) {
             synthLoopResyncing = true;
             clearPreviewTimers();
+            clearResyncTimer();
             clearChainBakedCache();
             const bassEngine = getSynthEngine('bass');
             const trebleEngine = getSynthEngine('treble');
@@ -3616,7 +3644,45 @@ if (downloadWavBtn) {
     });
 }
 
-
+function transposeSequenceBySemitone(delta) {
+    const group = getActiveGroup();
+    if (!group?.chordInput || !engine) return;
+    const seq = engine.parseChordSequence(group.chordInput.value);
+    if (!seq.length) return;
+    const noteNames = engine.noteNames || ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const next = seq.map((chord) => {
+        const idx = engine.noteToIndex[chord.rootNote];
+        if (idx === undefined) return chord;
+        const newIdx = (idx + delta + 12) % 12;
+        const newRoot = noteNames[newIdx];
+        return { ...chord, rootNote: newRoot };
+    });
+    group.chordInput.value = next.map((c) => engine.getChordDisplayName(c.rootNote, c.chordType)).join(', ');
+    if (typeof autoResizeTextarea === 'function') autoResizeTextarea(group.chordInput);
+    updateChordSequenceFromInput(group, { playOnChange: false });
+    updateChordPreviewItemsSettings(group);
+    // If playing, resync playback so the transposed sequence is heard (same as chord ideas ✦ imagine).
+    if (isSequencePreviewing) {
+        if (isSynthEnabled()) {
+            synthLoopResyncing = true;
+            clearPreviewTimers();
+            clearResyncTimer();
+            clearChainBakedCache();
+            const bassEngine = getSynthEngine('bass');
+            const trebleEngine = getSynthEngine('treble');
+            if (bassEngine) bassEngine.stop();
+            if (trebleEngine && trebleEngine !== bassEngine) trebleEngine.stop();
+            ensureGslWarmupForGroup(group).then(() => {
+                if (!isSequencePreviewing || !isSynthEnabled()) return;
+                resumeSynthLoopAfterSettingsChange();
+            }).catch(() => {
+                if (isSequencePreviewing && isSynthEnabled()) resumeSynthLoopAfterSettingsChange();
+            });
+        } else {
+            requestPreviewResync(group);
+        }
+    }
+}
 
 if (trebleNotesModal) {
     trebleNotesModal.addEventListener('click', (event) => {
@@ -4236,11 +4302,15 @@ function randomizeActiveGroupSynthPresets() {
 
 const soundIdeasDiceBtn = document.getElementById('soundIdeasDiceBtn');
 const soundIdeasAlsoRhythmCheckbox = document.getElementById('soundIdeasAlsoRhythmCheckbox');
+const soundIdeasAlsoChordCheckbox = document.getElementById('soundIdeasAlsoChordCheckbox');
 if (soundIdeasDiceBtn) {
     soundIdeasDiceBtn.addEventListener('click', () => {
         randomizeActiveGroupSynthPresets();
         if (soundIdeasAlsoRhythmCheckbox && soundIdeasAlsoRhythmCheckbox.checked) {
             randomizeActiveGroupRhythmAndSettings();
+        }
+        if (soundIdeasAlsoChordCheckbox && soundIdeasAlsoChordCheckbox.checked && typeof window.runChordIdeasImagine === 'function') {
+            window.runChordIdeasImagine();
         }
     });
 }
