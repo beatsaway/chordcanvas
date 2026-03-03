@@ -2032,6 +2032,7 @@
             <div id="ideas-pane-sound" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-sound">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 14px; font-size: 14px;" aria-label="Randomise bass and treble presets">🎲 Randomise</button>
+                    <button type="button" id="soundIdeasInfoBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 14px; font-weight: 600;" aria-label="Show current sound ideas settings">i</button>
                     <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
                         <input type="checkbox" id="soundIdeasAlsoRhythmCheckbox" aria-label="Also randomise rhythm when clicking Randomise">
                         with rhythm
@@ -2042,6 +2043,15 @@
     </div>
 
     <button type="button" id="ideasPanelReopen" aria-label="Open ideas panel">▲ ideas</button>
+
+    <div id="soundIdeasInfoModal" class="modal" role="dialog" aria-labelledby="soundIdeasInfoModalTitle" aria-modal="true" hidden>
+        <div class="modal-backdrop" id="soundIdeasInfoModalBackdrop"></div>
+        <div class="modal-card" style="max-width: 360px; padding: 16px;">
+            <h2 id="soundIdeasInfoModalTitle" style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">Current ideas settings</h2>
+            <ul id="soundIdeasInfoList" style="margin: 0; padding-left: 1.2em; font-size: 13px; line-height: 1.6; color: var(--surface-text);"></ul>
+            <button type="button" id="soundIdeasInfoClose" style="margin-top: 12px; padding: 6px 12px;">Close</button>
+        </div>
+    </div>
 
     <div id="nonDiatonicKeyModal" class="modal" role="dialog" aria-labelledby="nonDiatonicKeyModalTitle" aria-modal="true" hidden>
         <div class="modal-backdrop" id="nonDiatonicKeyModalBackdrop"></div>
@@ -2417,10 +2427,62 @@
             });
         }
 
+        function getSelectLabel(el) {
+            if (!el || !el.options || el.selectedIndex < 0) return '—';
+            return el.options[el.selectedIndex].textContent || el.value || '—';
+        }
+        function openSoundIdeasInfo() {
+            var listEl = document.getElementById('soundIdeasInfoList');
+            var modal = document.getElementById('soundIdeasInfoModal');
+            if (!listEl || !modal) return;
+            var getSel = getSelectLabel;
+            var lines = [];
+            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Rhythm</li>');
+            lines.push('<li>Bass: ' + getSel(document.getElementById('bassRhythmSelect')) + '</li>');
+            lines.push('<li>Treble: ' + getSel(document.getElementById('highRhythmSelect')) + '</li>');
+            lines.push('<li>BPM: ' + (document.getElementById('bpmInput')?.value || '—') + '</li>');
+            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Notes</li>');
+            lines.push('<li>Pattern: ' + getSel(document.getElementById('patternSelect')) + '</li>');
+            lines.push('<li>Octave: ' + getSel(document.getElementById('doubleHighNotes')) + '</li>');
+            lines.push('<li>Skip every: ' + getSel(document.getElementById('skipSelect')) + ', ' + getSel(document.getElementById('skipSelect2')) + ', ' + getSel(document.getElementById('skipSelect3')) + '</li>');
+            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Human</li>');
+            lines.push('<li>Play like a: ' + getSel(document.getElementById('delayModSelect')) + '</li>');
+            lines.push('<li>Bass every bar: ' + getSel(document.getElementById('bassVolumeModSelect')) + '</li>');
+            lines.push('<li>Treble every bar: ' + getSel(document.getElementById('trebleVolumeModSelect')) + '</li>');
+            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Sound</li>');
+            lines.push('<li>Bass: ' + getSel(document.getElementById('synthBassPreset')) + '</li>');
+            lines.push('<li>Treble: ' + getSel(document.getElementById('synthTreblePreset')) + '</li>');
+            var bassVol = document.getElementById('synthBassOutput');
+            var trebleVol = document.getElementById('synthTrebleOutput');
+            lines.push('<li>Bass volume: ' + (bassVol ? bassVol.value + '%' : '—') + '</li>');
+            lines.push('<li>Treble volume: ' + (trebleVol ? trebleVol.value + '%' : '—') + '</li>');
+            lines.push('<li>Bass every bar: ' + getSel(document.getElementById('synthBassVolumeMod')) + '</li>');
+            lines.push('<li>Treble every bar: ' + getSel(document.getElementById('synthTrebleVolumeMod')) + '</li>');
+            lines.push('<li>Bass delay: ' + getSel(document.getElementById('synthBassDelay')) + '</li>');
+            lines.push('<li>Treble delay: ' + getSel(document.getElementById('synthTrebleDelay')) + '</li>');
+            lines.push('<li>Bass reverb: ' + getSel(document.getElementById('synthBassReverb')) + '</li>');
+            lines.push('<li>Treble reverb: ' + getSel(document.getElementById('synthTrebleReverb')) + '</li>');
+            var withRhythm = document.getElementById('soundIdeasAlsoRhythmCheckbox');
+            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Randomise</li>');
+            lines.push('<li>With rhythm: ' + (withRhythm && withRhythm.checked ? 'Yes' : 'No') + '</li>');
+            listEl.innerHTML = lines.join('');
+            modal.hidden = false;
+        }
+        function closeSoundIdeasInfo() {
+            var modal = document.getElementById('soundIdeasInfoModal');
+            if (modal) modal.hidden = true;
+        }
+
         // Page load: dark overlay fades out in 1.6s; UI fades in after 2.2s
         document.addEventListener('DOMContentLoaded', function() {
             initIdeasPanel();
             initChordIdeasPane();
+            var soundIdeasInfoBtn = document.getElementById('soundIdeasInfoBtn');
+            var soundIdeasInfoBackdrop = document.getElementById('soundIdeasInfoModalBackdrop');
+            var soundIdeasInfoClose = document.getElementById('soundIdeasInfoClose');
+            if (soundIdeasInfoBtn) soundIdeasInfoBtn.addEventListener('click', openSoundIdeasInfo);
+            if (soundIdeasInfoBackdrop) soundIdeasInfoBackdrop.addEventListener('click', closeSoundIdeasInfo);
+            if (soundIdeasInfoClose) soundIdeasInfoClose.addEventListener('click', closeSoundIdeasInfo);
             requestAnimationFrame(function() {
                 var bgReveal = document.getElementById('bg-reveal');
                 if (bgReveal) bgReveal.classList.add('revealed');

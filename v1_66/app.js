@@ -1672,17 +1672,19 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
         segment.synthTrebleVolumeModIntensity
     );
 
+    const bassPreset = segment.group.synthBassPresetSelect?.value ?? segment.group.synthBassPreset ?? 'bass';
+    const treblePreset = segment.group.synthTreblePresetSelect?.value ?? segment.group.synthTreblePreset ?? 'pluck';
     const bassRenderSegment = bassEvents.length ? {
         events: bassEvents,
         durationSeconds: barSeconds,
-        preset: segment.group.synthBassPreset,
+        preset: bassPreset,
         effects: getSynthEffectsFromGroup(segment.group, 'bass'),
         bpm: segment.bpm
     } : null;
     const trebleRenderSegment = trebleEvents.length ? {
         events: trebleEvents,
         durationSeconds: barSeconds,
-        preset: segment.group.synthTreblePreset,
+        preset: treblePreset,
         effects: getSynthEffectsFromGroup(segment.group, 'treble'),
         bpm: segment.bpm
     } : null;
@@ -1692,12 +1694,15 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
 let loopChain = [];
 let chainBakedBuffers = {};
 let chainBakingPromises = {};
+/** Incremented on clear; bakes only write if their generation matches current (avoids old-preset buffers overwriting after preset change). */
+let chainBakedCacheGeneration = 0;
 let prebakeResumeThreshold = 1;
 let hasUserClickedForPrebake = false;
 let currentSynthChainIndex = null;
 let synthLoopResyncing = false;
 
 function clearChainBakedCache() {
+    chainBakedCacheGeneration += 1;
     chainBakedBuffers = {};
     chainBakingPromises = {};
 }
@@ -1730,12 +1735,14 @@ function bakeChainChord(chainIndex) {
     const { bassRenderSegment, trebleRenderSegment } = buildSingleChordRenderSegments(item.segment, item.chordIndex);
     const bassEngine = getSynthEngine('bass');
     const trebleEngine = getSynthEngine('treble');
+    const generationAtBake = chainBakedCacheGeneration;
     let resolveBake;
     chainBakingPromises[chainIndex] = new Promise((r) => { resolveBake = r; });
     Promise.all([
         bassRenderSegment && bassEngine ? bassEngine.renderBuffer([bassRenderSegment], { sampleRate: BAKED_SAMPLE_RATE }) : null,
         trebleRenderSegment && trebleEngine ? trebleEngine.renderBuffer([trebleRenderSegment], { sampleRate: BAKED_SAMPLE_RATE }) : null
     ]).then(([bassBuf, trebleBuf]) => {
+        if (generationAtBake !== chainBakedCacheGeneration) return;
         chainBakedBuffers[chainIndex] = chainBakedBuffers[chainIndex] || {};
         if (bassBuf) chainBakedBuffers[chainIndex].bass = bassBuf;
         if (trebleBuf) chainBakedBuffers[chainIndex].treble = trebleBuf;

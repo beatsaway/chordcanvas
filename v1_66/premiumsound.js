@@ -845,19 +845,35 @@
       }
 
       const baseUrl = (typeof document !== "undefined" && document.baseURI) ? document.baseURI : (typeof window !== "undefined" && window.location && window.location.href) ? window.location.href : "";
-      const samplePresetNames = [];
-      segments.forEach((segment) => {
-        const name = segment.preset;
-        if (name && samplePresetNames.indexOf(name) === -1) {
-          const p = resolvePreset(name, {});
-          if (p && p.type === "sample" && p.zones) samplePresetNames.push(name);
-        }
-      });
-      const loadPromises = samplePresetNames.length && typeof window !== "undefined" && window.InstrumentSampleHandler
-        ? samplePresetNames.map((name) => window.InstrumentSampleHandler.loadPreset(offlineCtx, name, baseUrl))
-        : [Promise.resolve()];
+      const gslPreload = (typeof window !== "undefined" && window.InstrumentSampleHandler && window.InstrumentSampleHandler.ensureGslManifest)
+        ? window.InstrumentSampleHandler.ensureGslManifest().then(() => {
+            const gslSlugToId = window.InstrumentSampleHandler.getGslSlugToId && window.InstrumentSampleHandler.getGslSlugToId();
+            if (!gslSlugToId || typeof gslSlugToId !== "object") return;
+            const names = [];
+            segments.forEach((s) => {
+              if (s.preset && names.indexOf(s.preset) === -1) names.push(s.preset);
+            });
+            const ensureZones = window.InstrumentSampleHandler.ensureGslZonesLoaded;
+            if (ensureZones) {
+              return Promise.all(names.filter((n) => gslSlugToId[n]).map((n) => ensureZones(n, baseUrl)));
+            }
+          })
+        : Promise.resolve();
 
-      return Promise.all(loadPromises).then(() => {
+      return gslPreload.then(() => {
+        const samplePresetNames = [];
+        segments.forEach((segment) => {
+          const name = segment.preset;
+          if (name && samplePresetNames.indexOf(name) === -1) {
+            const p = resolvePreset(name, {});
+            if (p && p.type === "sample" && p.zones) samplePresetNames.push(name);
+          }
+        });
+        const loadPromises = samplePresetNames.length && typeof window !== "undefined" && window.InstrumentSampleHandler
+          ? samplePresetNames.map((name) => window.InstrumentSampleHandler.loadPreset(offlineCtx, name, baseUrl))
+          : [Promise.resolve()];
+
+        return Promise.all(loadPromises).then(() => {
         let cursor = 0;
         segments.forEach((segment) => {
           applyEffectsAtTime(nodes, segment.effects || lastEffects, cursor);
@@ -876,6 +892,7 @@
         return offlineCtx.startRendering().then((buffer) => {
           buffer.__playDuration = Math.max(0, totalDuration - tailSeconds);
           return buffer;
+        });
         });
       });
     }

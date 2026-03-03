@@ -156,7 +156,7 @@
     return zone && ctx ? bufferMap(zone).get(ctx) : null;
   }
 
-  function loadPreset(ctx, presetName, baseUrl) {
+  function loadPresetInner(ctx, presetName, baseUrl) {
     var preset = getPreset(presetName);
     if (!preset || !preset.zones) return Promise.resolve();
     var basePath = preset.basePath;
@@ -177,14 +177,37 @@
     })).then(function () {});
   }
 
+  function loadPreset(ctx, presetName, baseUrl) {
+    return ensureGslManifest().then(function () {
+      if (gslSlugToId[presetName]) {
+        return ensureGslZonesLoaded(presetName, baseUrl || '').then(function () {
+          return loadPresetInner(ctx, presetName, baseUrl);
+        });
+      }
+      return loadPresetInner(ctx, presetName, baseUrl);
+    });
+  }
+
   function ensurePresetLoaded(ctx, presetName, baseUrl) {
     var base = (baseUrl || '').replace(/\/[^/]*$/, '/');
     if (isGslPreset(presetName)) {
       return ensureGslZonesLoaded(presetName, base).then(function () {
-        return loadPreset(ctx, presetName, baseUrl);
+        return loadPresetInner(ctx, presetName, baseUrl);
       });
     }
-    return loadPreset(ctx, presetName, baseUrl);
+    return ensureGslManifest().then(function () {
+      if (gslSlugToId[presetName]) {
+        return ensureGslZonesLoaded(presetName, base).then(function () {
+          return loadPresetInner(ctx, presetName, baseUrl);
+        });
+      }
+      return loadPresetInner(ctx, presetName, baseUrl);
+    });
+  }
+
+  /** Returns slug -> id map after ensureGslManifest(); used to know which preset names need zones loaded before getPreset. */
+  function getGslSlugToId() {
+    return gslSlugToId;
   }
 
   window.InstrumentSampleHandler = {
@@ -195,6 +218,8 @@
     ensurePresetLoaded: ensurePresetLoaded,
     getGslManifest: function () { return gslManifest; },
     ensureGslManifest: ensureGslManifest,
+    getGslSlugToId: getGslSlugToId,
+    ensureGslZonesLoaded: ensureGslZonesLoaded,
     isGslPreset: isGslPreset
   };
 })();
