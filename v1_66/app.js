@@ -2313,6 +2313,36 @@ window.playIdeasChord = function (chordName) {
 window.replaceCaretChordWith = replaceCaretChordWith;
 window.addChordAfterCaret = addChordAfterCaret;
 
+/** Set the active group's chord sequence from a comma-separated chord string (e.g. from Chord ideas ✦ imagine). */
+window.setActiveGroupChordSequenceFromIdeas = function (chordString) {
+    const group = getActiveGroup();
+    if (!group?.chordInput) return;
+    group.chordInput.value = (chordString || '').trim();
+    if (typeof autoResizeTextarea === 'function') autoResizeTextarea(group.chordInput);
+    updateChordSequenceFromInput(group, { playOnChange: false });
+    updateChordPreviewItemsSettings(group);
+    // If currently previewing, resync playback so the new chord sequence is actually heard.
+    if (isSequencePreviewing) {
+        if (isSynthEnabled()) {
+            synthLoopResyncing = true;
+            clearPreviewTimers();
+            clearChainBakedCache();
+            const bassEngine = getSynthEngine('bass');
+            const trebleEngine = getSynthEngine('treble');
+            if (bassEngine) bassEngine.stop();
+            if (trebleEngine && trebleEngine !== bassEngine) trebleEngine.stop();
+            ensureGslWarmupForGroup(group).then(() => {
+                if (!isSequencePreviewing || !isSynthEnabled()) return;
+                resumeSynthLoopAfterSettingsChange();
+            }).catch(() => {
+                if (isSequencePreviewing && isSynthEnabled()) resumeSynthLoopAfterSettingsChange();
+            });
+        } else {
+            requestPreviewResync(group);
+        }
+    }
+};
+
 const TREBLE_NOTE_PREVIEW_DURATION = 0.4;
 
 async function playSingleTrebleNote(group, midiNote) {

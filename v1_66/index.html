@@ -1270,8 +1270,8 @@
             padding-bottom: max(8px, env(safe-area-inset-bottom));
             background: transparent;
             border: none;
-            color: var(--accent);
-            font-size: 12px;
+            color: #ffffff;
+            font-size: 13px;
             cursor: pointer;
             display: none;
         }
@@ -1301,6 +1301,7 @@
             font-size: 12px;
         }
         .ideas-chord-key-and-actions select {
+            min-width: 0;
             padding: 3px 6px;
             font-size: 11px;
             border-radius: 4px;
@@ -2024,14 +2025,15 @@
                     </div>
                     <label for="ideasChordKeySelect">Current Key</label>
                     <select id="ideasChordKeySelect" aria-label="Key for chord ideas"></select>
+                    <button type="button" id="chordIdeasImagineBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Imagine 8 chords from current key (emo producer flavour)">✦ imagine</button>
                 </div>
             </div>
             <div id="ideas-pane-rhythm" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-rhythm">
-                <button type="button" id="rhythmIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 14px; font-size: 14px;" aria-label="Randomise all rhythm and sound settings">🎲 Randomise</button>
+                <button type="button" id="rhythmIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise all rhythm and sound settings">✦ imagine</button>
             </div>
             <div id="ideas-pane-sound" class="ideas-panel-pane" role="tabpanel" aria-labelledby="ideas-tab-sound">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 14px; font-size: 14px;" aria-label="Randomise bass and treble presets">🎲 Randomise</button>
+                    <button type="button" id="soundIdeasDiceBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 12px;" aria-label="Randomise bass and treble presets">✦ imagine</button>
                     <button type="button" id="soundIdeasInfoBtn" class="ideas-action-btn" style="padding: 8px 12px; font-size: 14px; font-weight: 600;" aria-label="Show current sound ideas settings">i</button>
                     <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
                         <input type="checkbox" id="soundIdeasAlsoRhythmCheckbox" aria-label="Also randomise rhythm when clicking Randomise">
@@ -2084,7 +2086,14 @@
                 if (panel) {
                     panel.classList.remove('is-visible');
                     document.body.classList.remove('ideas-panel-open');
-                    if (reopenBtn) reopenBtn.classList.add('is-visible');
+                    if (reopenBtn) {
+                        // Wait for the close transition to finish before showing the reopen button.
+                        setTimeout(function() {
+                            if (!panel.classList.contains('is-visible')) {
+                                reopenBtn.classList.add('is-visible');
+                            }
+                        }, 600);
+                    }
                 }
             }
 
@@ -2131,6 +2140,27 @@
             'A': 'A major / F♯ minor', 'E': 'E major / C♯ minor', 'B': 'B major / G♯ minor',
             'F#': 'F♯ major / D♯ minor', 'F': 'F major / D minor', 'Bb': 'B♭ major / G minor',
             'Eb': 'E♭ major / C minor', 'Ab': 'A♭ major / F minor', 'Db': 'D♭ major / B♭ minor'
+        };
+
+        // Emo producer flavour: default extensions per diatonic degree (I, ii, iii, IV, V, vi, vii°)
+        var IDEAS_EMO_EXTENSIONS = [
+            ['', 'add2', 'add4', 'add9', 'maj7', 'maj9', 'maj11', 'maj13'], // I
+            ['', '7', '9', '11', '13'],                                     // ii (minor)
+            ['', '7', '9', '11', '13'],                                     // iii (minor)
+            ['', 'add2', 'add9', 'maj7', 'maj9', 'maj13'],                  // IV (major)
+            ['', 'sus2', 'sus4', 'add13', '13', '7sus4', '9sus4', 'maj7', 'maj9', 'maj13'], // V
+            ['', '7', '9', '11', '13'],                                     // vi (minor)
+            ['']                                                            // vii (keep simple)
+        ];
+
+        // Optional alternate qualities + extension palettes for some degrees
+        // 3rd degree: iii major (III) with none/7/9
+        // 4th degree: iv minor with none/7/9/11/13
+        // 6th degree: VI major with 7sus4/9sus4
+        var IDEAS_EMO_ALT_QUALITY = {
+            2: { quality: 'major', exts: ['', '7', '9'] },                  // iii as major
+            3: { quality: 'minor', exts: ['', '7', '9', '11', '13'] },      // IV as minor
+            5: { quality: 'major', exts: ['7sus4', '9sus4'] }               // vi as major (VI)
         };
 
         // Non-diatonic next chords (triads) per diatonic degree in C. Universal: transpose by key.
@@ -2273,6 +2303,72 @@
             keySelect.value = 'C';
             renderChords('C');
             keySelect.addEventListener('change', function() { renderChords(this.value); });
+
+            function pickRandom(arr) {
+                return arr[Math.floor(Math.random() * arr.length)];
+            }
+            function runChordIdeasImagine() {
+                var key = keySelect.value || 'C';
+                var diatonic = IDEAS_KEY_CHORDS[key] || IDEAS_KEY_CHORDS['C'];
+                var bases = [];
+                var degrees = [];
+                var extLists = [];
+                for (var i = 0; i < 4; i++) {
+                    var degreeIndex = Math.floor(Math.random() * diatonic.length);
+                    var triad = diatonic[degreeIndex];
+                    var altCfg = IDEAS_EMO_ALT_QUALITY[degreeIndex] || null;
+                    var useAlt = altCfg && Math.random() < 0.5;
+                    var baseTriad = triad;
+                    var extArr;
+                    if (useAlt) {
+                        if (altCfg.quality === 'major') {
+                            // Force major quality: drop simple 'm' suffix, and strip 'dim' if present.
+                            if (/dim$/i.test(triad)) {
+                                baseTriad = triad.replace(/dim$/i, '');
+                            } else if (/m$/i.test(triad)) {
+                                baseTriad = triad.replace(/m$/i, '');
+                            } else {
+                                baseTriad = triad;
+                            }
+                        } else if (altCfg.quality === 'minor') {
+                            // Force minor quality: if not already minor or dim, append 'm'.
+                            if (/dim$/i.test(triad) || /m$/i.test(triad)) {
+                                baseTriad = triad;
+                            } else {
+                                baseTriad = triad + 'm';
+                            }
+                        }
+                        extArr = altCfg.exts || [''];
+                    } else {
+                        baseTriad = triad;
+                        extArr = IDEAS_EMO_EXTENSIONS[degreeIndex] || [''];
+                    }
+                    bases.push(baseTriad);
+                    degrees.push(degreeIndex);
+                    extLists.push(extArr);
+                }
+                var eight = [];
+                // First pass: bases with emo extensions ('' means none)
+                for (var j = 0; j < 4; j++) {
+                    var ext0 = pickRandom(extLists[j] || ['']);
+                    eight.push(ext0 ? (bases[j] + ext0) : bases[j]);
+                }
+                // Second pass: same bases with (new) emo extensions
+                for (var k = 0; k < 4; k++) {
+                    var baseTriad = bases[k];
+                    var extArr = extLists[k] || [''];
+                    var ext = pickRandom(extArr);
+                    eight.push(ext ? (baseTriad + ext) : baseTriad);
+                }
+                var chordString = eight.join(', ');
+                if (typeof window.setActiveGroupChordSequenceFromIdeas === 'function') {
+                    window.setActiveGroupChordSequenceFromIdeas(chordString);
+                }
+                clearAllChordIdeaSelection();
+                document.querySelector('.ideas-chord-actions')?.classList.remove('is-visible');
+            }
+            var chordImagineBtn = document.getElementById('chordIdeasImagineBtn');
+            if (chordImagineBtn) chordImagineBtn.addEventListener('click', runChordIdeasImagine);
 
             window.updateIdeasCurrentChord = function(triadKey, chordIndex, totalCount) {
                 window.__ideasCurrentTriadKey = triadKey || null;
@@ -2463,7 +2559,6 @@
             lines.push('<li>Bass reverb: ' + getSel(document.getElementById('synthBassReverb')) + '</li>');
             lines.push('<li>Treble reverb: ' + getSel(document.getElementById('synthTrebleReverb')) + '</li>');
             var withRhythm = document.getElementById('soundIdeasAlsoRhythmCheckbox');
-            lines.push('<li style="list-style: none; font-weight: 600; margin-top: 8px;">Randomise</li>');
             lines.push('<li>With rhythm: ' + (withRhythm && withRhythm.checked ? 'Yes' : 'No') + '</li>');
             listEl.innerHTML = lines.join('');
             modal.hidden = false;
