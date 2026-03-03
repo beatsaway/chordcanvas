@@ -221,10 +221,10 @@
         .chord-transpose-btn {
             background: none;
             border: none;
-            color: var(--surface-muted);
+            color: #c3e4e0;
             font-size: 14px;
             line-height: 1;
-            padding: 4px 4px;
+            padding: 4px 6px;
             cursor: pointer;
         }
         .chord-transpose-btn:hover {
@@ -337,7 +337,7 @@
         /* Info modal tab content: crossfade between panels */
         .info-modal-panels {
             position: relative;
-            min-height: 320px;
+            min-height: 380px;
         }
         [data-role="info-modal"] .info-modal-panels .modal-panel {
             position: absolute;
@@ -354,6 +354,13 @@
         .modal-panel p {
             margin: 0 0 14px;
             color: var(--surface-muted);
+        }
+        .about-logo-title {
+            font-family: "Pacifico", cursive;
+            font-size: 26px;
+            font-weight: 400;
+            color: var(--surface-text);
+            margin: 0 0 14px 0;
         }
         .modal-link {
             display: inline-block;
@@ -1208,6 +1215,12 @@
             border-color: var(--accent);
             color: var(--accent);
         }
+        .panel-group:not(.is-active) .chord-transpose-btn {
+            color: var(--surface-muted);
+        }
+        .panel-group:not(.is-active) .chord-transpose-btn:hover {
+            color: var(--accent);
+        }
         input[type="range"] {
             accent-color: var(--accent);
         }
@@ -1967,9 +1980,7 @@
             </nav>
             <div class="info-modal-panels">
             <section class="modal-panel is-active" data-panel="about">
-                <p>
-                    
-                </p>
+                <div class="about-logo-title">Chord Canvas</div>
                 <p>
                     <strong><a class="modal-link" href="../index.html">Chord Canvas</a></strong>
                     is an

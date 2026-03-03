@@ -543,7 +543,7 @@ function updateChordPreview(group) {
         const transposeUpBtn = document.createElement('button');
         transposeUpBtn.type = 'button';
         transposeUpBtn.className = 'chord-transpose-btn';
-        transposeUpBtn.textContent = '△';
+        transposeUpBtn.textContent = '▲';
         transposeUpBtn.setAttribute('aria-label', 'Transpose up half step');
         transposeUpBtn.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -554,7 +554,7 @@ function updateChordPreview(group) {
         const transposeDownBtn = document.createElement('button');
         transposeDownBtn.type = 'button';
         transposeDownBtn.className = 'chord-transpose-btn';
-        transposeDownBtn.textContent = '▽';
+        transposeDownBtn.textContent = '▼';
         transposeDownBtn.setAttribute('aria-label', 'Transpose down half step');
         transposeDownBtn.addEventListener('click', (event) => {
             event.stopPropagation();
