@@ -114,7 +114,7 @@
             opacity: 1;
         }
         h1.app-logo {
-            margin: 0 0 14px 0;
+            margin: -6px 0 14px 0;
             font-size: 36px;
             font-weight: 400;
             font-family: "Pacifico", cursive;
@@ -1379,6 +1379,9 @@
             border-color: #c026d3;
             color: #c026d3;
         }
+        .ideas-action-btn.is-imagining {
+            color: var(--accent);
+        }
     </style>
 </head>
 <body>
@@ -2075,6 +2078,17 @@
             var panes = panel ? panel.querySelectorAll('.ideas-panel-pane') : [];
             var hasShownForCaretChord = false;
 
+            function attachImagineClickFeedback(btn) {
+                if (!btn) return;
+                btn.addEventListener('click', function () {
+                    var el = this;
+                    el.classList.add('is-imagining');
+                    setTimeout(function () {
+                        el.classList.remove('is-imagining');
+                    }, 180);
+                });
+            }
+
             function showPanel() {
                 if (panel) {
                     panel.classList.add('is-visible');
@@ -2106,6 +2120,11 @@
 
             if (foldBtn) foldBtn.addEventListener('click', hidePanel);
             if (reopenBtn) reopenBtn.addEventListener('click', showPanel);
+
+            // Visual click indication for ✦ imagine buttons
+            attachImagineClickFeedback(document.getElementById('chordIdeasImagineBtn'));
+            attachImagineClickFeedback(document.getElementById('rhythmIdeasDiceBtn'));
+            attachImagineClickFeedback(document.getElementById('soundIdeasDiceBtn'));
 
             for (var i = 0; i < tabButtons.length; i++) {
                 (function(idx) {
