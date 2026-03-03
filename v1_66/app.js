@@ -1707,6 +1707,22 @@ function clearChainBakedCache() {
     chainBakingPromises = {};
 }
 
+/** Pre-load GSL manifest and zones for the group's bass/treble presets so first bake isn't blocked by network. */
+function ensureGslWarmupForGroup(group) {
+    const handler = typeof window !== 'undefined' && window.InstrumentSampleHandler;
+    if (!handler || !handler.ensureGslManifest || !handler.getGslSlugToId || !handler.ensureGslZonesLoaded) return Promise.resolve();
+    const baseUrl = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI : (typeof window !== 'undefined' && window.location && window.location.href) ? window.location.href : '';
+    const bassPreset = group?.synthBassPresetSelect?.value ?? group?.synthBassPreset ?? 'bass';
+    const treblePreset = group?.synthTreblePresetSelect?.value ?? group?.synthTreblePreset ?? 'pluck';
+    return handler.ensureGslManifest().then(() => {
+        const gslSlugToId = handler.getGslSlugToId && handler.getGslSlugToId();
+        if (!gslSlugToId || typeof gslSlugToId !== 'object') return;
+        const names = [bassPreset, treblePreset].filter(Boolean);
+        const toLoad = names.filter((n) => gslSlugToId[n]);
+        if (toLoad.length) return Promise.all(toLoad.map((n) => handler.ensureGslZonesLoaded(n, baseUrl)));
+    }).catch(() => {});
+}
+
 function resumeSynthLoopAfterSettingsChange() {
     if (!isSequencePreviewing || !isSynthEnabled()) return;
     loopChain = buildLoopChain();
@@ -1721,6 +1737,7 @@ function resumeSynthLoopAfterSettingsChange() {
         if (!isSequencePreviewing) return;
         synthLoopResyncing = false;
         for (let k = 1; k <= LOOP_CHAIN_PREBAKE_COUNT; k += 1) bakeChainChord((position + k) % L);
+        for (let i = 0; i < L; i += 1) bakeChainChord(i);
         playBakedChainLoop(position);
     });
 }
@@ -1735,6 +1752,15 @@ function bakeChainChord(chainIndex) {
     const { bassRenderSegment, trebleRenderSegment } = buildSingleChordRenderSegments(item.segment, item.chordIndex);
     const bassEngine = getSynthEngine('bass');
     const trebleEngine = getSynthEngine('treble');
+    const bassExpected = !!(bassRenderSegment && bassEngine);
+    const trebleExpected = !!(trebleRenderSegment && trebleEngine);
+    // Create or update entry up front so readiness can see per-part expectations while buffers load.
+    const existingEntry = chainBakedBuffers[chainIndex] || {};
+    chainBakedBuffers[chainIndex] = {
+        ...existingEntry,
+        bassExpected,
+        trebleExpected
+    };
     const generationAtBake = chainBakedCacheGeneration;
     let resolveBake;
     chainBakingPromises[chainIndex] = new Promise((r) => { resolveBake = r; });
@@ -1743,9 +1769,10 @@ function bakeChainChord(chainIndex) {
         trebleRenderSegment && trebleEngine ? trebleEngine.renderBuffer([trebleRenderSegment], { sampleRate: BAKED_SAMPLE_RATE }) : null
     ]).then(([bassBuf, trebleBuf]) => {
         if (generationAtBake !== chainBakedCacheGeneration) return;
-        chainBakedBuffers[chainIndex] = chainBakedBuffers[chainIndex] || {};
-        if (bassBuf) chainBakedBuffers[chainIndex].bass = bassBuf;
-        if (trebleBuf) chainBakedBuffers[chainIndex].treble = trebleBuf;
+        const entry = chainBakedBuffers[chainIndex] || {};
+        if (bassBuf) entry.bass = bassBuf;
+        if (trebleBuf) entry.treble = trebleBuf;
+        chainBakedBuffers[chainIndex] = entry;
         resolveBake();
     }).catch(() => { resolveBake(); });
     return chainBakingPromises[chainIndex];
@@ -1763,7 +1790,11 @@ function startPrebakeOnFirstClick() {
 }
 
 function isChainIndexBaked(chainIndex) {
-    return chainBakedBuffers[chainIndex] != null;
+    const entry = chainBakedBuffers[chainIndex];
+    if (!entry) return false;
+    const bassReady = !entry.bassExpected || !!entry.bass;
+    const trebleReady = !entry.trebleExpected || !!entry.treble;
+    return bassReady && trebleReady;
 }
 
 async function playBakedChainLoop(position) {
@@ -2824,7 +2855,12 @@ function registerPanelGroup(groupEl, insertIndex) {
             const trebleEngine = getSynthEngine('treble');
             if (bassEngine) bassEngine.stop();
             if (trebleEngine && trebleEngine !== bassEngine) trebleEngine.stop();
-            resumeSynthLoopAfterSettingsChange();
+            ensureGslWarmupForGroup(group).then(() => {
+                if (!isSequencePreviewing || !isSynthEnabled()) return;
+                resumeSynthLoopAfterSettingsChange();
+            }).catch(() => {
+                if (isSequencePreviewing && isSynthEnabled()) resumeSynthLoopAfterSettingsChange();
+            });
         }
     };
 

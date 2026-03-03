@@ -52,10 +52,9 @@
     { keyLow: 74, keyHigh: 127, originalPitchCents: 7900, file: '0250_Chaos_sf2_file_wavs/zone_4_midi25_keys_74-127.wav', loopStart: 0.8000907029478458,  loopEnd: 0.8319274376417233 }
   ];
 
-  // Base path for piano/guitar. After moving into GSL, set both to 'instruments/GSL/' and put
-  // 0000_Chaos_sf2_file_wavs and 0250_Chaos_sf2_file_wavs inside instruments/GSL/.
-  var PIANO_BASE = 'instruments/piano/';
-  var GUITAR_BASE = 'instruments/guitar/';
+  // Piano and guitar sample folders live under instruments/GSL/ (0000_Chaos_sf2_file_wavs, 0250_Chaos_sf2_file_wavs).
+  var PIANO_BASE = 'instruments/GSL/';
+  var GUITAR_BASE = 'instruments/GSL/';
 
   registry.piano = function () {
     return {
