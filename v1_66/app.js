@@ -1603,7 +1603,13 @@ function buildSingleChordRenderSegments(segment, chordIndex) {
     const chordStart = 0;
     const chordEnd = barSeconds;
     const delayState = { counter: 0 };
-    const skipState = buildSkipStateFromPattern(segment.skipPattern);
+    // For synth playback, keep skip pattern continuous across chords in this segment:
+    // reuse a per-segment skipState so "skip every N" evolves over time like the WAV render.
+    let skipState = segment._synthSkipState;
+    if (!skipState) {
+        skipState = buildSkipStateFromPattern(segment.skipPattern);
+        segment._synthSkipState = skipState;
+    }
     const chordNotes = getResolvedChordNotes(segment.chordSequence[chordIndex]);
     const highNotes = getHighNotesForPattern(chordNotes, segment.doubleHighEnabled);
     const bassVelocityPattern = segment.bassVolumeModPattern || 'none';
