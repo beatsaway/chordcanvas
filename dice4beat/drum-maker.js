@@ -1452,7 +1452,33 @@ function encodeWavFromBuffer(buffer) {
       offset += 2;
     }
   }
-  return new Blob([view], { type: 'audio/wav' });
+  return new Blob([view.buffer], { type: 'audio/wav' });
+}
+
+/** Copy one AudioBuffer into a new buffer created in dstCtx (so it can be used in that context). */
+function copyBufferToContext(srcBuffer, dstCtx) {
+  const numCh = srcBuffer.numberOfChannels;
+  const len = srcBuffer.length;
+  const sr = srcBuffer.sampleRate;
+  const dst = dstCtx.createBuffer(numCh, len, sr);
+  for (let ch = 0; ch < numCh; ch++) dst.copyToChannel(srcBuffer.getChannelData(ch), ch, 0);
+  return dst;
+}
+
+/** Clone the global sound bank so all buffers belong to dstCtx. Used for offline WAV export. */
+function cloneSoundBankForContext(dstCtx) {
+  const out = {};
+  const keys = ['kick', 'snare', 'clap', 'hatClosed', 'hatOpen', 'ride', 'cowbell', 'tom'];
+  keys.forEach((key) => {
+    const val = soundBank[key];
+    if (!val) return;
+    if (Array.isArray(val)) {
+      out[key] = val.map((buf) => copyBufferToContext(buf, dstCtx));
+    } else {
+      out[key] = copyBufferToContext(val, dstCtx);
+    }
+  });
+  return out;
 }
 
 async function exportDrumWav() {
@@ -1470,6 +1496,12 @@ async function exportDrumWav() {
   const offlineCtx = new OfflineCtx(2, numSamples, sampleRate);
   const renderSynth = new DrumSynth();
   renderSynth.init(offlineCtx);
+  const savedSoundBank = {};
+  const renderBank = cloneSoundBankForContext(offlineCtx);
+  Object.keys(renderBank).forEach((k) => {
+    savedSoundBank[k] = soundBank[k];
+    soundBank[k] = renderBank[k];
+  });
   const stepDurStraight = barDurationSec / STEPS_STRAIGHT_PER_BAR;
   const stepDur36 = barDurationSec / STEPS_36_PER_BAR;
   const totalStraight = bars * STEPS_STRAIGHT_PER_BAR;
@@ -1485,16 +1517,46 @@ async function exportDrumWav() {
     scheduleStep36(stepIdx, when, stepDur36);
   }
   synth = savedSynth;
+  Object.keys(savedSoundBank).forEach((k) => { soundBank[k] = savedSoundBank[k]; });
   const buffer = await offlineCtx.startRendering();
+  if (buffer.length === 0) {
+    if (document.getElementById('status')) document.getElementById('status').textContent = 'WAV render failed (empty buffer)';
+    return;
+  }
   const blob = encodeWavFromBuffer(buffer);
   const url = URL.createObjectURL(blob);
+  const filename = `freakbeat-${Date.now()}.wav`;
   const a = document.createElement('a');
   a.href = url;
-  a.download = `freakbeat-${Date.now()}.wav`;
+  a.download = filename;
+  a.style.display = 'none';
   document.body.appendChild(a);
-  a.click();
+  try {
+    a.click();
+  } catch (e) {
+    triggerDownloadFallback(url, filename);
+  }
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const fallback = triggerDownloadFallback(url, filename);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    if (fallback && fallback.parentNode) fallback.remove();
+  }, 30000);
+}
+
+function triggerDownloadFallback(url, filename) {
+  const wrap = document.createElement('div');
+  wrap.setAttribute('role', 'status');
+  wrap.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:0.85rem;';
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.textContent = 'If download didn\'t start, click here to save WAV';
+  link.style.cssText = 'color:var(--accent);font-weight:500;';
+  wrap.appendChild(link);
+  document.body.appendChild(wrap);
+  setTimeout(() => { if (wrap.parentNode) wrap.remove(); }, 12000);
+  return wrap;
 }
 
 // --- Composition JSON: full round-trip of grid, bar length, and sound settings (pattern, bars, controls, makerSoundParams, voiceVersions, voiceHues) ---
