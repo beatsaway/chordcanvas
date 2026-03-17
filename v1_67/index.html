@@ -1,0 +1,2716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChordCanvas</title>
+    <!-- Suppress favicon request to prevent 404 error -->
+    <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* — Light mode palette (coherent across page) — */
+        :root {
+            /* Scene / page: soft light gradient, stronger falloff with darker outer ring */
+            --bg-center:     #e0e3e2;
+            --bg-mid:        #b2b7b5;
+            --bg-edge:       #5e6462;
+            /* Header: light frosted bar */
+            --header-text:   #1d1d1f;
+            --header-text-dim: #6e6e73;
+            /* Toolbar controls: light */
+            --control-bg:    #fff;
+            --control-border: rgba(0, 0, 0, 0.12);
+            --control-hover: rgba(0, 0, 0, 0.06);
+            /* Panels / modals: Muji-style light surface */
+            --surface:      #fafafa;
+            --surface-text: #2c2c2c;
+            --surface-text-secondary: #737373;
+            --accent:       #1e3a5f;
+            --accent-hover: #152a47;
+            --modal-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+            --overlay-scrim: rgba(0, 0, 0, 0.28);
+            --hairline:     rgba(0, 0, 0, 0.06);
+            /* Popup design system — one source of truth for all popups (matches teal logo) */
+            --popup-accent:         #0d9488;
+            --popup-accent-hover:   #0f766e;
+            --popup-accent-subtle:  rgba(13, 148, 136, 0.12);
+            --popup-accent-border:  rgba(13, 148, 136, 0.25);
+            --popup-bg:             #fafafa;
+            --popup-bg-top:         #ffffff;
+            --popup-surface:       #ffffff;
+            --popup-text:          #1a1a1c;
+            --popup-text-secondary: #5c5c62;
+            --popup-border:        rgba(0, 0, 0, 0.07);
+            --popup-border-strong:  rgba(0, 0, 0, 0.1);
+            --popup-shadow:        0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 2px rgba(0, 0, 0, 0.02), 0 24px 56px -12px rgba(0, 0, 0, 0.14), 0 12px 28px -8px rgba(0, 0, 0, 0.08);
+            --popup-shadow-card:    0 0 0 1px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+        html {
+            font-size: 14px;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+            font-size: 1rem;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: radial-gradient(ellipse 100% 85% at 50% 45%, var(--bg-center) 0%, var(--bg-mid) 38%, var(--bg-edge) 100%);
+            color: var(--surface-text);
+        }
+        /* Full-screen dark overlay: glow in to normal over 4s (no hold) */
+        .bg-reveal {
+            position: fixed;
+            inset: 0;
+            background: #151518;
+            z-index: 0;
+            opacity: 1;
+            transition: opacity 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+            pointer-events: none;
+        }
+        .bg-reveal.revealed {
+            opacity: 0;
+        }
+        canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: 1;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .overlay > * { pointer-events: auto; }
+
+        .div-labels-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            overflow: visible;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .div-labels-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .div-label-cell {
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            padding: 0.2rem 0.45rem;
+            background: #fff;
+            color: #1d1d1f;
+            border-radius: 999px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .div-label-cell span {
+            font-size: inherit;
+            font-weight: inherit;
+            letter-spacing: inherit;
+            color: inherit;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            min-height: 36px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px 10px;
+            z-index: 101;
+        }
+        .header-nav-link {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--header-text-dim, #6e6e73);
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .header-nav-link:hover { color: var(--header-text, #1d1d1f); }
+
+        .app-logo {
+            font-family: "Pacifico", cursive;
+            font-size: 26px;
+            font-weight: 400;
+            color: var(--surface-text);
+            margin: 0 0 14px 0;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s ease;
+            text-align: center;
+        }
+        .app-logo:hover { color: var(--header-text, #1d1d1f); }
+
+        .header-rest {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 6px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .header-rest.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .toolbar select {
+            height: 28px;
+            padding: 0 22px 0 8px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            color: var(--header-text);
+            background: var(--control-bg);
+            border: 1px solid var(--hairline);
+            border-radius: 4px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' viewBox='0 0 12 12'%3E%3Cpath fill='%236e6e73' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 5px center;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .toolbar select:hover {
+            border-color: rgba(0, 0, 0, 0.2);
+            background: var(--control-hover);
+        }
+        .toolbar select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .toolbar select option {
+            background: var(--surface);
+            color: var(--surface-text);
+        }
+
+
+        .toolbar-btn {
+            height: 28px;
+            padding: 0 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            color: var(--header-text);
+            background: var(--control-bg);
+            border: 1px solid var(--hairline);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .toolbar-btn:hover {
+            border-color: var(--control-border);
+            background: var(--control-hover);
+        }
+
+        /* Modals — Muji minimal */
+        .keyboard-visual-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--overlay-scrim);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .keyboard-visual-modal.active { display: flex; }
+
+        .keyboard-visual-panel {
+            background: var(--popup-surface);
+            color: var(--popup-text);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            max-width: 20rem;
+            width: 90%;
+            height: 72vh;
+            max-height: 90vh;
+            box-shadow: var(--popup-shadow-card);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .settings-about-content { font-size: 0.8rem; color: var(--popup-text-secondary); line-height: 1.6; }
+        .settings-about-content p { margin: 0 0 0.6rem 0; }
+        .settings-about-content p:last-child { margin-bottom: 0; }
+        .settings-about-content a { color: var(--popup-accent); text-decoration: none; }
+        .settings-about-content a:hover { color: var(--popup-accent-hover); text-decoration: underline; }
+
+        .keyboard-visual-setting-item { margin-bottom: 0.4rem; padding: 0; }
+        .keyboard-visual-setting-item:last-child { margin-bottom: 0; }
+        .keyboard-visual-setting-item label {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.35rem;
+            cursor: pointer;
+            font-size: 0.7rem;
+            line-height: 1.3;
+            letter-spacing: 0.01em;
+            color: var(--popup-text);
+        }
+        .keyboard-visual-setting-item input[type="checkbox"] {
+            margin-top: 0.12rem;
+            width: 0.85rem;
+            height: 0.85rem;
+            flex-shrink: 0;
+            accent-color: var(--popup-accent);
+        }
+        .keyboard-visual-setting-item .setting-description {
+            display: block;
+            margin-top: 0.1rem;
+            font-size: 0.6rem;
+            color: var(--popup-text-secondary);
+            line-height: 1.25;
+            letter-spacing: 0.01em;
+        }
+        .keyboard-visual-settings-menu {
+            margin-left: 0.25rem;
+            padding: 0;
+            font-size: 0.75rem;
+            line-height: 1;
+            color: var(--popup-accent);
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .keyboard-visual-settings-menu:hover { color: var(--popup-accent-hover); }
+        .settings-tabs {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 0.6rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--popup-border);
+            min-height: 1.75rem;
+            align-items: flex-end;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .settings-tab {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            color: var(--surface-text-secondary);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .settings-tab:hover { color: var(--popup-text); background: rgba(0, 0, 0, 0.04); }
+        .settings-tab.active { color: var(--popup-accent); background: var(--popup-accent-subtle); }
+        .settings-panel {
+            display: none;
+            padding-top: 0;
+            margin-top: 0;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .settings-panel.active { display: block; }
+        .keyboard-visual-setting-item .setting-label-inline { min-width: 3.5rem; font-weight: 500; font-size: 0.7rem; }
+        .keyboard-visual-setting-item select {
+            margin-left: 0.25rem;
+            padding: 0.25rem 0.45rem;
+            font-size: 0.75rem;
+            border: 1px solid var(--popup-border-strong);
+            border-radius: 6px;
+            background: var(--popup-surface);
+            color: var(--popup-text);
+            height: auto;
+            line-height: 1.3;
+        }
+        .keyboard-visual-setting-item select:focus { outline: none; border-color: var(--popup-accent); box-shadow: 0 0 0 2px var(--popup-accent-subtle); }
+        .keyboard-visual-setting-item input[type="range"] { flex: 1; min-width: 0; }
+        .settings-master-volume-value { min-width: 2.75rem; text-align: right; font-size: 0.75rem; color: var(--popup-text-secondary); }
+        .camera-help-wrap label { flex-wrap: nowrap; }
+        .camera-help-btn { margin-left: 0.35rem; width: 1.25rem; height: 1.25rem; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--popup-text-secondary); background: transparent; border: 1px solid var(--popup-border-strong); border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; transition: color 0.2s, border-color 0.2s; }
+        .camera-help-btn:hover { color: var(--popup-accent); border-color: var(--popup-accent); }
+        /* Camera help: full-screen overlay popup (same pattern as key-movement-popup) */
+        .camera-help-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3001;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .camera-help-overlay.visible { display: flex; }
+        .camera-help-overlay-content {
+            background: var(--popup-surface);
+            color: var(--popup-text);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            max-width: 22rem;
+            width: 90%;
+            box-shadow: var(--popup-shadow-card);
+            position: relative;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .camera-help-overlay-title { font-weight: 600; margin: 0 0 0.5rem 0; font-size: 1.05rem; }
+        .camera-help-overlay p { margin: 0 0 1rem 0; color: var(--popup-text-secondary); }
+        .camera-help-overlay-close {
+            display: block;
+            margin-left: auto;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--popup-accent);
+            background: var(--popup-accent-subtle);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .camera-help-overlay-close:hover { background: rgba(13, 148, 136, 0.2); }
+
+        /* MIDI Debug — Muji-style panel */
+        #midi-debug-container {
+            position: fixed;
+            top: 48px;
+            right: 14px;
+            width: min(20rem, calc(100vw - 28px));
+            max-height: 70vh;
+            overflow-y: auto;
+            z-index: 500;
+            display: none;
+            background: var(--surface);
+            color: var(--surface-text);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: var(--modal-shadow);
+            font-size: 0.78rem;
+            letter-spacing: 0.01em;
+            line-height: 1.4;
+        }
+        #midi-debug-container.midi-debug-visible { display: block; }
+        .midi-debug-header {
+            font-weight: 600;
+            margin: 0 0 0.75rem 0;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid var(--hairline);
+            font-size: 0.8rem;
+            color: var(--surface-text);
+        }
+        .midi-debug-pedal {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0.6rem;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--hairline);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: var(--surface-text-secondary);
+        }
+        .midi-debug-pedal.on { background: rgba(30, 58, 95, 0.08); color: var(--accent); border-color: rgba(30, 58, 95, 0.2); }
+        .midi-debug-empty { color: var(--surface-text-secondary); font-style: italic; font-size: 0.7rem; }
+        .midi-debug-note {
+            padding: 0.55rem 0.65rem;
+            margin-bottom: 0.5rem;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--hairline);
+            border-radius: 4px;
+            border-left: 3px solid var(--accent);
+        }
+        .midi-debug-note-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
+        .midi-debug-note-name { font-weight: 600; color: var(--surface-text); font-size: 0.72rem; }
+        .midi-debug-note-meta { font-size: 0.65rem; color: var(--surface-text-secondary); }
+        .midi-debug-vel { font-weight: 600; font-size: 0.75rem; color: var(--accent); }
+        .midi-debug-vel.mid { color: #b8860b; }
+        .midi-debug-vel.high { color: #c44; }
+        .midi-debug-states { display: flex; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.65rem; }
+        .midi-debug-states span { color: var(--surface-text-secondary); }
+        .midi-debug-states span.on { color: var(--accent); }
+        .midi-debug-states span.sustain-on { color: #b8860b; }
+        .midi-debug-detail { margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--hairline); font-size: 0.7rem; color: var(--surface-text-secondary); }
+        .midi-debug-detail strong { color: var(--surface-text); }
+        .midi-debug-detail-line { margin-left: 0.5rem; }
+        .midi-debug-detail-block { margin-top: 0.35rem; }
+        .midi-debug-summary { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--hairline); font-size: 0.7rem; color: var(--surface-text-secondary); }
+
+        /* Sub-popups: use popup design system (Key Movement, Key Labels) — coherent with main popup */
+        .key-movement-popup, .key-labels-popup {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3001;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .key-movement-popup.active, .key-labels-popup.active { display: flex; }
+        .key-movement-popup-content, .key-labels-popup-content {
+            background: var(--popup-surface);
+            color: var(--popup-text);
+            border-radius: 14px;
+            padding: 1.15rem 1.25rem 1.25rem;
+            padding-right: calc(1.25rem + 36px);
+            max-width: 26rem;
+            width: 94%;
+            min-width: 18rem;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: var(--popup-shadow-card);
+            position: relative;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            font-size: 15px;
+        }
+        .key-movement-popup-header, .key-labels-popup-header {
+            margin-bottom: 0.6rem;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            min-height: 1.75rem;
+        }
+        .key-movement-popup-header h2, .key-labels-popup-header h2 { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.02em; color: var(--popup-text); line-height: 1.3; }
+        .key-movement-popup-close, .key-labels-popup-close {
+            position: absolute;
+            top: 1.15rem;
+            right: 1.25rem;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            font-size: 1.2rem;
+            line-height: 1;
+            color: var(--popup-text-secondary);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, background 0.2s;
+        }
+        .key-movement-popup-close:hover, .key-labels-popup-close:hover { color: var(--popup-text); background: rgba(0, 0, 0, 0.06); }
+        .key-movement-popup-body, .key-labels-popup-body { display: flex; flex-direction: column; gap: 0.75rem; }
+        .key-movement-setting, .key-labels-setting { display: flex; flex-direction: column; gap: 0.15rem; }
+        .key-movement-setting label, .key-labels-setting label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--popup-text);
+            min-height: 1.65rem;
+        }
+        .key-movement-setting label span:first-child, .key-labels-setting label span:first-child {
+            min-width: 5.5rem;
+            font-weight: 500;
+            line-height: 1.65rem;
+        }
+        .key-movement-setting select, .key-labels-setting select {
+            flex: 1;
+            min-height: 1.65rem;
+            padding: 0.2rem 0.5rem;
+            font-size: 13px;
+            border: 1px solid var(--popup-border-strong);
+            border-radius: 8px;
+            background: var(--popup-surface);
+            color: var(--popup-text);
+            line-height: 1.3;
+        }
+        .key-movement-setting select:focus, .key-labels-setting select:focus { outline: none; border-color: var(--popup-accent); box-shadow: 0 0 0 3px var(--popup-accent-subtle); }
+        .key-movement-setting input[type="range"] { flex: 1; accent-color: var(--popup-accent); }
+        .key-labels-setting input[type="checkbox"] { accent-color: var(--popup-accent); }
+        .key-movement-value { min-width: 2.75rem; text-align: right; font-size: 14px; color: var(--popup-text-secondary); }
+        .key-movement-description, .key-labels-description { font-size: 12px; color: var(--popup-text-secondary); line-height: 1.4; margin-top: 0.15rem; }
+        .key-movement-popup-footer, .key-labels-popup-footer { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--popup-border); }
+        .key-movement-reset, .key-labels-reset {
+            padding: 0.5rem 1rem;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            color: var(--popup-text);
+            background: transparent;
+            border: 1px solid var(--popup-border-strong);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .key-movement-reset:hover, .key-labels-reset:hover { border-color: var(--popup-border-strong); background: rgba(0, 0, 0, 0.04); }
+
+        /* Optional: reusable popup design-system classes — add to any popup for coherent look */
+        .ds-popup-content { background: var(--popup-surface); color: var(--popup-text); border-radius: 14px; padding: 1.5rem 1.75rem; box-shadow: var(--popup-shadow-card); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+        .ds-popup-title { font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; color: var(--popup-text); margin: 0; }
+        .ds-popup-close { color: var(--popup-text-secondary); background: transparent; border: none; border-radius: 8px; cursor: pointer; transition: color 0.2s, background 0.2s; }
+        .ds-popup-close:hover { color: var(--popup-text); background: rgba(0, 0, 0, 0.06); }
+        .ds-popup-setting label { font-size: 14px; font-weight: 500; color: var(--popup-text); }
+        .ds-popup-select { padding: 0.5rem 0.65rem; font-size: 14px; border: 1px solid var(--popup-border-strong); border-radius: 10px; background: var(--popup-surface); color: var(--popup-text); }
+        .ds-popup-select:focus { outline: none; border-color: var(--popup-accent); box-shadow: 0 0 0 3px var(--popup-accent-subtle); }
+        .ds-popup-btn-secondary { padding: 0.5rem 1rem; font-size: 14px; font-weight: 500; color: var(--popup-text); background: transparent; border: 1px solid var(--popup-border-strong); border-radius: 10px; cursor: pointer; }
+        .ds-popup-btn-secondary:hover { background: rgba(0, 0, 0, 0.04); }
+
+        /* Popup: centred card (like cc-dock), logo toggles */
+        .app-popup {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 1000;
+            padding: 12px;
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+        }
+        .app-popup.visible {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            transition-delay: 0s;
+        }
+        .app-popup-panel {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.5;
+            letter-spacing: -0.015em;
+            background: linear-gradient(180deg, var(--popup-bg-top) 0%, var(--popup-bg) 100%);
+            color: var(--popup-text);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            width: min(920px, calc(100vw - 24px));
+            max-height: calc(100vh - 24px);
+            border-radius: 14px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.15);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            transform: scale(0.98);
+            opacity: 0.98;
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease-out;
+        }
+        .app-popup.visible .app-popup-panel {
+            transform: scale(1);
+            opacity: 1;
+        }
+        .app-popup-panel .setting-description,
+        .app-popup-panel .instrument-category-title { color: var(--popup-text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+        .app-popup-panel .app-popup-tab {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--popup-text-secondary);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease;
+            display: flex;
+            align-items: center;
+            height: 24px;
+            padding: 0 8px;
+        }
+        .app-popup-panel .app-popup-tab:hover { color: var(--popup-text); background: rgba(0, 0, 0, 0.04); }
+        .app-popup-panel .app-popup-tab.active {
+            color: var(--popup-accent);
+            background: var(--popup-accent-subtle);
+        }
+        .app-popup-panel .instrument-item {
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            background: var(--popup-surface);
+            border: 1px solid var(--popup-border);
+            border-radius: 10px;
+            color: var(--popup-text);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+        .app-popup-panel .instrument-item:hover {
+            background: var(--popup-bg);
+            border-color: var(--popup-border-strong);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+        .app-popup-panel .instrument-item.selected {
+            background: var(--popup-accent-subtle);
+            border-color: var(--popup-accent-border);
+            color: var(--popup-accent);
+            box-shadow: 0 0 0 1px var(--popup-accent-subtle);
+        }
+        .app-popup-panel .keyboard-visual-setting-item label {
+            color: var(--popup-text);
+            font-size: 12px;
+            font-weight: 600;
+            align-items: center;
+        }
+        .app-popup-panel .keyboard-visual-setting-item .setting-description { font-weight: 400; }
+        .app-popup-panel .settings-about-content {
+            color: var(--popup-text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .app-popup-panel .settings-about-content a { color: var(--popup-accent); font-weight: 500; }
+        .app-popup-panel .settings-about-content a:hover { color: var(--popup-accent-hover); text-decoration: underline; }
+        .app-popup-panel select {
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--popup-surface);
+            border: 1px solid var(--popup-border-strong);
+            border-radius: 8px;
+            color: var(--popup-text);
+            padding: 4px 8px;
+            line-height: 1.3;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        .app-popup-panel select:focus {
+            outline: none;
+            border-color: var(--popup-accent);
+            box-shadow: 0 0 0 3px var(--popup-accent-subtle);
+        }
+        .app-popup-panel input[type="range"] {
+            background: transparent;
+            border: none;
+            accent-color: var(--popup-accent);
+            max-width: 12rem;
+            flex: 1;
+            min-width: 6rem;
+        }
+        .app-popup-panel .settings-master-volume-value { color: var(--popup-text-secondary); font-size: 12px; font-weight: 600; }
+        /* Top bar = tabs (cc-dock style: compact padding, small buttons) */
+        .app-popup-panel .app-popup-tabs {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 12px;
+            min-height: 44px;
+            background: var(--popup-bg-top);
+            border-bottom: 1px solid var(--popup-border);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+        }
+        .app-popup-tabs {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .app-popup-tab {
+            height: 24px;
+            padding: 0 8px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--popup-text-secondary);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        .app-popup-tab:hover { color: var(--popup-text); background: rgba(0, 0, 0, 0.04); }
+        .app-popup-tab.active {
+            color: var(--popup-accent);
+            background: var(--popup-accent-subtle);
+        }
+        .app-popup-close {
+            margin-left: auto;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 300;
+            line-height: 1;
+            color: var(--popup-text-secondary);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+        .app-popup-close:hover {
+            color: var(--popup-text);
+            background: rgba(0, 0, 0, 0.06);
+        }
+        .app-popup-close:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--popup-accent);
+        }
+        /* Content area (cc-dock-body style padding) */
+        .app-popup-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px 12px 12px;
+        }
+        /* Elegant scrollbar — shared by all popups (big, sub, modal, MIDI debug) */
+        .app-popup-body,
+        .key-movement-popup-content,
+        .key-labels-popup-content,
+        .keyboard-visual-panel,
+        #midi-debug-container {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+        }
+        .app-popup-body::-webkit-scrollbar,
+        .key-movement-popup-content::-webkit-scrollbar,
+        .key-labels-popup-content::-webkit-scrollbar,
+        .keyboard-visual-panel::-webkit-scrollbar,
+        #midi-debug-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .app-popup-body::-webkit-scrollbar-track,
+        .key-movement-popup-content::-webkit-scrollbar-track,
+        .key-labels-popup-content::-webkit-scrollbar-track,
+        .keyboard-visual-panel::-webkit-scrollbar-track,
+        #midi-debug-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 4px;
+        }
+        .app-popup-body::-webkit-scrollbar-thumb,
+        .key-movement-popup-content::-webkit-scrollbar-thumb,
+        .key-labels-popup-content::-webkit-scrollbar-thumb,
+        .keyboard-visual-panel::-webkit-scrollbar-thumb,
+        #midi-debug-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.16);
+            border-radius: 4px;
+        }
+        .app-popup-body::-webkit-scrollbar-thumb:hover,
+        .key-movement-popup-content::-webkit-scrollbar-thumb:hover,
+        .key-labels-popup-content::-webkit-scrollbar-thumb:hover,
+        .keyboard-visual-panel::-webkit-scrollbar-thumb:hover,
+        #midi-debug-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.24);
+        }
+        .app-popup-body::-webkit-scrollbar-thumb:active,
+        .key-movement-popup-content::-webkit-scrollbar-thumb:active,
+        .key-labels-popup-content::-webkit-scrollbar-thumb:active,
+        .keyboard-visual-panel::-webkit-scrollbar-thumb:active,
+        #midi-debug-container::-webkit-scrollbar-thumb:active {
+            background: rgba(0, 0, 0, 0.32);
+        }
+        .app-popup-body .settings-panel { display: none; padding: 0; margin: 0; }
+        .app-popup-body .settings-panel.active { display: block; }
+        .instrument-category {
+            margin-bottom: 10px;
+        }
+        .instrument-category-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--popup-text-secondary);
+            margin-bottom: 6px;
+            padding-bottom: 0.2rem;
+        }
+        .instrument-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+            gap: 0.65rem;
+        }
+        .instrument-item {
+            padding: 0.7rem 1rem;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            text-align: left;
+            background: var(--popup-surface);
+            border: 1px solid var(--popup-border);
+            border-radius: 14px;
+            cursor: pointer;
+            color: var(--popup-text);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .instrument-item:hover {
+            background: var(--popup-bg);
+            border-color: var(--popup-border-strong);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+        .instrument-item.selected {
+            background: var(--popup-accent-subtle);
+            border-color: var(--popup-accent-border);
+            color: var(--popup-accent);
+            box-shadow: 0 0 0 1px var(--popup-accent-subtle);
+        }
+        .instrument-search-wrap { margin-bottom: 0.75rem; }
+        .instrument-search-input { width: 100%; max-width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid var(--popup-border); border-radius: 10px; background: var(--popup-surface); color: var(--popup-text); box-sizing: border-box; }
+        .instrument-search-input::placeholder { color: var(--popup-text-secondary); }
+        .instrument-search-input:focus { outline: none; border-color: var(--popup-accent-border); }
+        .instrument-picker-list { max-height: 52vh; overflow: auto; padding-right: 2px; }
+        .instrument-picker-list button { display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 0 0 6px; border-radius: 10px; border: 1px solid var(--popup-border); background: rgba(255,255,255,0.04); color: var(--popup-text); cursor: pointer; font-family: inherit; }
+        .instrument-picker-list button:hover { border-color: var(--popup-accent-border); background: var(--popup-accent-subtle); color: var(--popup-accent); }
+        .instrument-item.instrument-item-hidden { display: none; }
+        .sound-layer-volumes { margin-bottom: 0.5rem; }
+        .sound-layer-volumes .keyboard-visual-setting-item { margin-bottom: 0.5rem; }
+        .sound-layer-item.sound-layer-empty { opacity: 0.85; color: var(--popup-text-secondary); }
+        .sound-layer-item.sound-layer-muted { opacity: 0.6; }
+        .sound-layer-item .sound-layer-row-inner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .sound-layer-label-btn { margin: 0; padding: 2px 6px; font-size: 13px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--popup-text); cursor: pointer; text-align: left; font-family: inherit; }
+        .sound-layer-label-btn:hover { background: var(--popup-accent-subtle); color: var(--popup-accent); border-color: var(--popup-accent-border); }
+        .sound-layer-label-wrap { position: relative; display: inline-block; }
+        .sound-layer-item.dropdown-open { position: relative; z-index: 10; }
+        .sound-layer-dropdown { position: absolute; left: 0; top: 100%; margin-top: 2px; z-index: 200; min-width: 120px; padding: 4px; border-radius: 8px; background: var(--popup-surface); border: 1px solid var(--popup-border); box-shadow: var(--popup-shadow); display: none; }
+        .sound-layer-dropdown.visible { display: block; }
+        .sound-layer-dropdown button { display: block; width: 100%; margin: 0; padding: 6px 10px; font-size: 12px; border: none; border-radius: 6px; background: transparent; color: var(--popup-text); cursor: pointer; text-align: left; font-family: inherit; }
+        .sound-layer-dropdown button:hover { background: var(--popup-accent-subtle); color: var(--popup-accent); }
+        .sound-layer-item .sound-layer-vol-wrap { display: inline-flex; align-items: center; gap: 4px; }
+        .sound-layer-item .sound-layer-vol-wrap input[type="range"] { width: 72px; }
+        .sound-layer-item .sound-layer-semi-wrap { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semi-label { font-size: 11px; font-weight: 600; color: var(--popup-text-secondary); }
+        .sound-layer-item .sound-layer-semi-wrap input[type="range"] { width: 64px; }
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semi-minus,
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semi-plus {
+            background: none;
+            border: none;
+            color: var(--popup-text-secondary);
+            font-size: 14px;
+            line-height: 1;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semi-minus:hover,
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semi-plus:hover { color: var(--popup-text); }
+        .sound-layer-item .sound-layer-semi-wrap .sound-layer-semitone-input {
+            width: 2.8em;
+            min-width: 2.8em;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            padding: 4px 4px;
+            border-radius: 6px;
+            border: 1px solid var(--popup-border);
+            background: var(--popup-surface);
+            color: var(--popup-text);
+        }
+        .sound-layer-item .sound-layer-vol-value, .sound-layer-item .sound-layer-semi-value { font-size: 11px; color: var(--popup-text-secondary); min-width: 2.5em; }
+        .sound-layer-item .sound-layer-everybar-wrap { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; }
+        .sound-layer-item .every-bar-label { font-size: 11px; color: var(--popup-accent); cursor: pointer; text-decoration: none; }
+        .sound-layer-item .every-bar-label:hover { color: var(--popup-accent-hover); }
+        .sound-layer-item .sound-layer-everybar-select { font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--popup-border); background: var(--popup-surface); color: var(--popup-text); min-width: 72px; }
+        .sound-feeling-lucky-wrap { margin-bottom: 0.75rem; }
+        .sound-feeling-lucky-wrap .sound-feeling-lucky-btn { padding: 4px 12px; font-size: 12px; border-radius: 8px; border: 1px solid var(--popup-accent-border); background: var(--popup-accent-subtle); color: var(--popup-accent); cursor: pointer; font-weight: 500; }
+        .sound-feeling-lucky-wrap .sound-feeling-lucky-btn:hover { background: var(--popup-accent); color: #fff; border-color: var(--popup-accent); }
+        .display-section-divider {
+            height: 1px;
+            background: var(--popup-border);
+            margin: 1.25rem 0;
+        }
+        .app-popup-panel .keyboard-visual-setting-item input[type="checkbox"] { accent-color: var(--popup-accent); }
+        .app-popup-panel .keyboard-visual-settings-menu {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--popup-accent);
+        }
+        .app-popup-panel .keyboard-visual-settings-menu:hover { color: var(--popup-accent-hover); }
+        .human-layer-row label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+        .human-layer-row .human-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--popup-border); transition: background 0.05s ease, transform 0.08s ease; flex-shrink: 0; margin-left: 4px; }
+        .human-layer-row .human-dot.triggered { background: var(--popup-accent); transform: scale(1.3); box-shadow: 0 0 0 1px var(--popup-accent-subtle); }
+        .human-dots-row { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+        .human-dots-row .human-dot { margin-left: 0; }
+        .human-delay-hint { font-size: 11px; color: var(--popup-text-secondary); margin-top: 2px; }
+        .human-max-delay-value { font-size: 12px; color: var(--popup-text-secondary); margin-top: 4px; font-weight: 500; }
+
+        /* --- Chord input dock (bottom) --- */
+        .cc-dock {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 220;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+        }
+        .cc-dock-inner {
+            position: relative;
+            pointer-events: auto;
+            width: min(920px, calc(100vw - 24px));
+            background: rgba(250, 250, 250, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 14px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+            transition: transform 0.28s ease-out;
+        }
+        .cc-dock-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .cc-dock-hide-overlay {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+            pointer-events: auto;
+        }
+        .cc-dock-hide-overlay-btn {
+            border: none;
+            background: transparent;
+            color: rgba(0,0,0,0.45);
+            border-radius: 999px;
+            font-size: 18px;
+            line-height: 1;
+            padding: 2px 8px 4px;
+            cursor: pointer;
+        }
+        .cc-dock-hide-overlay-btn:hover {
+            background: transparent;
+            color: rgba(0,0,0,0.6);
+        }
+        .cc-dock-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(26, 26, 28, 0.8);
+            user-select: none;
+        }
+        .cc-dock-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cc-btn {
+            height: 24px;
+            padding: 0 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.10);
+            background: #ffffff;
+            color: #1a1a1c;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .cc-btn:hover { background: rgba(0,0,0,0.04); }
+        .cc-dock-header .cc-btn:hover { background: var(--cc-accent, rgba(0,0,0,0.04)); color: #fff; border-color: var(--cc-accent, rgba(0,0,0,0.12)); }
+        .cc-dock-header #cc-save-btn { color: var(--cc-accent, #0f766e); }
+        .cc-btn-primary {
+            background: var(--cc-accent, #0d9488);
+            border-color: var(--cc-accent, rgba(13, 148, 136, 0.35));
+            color: #fff;
+        }
+        .cc-btn-primary:hover { filter: brightness(0.92); }
+        /* Style button — Imagine-style colourful gradient (matches chordcanvas v1_66) */
+        @keyframes cc-style-hue {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+        .cc-btn.cc-style-btn {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 28%);
+            border: none;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+        .cc-btn.cc-style-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #b88ae0 0%, #7aa8e8 35%, #5dd0d0 70%, #48b8b8 100%);
+            animation: cc-style-hue 12s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .cc-btn.cc-style-btn:hover::before {
+            animation-duration: 1.2s;
+        }
+        .cc-btn.cc-style-btn:hover {
+            background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 28%);
+            color: #fff;
+        }
+        .cc-btn.cc-style-btn.cc-style-flash {
+            box-shadow: inset 0 0 0 999px rgba(255,255,255,0.7);
+            transition: box-shadow 0.18s ease-out;
+        }
+        .cc-dock-toggle-fab .cc-btn {
+            background: transparent;
+            border: none;
+            padding: 4px 8px;
+            color: rgba(0, 0, 0, 0.35);
+        }
+        .cc-dock-toggle-fab .cc-btn:hover {
+            background: transparent;
+            color: rgba(0, 0, 0, 0.55);
+        }
+        .cc-dock-body {
+            padding: 10px 12px 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .cc-chord-rows { display: flex; flex-direction: column; gap: 4px; }
+        .cc-chord-rows.cc-playing { pointer-events: none; opacity: 0.85; user-select: none; }
+        .cc-chord-rows.cc-playing .cc-chord-row.focused { background: transparent; }
+        .cc-chord-row.cc-row-playing .cc-chord-input { font-weight: bold; font-size: 13px; }
+        .cc-chord-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            transition: background 0.15s ease, border-radius 0.15s ease;
+        }
+        .cc-chord-row.focused { border-radius: 8px; background: var(--cc-row-bg, transparent); }
+        .cc-chord-row .cc-chord-input-wrap { flex: 1; min-width: 0; }
+        .cc-chord-row-drag {
+            flex-shrink: 0;
+            width: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            color: rgba(0,0,0,0.35);
+            font-size: 14px;
+            line-height: 1;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .cc-chord-row-drag:active { cursor: grabbing; }
+        .cc-chord-row-drag:hover { color: var(--cc-accent, rgba(0,0,0,0.5)); }
+        .cc-chord-input {
+            width: 100%;
+            min-height: 34px;
+            max-height: 38px;
+            resize: vertical;
+            padding: 3px 6px;
+            border-radius: 5px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            outline: none;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+            line-height: 13px; /* fixed so playing state (font-size: 13px) doesn’t change vertical alignment */
+            background: rgba(255,255,255,0.96);
+            color: #1a1a1c;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .cc-chord-input:focus { border-color: var(--cc-accent, rgba(13, 148, 136, 0.55)); box-shadow: 0 0 0 3px var(--cc-accent-shadow, rgba(13, 148, 136, 0.14)); }
+        .cc-chord-row-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+        .cc-chord-row-actions .cc-btn {
+            width: 22px; height: 22px; padding: 0; font-size: 12px; line-height: 1;
+            border-radius: 6px; border: 1px solid rgba(0,0,0,0.12);
+            background: var(--cc-btn-bg, rgba(255,255,255,0.96));
+            color: var(--cc-accent, #0d9488);
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+        .cc-chord-row-actions .cc-btn:hover:not(:disabled) {
+            background: var(--cc-accent, #0d9488);
+            color: #fff;
+            border-color: var(--cc-accent, #0d9488);
+        }
+        .cc-chord-row-actions .cc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .cc-drag-row-menu {
+            position: fixed; z-index: 300; display: none; flex-direction: column; gap: 2px;
+            min-width: 100px; padding: 4px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.12);
+            background: rgba(255,255,255,0.98); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 12px; font-family: inherit;
+        }
+        .cc-drag-row-menu.visible { display: flex; }
+        .cc-drag-row-menu button {
+            margin: 0; padding: 6px 10px; border: none; border-radius: 6px; background: transparent;
+            color: var(--cc-accent, #0d9488); cursor: pointer; text-align: left; font-size: inherit;
+        }
+        .cc-drag-row-menu button:hover:not(:disabled) { background: var(--cc-accent-subtle, rgba(13,148,136,0.12)); }
+        .cc-drag-row-menu button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .cc-dock-hint {
+            font-size: 11px;
+            color: rgba(26, 26, 28, 0.65);
+            margin-top: -4px;
+        }
+
+        .cc-tabs {
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            flex-wrap: wrap;
+        }
+        .cc-tab {
+            height: 20px;
+            padding: 0 4px;
+            border-radius: 999px;
+            border: 1px solid rgba(0, 0, 0, 0.10);
+            background: rgba(255,255,255,0.9);
+            color: rgba(26, 26, 28, 0.85);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .cc-tab:hover { background: rgba(0,0,0,0.04); }
+        .cc-tab.active {
+            background: var(--cc-tab-active-bg, rgba(13, 148, 136, 0.12));
+            border-color: var(--cc-tab-active-border, rgba(13, 148, 136, 0.30));
+            color: var(--cc-accent, #0f766e);
+        }
+        .cc-tab.cc-tab-adjustment {
+            background: none;
+            border: none;
+            color: var(--cc-accent, #0f766e);
+        }
+        .cc-tab.cc-tab-adjustment:hover { background: rgba(0,0,0,0.04); }
+        .cc-tab.cc-tab-adjustment.active {
+            background: transparent;
+            border: none;
+            color: var(--cc-accent, #0f766e);
+        }
+        .cc-tab-panel { display: none; }
+        .cc-tab-panel.active { display: block; }
+        .cc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .cc-grid-compact {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+        }
+        .cc-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .cc-field label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: rgba(26,26,28,0.65);
+            user-select: none;
+        }
+        .cc-input, .cc-select {
+            height: 30px;
+            padding: 0 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            background: rgba(255,255,255,0.96);
+            color: #1a1a1c;
+            font-size: 12px;
+            font-weight: 600;
+            outline: none;
+        }
+        .cc-select {
+            min-width: 0;
+            max-width: 100%;
+        }
+        .cc-input:focus, .cc-select:focus { border-color: rgba(13, 148, 136, 0.55); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12); }
+        .cc-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-top: 6px;
+        }
+        .cc-checkbox-row input[type="checkbox"] { accent-color: #0d9488; }
+
+        .cc-dock.cc-hidden .cc-dock-inner { transform: translateY(calc(100% + 12px)); pointer-events: none; }
+        .cc-dock-toggle-fab {
+            pointer-events: auto;
+            position: fixed;
+            left: 50%;
+            bottom: 10px;
+            transform: translateX(-50%);
+            z-index: 221;
+            display: none;
+        }
+        .cc-dock.cc-hidden + .cc-dock-toggle-fab { display: block; }
+
+        /* Random modal (Chord dock) */
+        .cc-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 260;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.28);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            padding: 14px;
+        }
+        .cc-modal.visible { display: flex; }
+        .cc-modal-card {
+            width: min(520px, calc(100vw - 24px));
+            background: rgba(250, 250, 250, 0.96);
+            border: 1px solid rgba(0, 0, 0, 0.10);
+            border-radius: 16px;
+            box-shadow: 0 24px 56px rgba(0,0,0,0.18);
+            overflow: hidden;
+        }
+        .cc-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .cc-modal-title {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(26,26,28,0.8);
+        }
+        .cc-modal-body { padding: 12px 14px 14px; }
+        .cc-bpm-row {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .cc-bpm-row label[for="cc-bpm"] { margin: 0; flex-shrink: 0; }
+        .cc-bpm-row #cc-bpm { width: 52px; min-width: 52px; flex-shrink: 0; padding: 0 6px; text-align: center; }
+        .cc-bpm-row .cc-rand-bpm-box { margin: 0; padding: 0; flex-shrink: 0; border: none; background: none; }
+        .cc-bpm-row .cc-rand-bpm-box input[type="checkbox"] { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+        .cc-key-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+        .cc-key-inline label[for="cc-key"] { margin: 0; flex-shrink: 0; }
+        .cc-key-inline #cc-key { min-width: 0; }
+        .cc-key-inline .cc-rand-bpm-box { margin: 0; padding: 0; flex-shrink: 0; border: none; background: none; }
+        .cc-key-inline .cc-rand-bpm-box input[type="checkbox"] { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+        .cc-checklist {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .cc-check {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: rgba(255,255,255,0.8);
+            cursor: pointer;
+            user-select: none;
+        }
+        .cc-check input { accent-color: var(--cc-accent, #0d9488); }
+        .cc-check strong { font-size: 13px; color: rgba(26,26,28,0.9); }
+        .cc-save-row-only-wrap { margin-top: 8px; }
+        .cc-save-row-only-label {
+            border: none;
+            background: none;
+            padding: 0;
+            margin: 0;
+            font-size: 11px;
+            color: rgba(26,26,28,0.75);
+        }
+        .cc-save-row-only-label input[type="checkbox"] { width: 14px; height: 14px; margin: 0 6px 0 0; cursor: pointer; vertical-align: -2px; }
+        .cc-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-reveal" id="bg-reveal" aria-hidden="true"></div>
+    <div class="overlay">
+        <header class="header">
+            <h1 class="app-logo" id="app-logo">Chord Canvas</h1>
+            <!-- Hidden preset select keeps v1_10b preload path: populateGslPresetDropdown populates it and triggers piano preload -->
+            <select id="preset-select" aria-hidden="true" style="position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;opacity:0;pointer-events:none">
+                <option value="">Loading…</option>
+            </select>
+        </header>
+    </div>
+    <!-- Big popup: Instrument | Keyboard | Sound | Camera | About (logo click toggles) -->
+    <div class="app-popup" id="app-popup" role="dialog" aria-label="Settings">
+        <div class="app-popup-panel">
+            <div class="app-popup-tabs" role="tablist">
+                <button type="button" class="app-popup-tab active" role="tab" id="app-tab-display" data-panel="settings-panel-keyboard">Display</button>
+                <button type="button" class="app-popup-tab" role="tab" id="app-tab-sound" data-panel="settings-panel-sound">Sound</button>
+                <button type="button" class="app-popup-tab" role="tab" id="app-tab-about" data-panel="settings-panel-about">About</button>
+                <button type="button" class="app-popup-close" id="app-popup-close" aria-label="Close">×</button>
+            </div>
+            <div class="app-popup-body" id="app-popup-body">
+                <div id="settings-panel-keyboard" class="settings-panel active">
+                    <div class="keyboard-visual-setting-item">
+                        <label><input type="checkbox" id="enable-key-highlight"><div><strong>Key highlight</strong></div></label>
+                    </div>
+                    <div class="keyboard-visual-setting-item">
+                        <label><input type="checkbox" id="enable-key-movement" checked><div><strong>Key movement</strong><button type="button" class="keyboard-visual-settings-menu camera-help-btn" id="key-movement-settings-btn" aria-label="More options">?</button></div></label>
+                    </div>
+                    <div class="keyboard-visual-setting-item">
+                        <label><input type="checkbox" id="enable-key-labels" checked><div><strong>Key labels</strong><button type="button" class="keyboard-visual-settings-menu camera-help-btn" id="key-labels-settings-btn" aria-label="More options">?</button></div></label>
+                    </div>
+                    <div class="keyboard-visual-setting-item">
+                        <label><input type="checkbox" id="enable-keypress-input"><div><strong>Computer keyboard</strong></div></label>
+                    </div>
+                    <div class="keyboard-visual-setting-item camera-help-wrap">
+                        <label><input type="checkbox" id="camera-enabled" checked><div><strong>Camera Control</strong></div><button type="button" class="keyboard-visual-settings-menu camera-help-btn" id="camera-help-btn" aria-label="What Camera Control does">?</button></label>
+                    </div>
+                </div>
+                <div id="settings-panel-sound" class="settings-panel">
+                    <div class="keyboard-visual-setting-item" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                        <label style="display:flex;align-items:center;gap:4px;">
+                            <span class="setting-label-inline">Reverb</span>
+                            <select id="settings-reverb-select">
+                                <option value="0">Off</option>
+                                <option value="25">Subtle</option>
+                                <option value="50">Light</option>
+                                <option value="75">Medium</option>
+                                <option value="100" selected>Full</option>
+                            </select>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;">
+                            <span class="setting-label-inline">Stereo width</span>
+                            <select id="settings-stereo-select">
+                                <option value="-100">Wide</option>
+                                <option value="-75">Moderate</option>
+                                <option value="-50">Narrow</option>
+                                <option value="-25" selected>Subtle</option>
+                                <option value="0">Mono</option>
+                            </select>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;">
+                            <span class="setting-label-inline">Master level</span>
+                            <input type="range" id="settings-master-volume" min="0" max="2000" value="700" step="10">
+                            <span class="settings-master-volume-value" id="settings-master-volume-value">700%</span>
+                        </label>
+                    </div>
+                    <div class="keyboard-visual-setting-item" style="margin-top:12px;">
+                        <div class="setting-description" style="margin-bottom:6px;">Piano layer</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;">
+                            <label style="display:flex;align-items:center;gap:6px;">
+                                <span class="setting-label-inline">Bass every bar</span>
+                                <select id="popup-piano-bass-everybar">
+                                    <option value="none">none</option>
+                                    <option value="uphill">uphill</option>
+                                    <option value="downhill">downhill</option>
+                                    <option value="valley">valley</option>
+                                    <option value="hill">hill</option>
+                                    <option value="2valley">2 valley</option>
+                                    <option value="2hill">2 hill</option>
+                                </select>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;">
+                                <span class="setting-label-inline">Bass intensity</span>
+                                <input type="range" id="popup-piano-bass-intensity" min="0" max="100" value="51" step="1" style="width:80px;">
+                                <span class="settings-master-volume-value" id="popup-piano-bass-intensity-value">51%</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;">
+                                <span class="setting-label-inline">Treble every bar</span>
+                                <select id="popup-piano-treble-everybar">
+                                    <option value="none">none</option>
+                                    <option value="uphill">uphill</option>
+                                    <option value="downhill">downhill</option>
+                                    <option value="valley">valley</option>
+                                    <option value="hill">hill</option>
+                                    <option value="2valley">2 valley</option>
+                                    <option value="2hill">2 hill</option>
+                                </select>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;">
+                                <span class="setting-label-inline">Treble intensity</span>
+                                <input type="range" id="popup-piano-treble-intensity" min="0" max="100" value="51" step="1" style="width:80px;">
+                                <span class="settings-master-volume-value" id="popup-piano-treble-intensity-value">51%</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div id="settings-panel-about" class="settings-panel">
+                    <div class="settings-about-content">
+                        <p>Chord MIDI and WAV generator with real-time 3D piano visualisation. Play from a controller or build ideas in the browser—no DAW required.</p>
+                        <p><a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">Support the project</a> to help keep development going.</p>
+                        <p>By <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>—music producer and sound designer. Built for playing and sketching with chords directly from MIDI, without opening a DAW.</p>
+                        <p>Piano sound: <a href="https://www.schristiancollins.com/generaluser" target="_blank" rel="noopener noreferrer" style="text-decoration: none">GeneralUser</a> GS (SF2) by S. Christian Collins, converted to WAV.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Instrument and intensity modals outside .app-popup-panel so position:fixed is viewport-relative (panel has transform) -->
+        <div id="instrument-picker-modal" class="options-modal" aria-hidden="true" style="position:fixed;inset:0;z-index:320;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);">
+            <div class="options-card" style="padding:1rem;min-width:280px;max-width:520px;width:min(92vw,520px);background:var(--popup-surface);border:1px solid var(--popup-border);border-radius:12px;box-shadow:var(--popup-shadow);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                    <strong>Choose instrument</strong>
+                    <button type="button" id="instrument-picker-close" class="options-cancel">Close</button>
+                </div>
+                <div class="instrument-search-wrap">
+                    <input type="text" id="instrument-picker-search" placeholder="Search instruments…" aria-label="Search instruments" class="instrument-search-input">
+                </div>
+                <div id="instrument-picker-list" class="instrument-picker-list" aria-label="Instrument list"></div>
+            </div>
+        </div>
+        <div id="every-bar-intensity-modal" class="options-modal" aria-hidden="true" style="position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);">
+            <div class="options-card" style="padding:1rem;min-width:200px;background:var(--popup-surface);border:1px solid var(--popup-border);border-radius:12px;box-shadow:var(--popup-shadow);">
+                <div class="control-row" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <label for="every-bar-intensity-slider">Filter</label>
+                    <input type="range" id="every-bar-intensity-slider" min="0" max="100" value="76" style="flex:1;">
+                    <span id="every-bar-intensity-value">76%</span>
+                </div>
+                <button type="button" id="every-bar-intensity-close" class="options-cancel">Close</button>
+            </div>
+        </div>
+    </div>
+    <!-- Camera Control help: overlay popup (click ? next to Camera Control) -->
+    <div class="camera-help-overlay" id="camera-help-overlay" role="dialog" aria-label="Camera Control" aria-modal="true">
+        <div class="camera-help-overlay-content">
+            <h2 class="camera-help-overlay-title">Camera Control</h2>
+            <p>Spacebar: cycle camera views. R: toggle orbit around piano.</p>
+            <button type="button" class="camera-help-overlay-close" id="camera-help-overlay-close">OK</button>
+        </div>
+    </div>
+
+    <!-- Chords (bottom dock) -->
+    <div class="cc-dock" id="cc-dock" aria-label="Chords input">
+        <div class="cc-dock-inner">
+            <div class="cc-dock-hide-overlay">
+                <button type="button" class="cc-dock-hide-overlay-btn" id="cc-hide-overlay-btn" aria-controls="cc-dock" aria-label="Hide chords panel">▼</button>
+            </div>
+            <div class="cc-dock-body">
+                <div class="cc-tab-panel active" id="cc-panel-chords" role="tabpanel" aria-labelledby="cc-tab-chords">
+                    <div class="cc-chord-rows" id="cc-chord-rows">
+                        <div class="cc-chord-row focused" data-index="0" data-color-index="0">
+                            <div class="cc-chord-row-drag" draggable="true" title="Tap: Add/Delete · Drag: reorder" aria-label="Tap for options or drag to reorder">⋮</div>
+                            <div class="cc-chord-input-wrap">
+                                <textarea class="cc-chord-input" data-index="0" maxlength="120" placeholder="Enter chords separated by commas (e.g. C, Am, F, G7)"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cc-tab-panel" id="cc-panel-rhythm" role="tabpanel" aria-labelledby="cc-tab-rhythm">
+                    <div class="cc-grid-compact">
+                        <div class="cc-field">
+                            <label for="cc-bass-rhythm">Bass rhythm</label>
+                            <select class="cc-select" id="cc-bass-rhythm"></select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-treble-rhythm">Treble rhythm</label>
+                            <select class="cc-select" id="cc-treble-rhythm"></select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-bass-skip1">Bass skip</label>
+                            <div style="display:flex; gap:8px;">
+                                <select class="cc-select" id="cc-bass-skip1" style="flex:1;"></select>
+                                <select class="cc-select" id="cc-bass-skip2" style="flex:1;"></select>
+                                <select class="cc-select" id="cc-bass-skip3" style="flex:1;"></select>
+                            </div>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-skip1">Treble skip</label>
+                            <div style="display:flex; gap:8px;">
+                                <select class="cc-select" id="cc-skip1" style="flex:1;"></select>
+                                <select class="cc-select" id="cc-skip2" style="flex:1;"></select>
+                                <select class="cc-select" id="cc-skip3" style="flex:1;"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cc-tab-panel" id="cc-panel-notes" role="tabpanel" aria-labelledby="cc-tab-notes">
+                    <div class="cc-grid">
+                        <div class="cc-field">
+                            <label for="cc-pattern-mode">Treble pattern</label>
+                            <select class="cc-select" id="cc-pattern-mode">
+                                <option value="normal" selected>normal</option>
+                                <option value="ascend">ascend</option>
+                                <option value="descend">descend</option>
+                                <option value="ascend2">ascend2</option>
+                                <option value="descend2">descend2</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-bass-pattern-mode">Bass pattern</label>
+                            <select class="cc-select" id="cc-bass-pattern-mode">
+                                <option value="normal" selected>normal</option>
+                                <option value="ascend">ascend</option>
+                                <option value="descend">descend</option>
+                                <option value="ascend2">ascend2</option>
+                                <option value="descend2">descend2</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-octave-shift">Octave shift</label>
+                            <select class="cc-select" id="cc-octave-shift">
+                                <option value="-2">-2</option>
+                                <option value="-1">-1</option>
+                                <option value="0" selected>0</option>
+                                <option value="1">+1</option>
+                                <option value="2">+2</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-voicing">Voicing</label>
+                            <select class="cc-select" id="cc-voicing">
+                                <option value="full" selected>full (bass + treble)</option>
+                                <option value="treble">treble only</option>
+                                <option value="bass">bass only</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-double-treble">Treble octaves</label>
+                            <select class="cc-select" id="cc-double-treble">
+                                <option value="1" selected>1 octave</option>
+                                <option value="2">2 octaves</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-double-bass">Bass octaves</label>
+                            <select class="cc-select" id="cc-double-bass">
+                                <option value="1" selected>1 octave</option>
+                                <option value="2">2 octaves</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-velocity">Note velocity</label>
+                            <input class="cc-input" id="cc-velocity" type="number" inputmode="numeric" min="1" max="127" value="74" title="MIDI velocity 1–127">
+                        </div>
+                    </div>
+                </div>
+                <div class="cc-tab-panel" id="cc-panel-human" role="tabpanel" aria-labelledby="cc-tab-human">
+                    <div class="cc-grid">
+                        <div class="cc-field">
+                            <label for="cc-delay-mod">Play like a</label>
+                            <select class="cc-select" id="cc-delay-mod">
+                                <option value="none">metronome</option>
+                                <option value="human">human</option>
+                                <option value="drunk" selected>drunk</option>
+                            </select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-bass-everybar">Bass every-bar</label>
+                            <select class="cc-select" id="cc-bass-everybar"></select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-bass-everybar-intensity">Bass filter intensity</label>
+                            <input class="cc-input" id="cc-bass-everybar-intensity" type="number" inputmode="numeric" min="0" max="100" step="1" value="51">
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-treble-everybar">Treble every-bar</label>
+                            <select class="cc-select" id="cc-treble-everybar"></select>
+                        </div>
+                        <div class="cc-field">
+                            <label for="cc-treble-everybar-intensity">Treble filter intensity</label>
+                            <input class="cc-input" id="cc-treble-everybar-intensity" type="number" inputmode="numeric" min="0" max="100" step="1" value="51">
+                        </div>
+                        <div class="cc-field">
+                            <label class="cc-check">
+                                <input type="checkbox" id="cc-sustain-pedal" checked>
+                                Sustain pedal
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="cc-dock-header">
+                <div class="cc-tabs" role="tablist" aria-label="Chord panel tabs">
+                    <button type="button" class="cc-tab active" id="cc-tab-chords" data-panel="cc-panel-chords" role="tab" aria-selected="true">Chords</button>
+                    <button type="button" class="cc-tab cc-tab-adjustment" id="cc-tab-rhythm" data-panel="cc-panel-rhythm" role="tab" aria-selected="false">Rhythm</button>
+                    <button type="button" class="cc-tab cc-tab-adjustment" id="cc-tab-notes" data-panel="cc-panel-notes" role="tab" aria-selected="false">Notes</button>
+                    <button type="button" class="cc-tab cc-tab-adjustment" id="cc-tab-human" data-panel="cc-panel-human" role="tab" aria-selected="false">Human</button>
+                    <button type="button" class="cc-tab cc-tab-adjustment" id="cc-tab-sound" data-panel="app-popup-sound" role="tab" aria-selected="false">Sound</button>
+                </div>
+                <div class="cc-dock-actions">
+                    <button type="button" class="cc-btn cc-style-btn" id="cc-random-btn">✦ imagine</button>
+                    <button type="button" class="cc-btn cc-btn-primary" id="cc-play-btn">▶</button>
+                    <button type="button" class="cc-btn" id="cc-save-btn" aria-label="Save">🡇</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="cc-dock-toggle-fab">
+        <button type="button" class="cc-btn" id="cc-show-btn" aria-controls="cc-dock" aria-label="Show chords panel">▲</button>
+    </div>
+
+    <!-- ✦ imagine popup (Chord dock) -->
+    <div class="cc-modal" id="cc-random-modal" role="dialog" aria-label="✦ imagine settings" aria-modal="true">
+        <div class="cc-modal-card">
+            <div class="cc-modal-head">
+                <div class="cc-modal-title">✦ imagine</div>
+            </div>
+                <div class="cc-modal-body">
+                <div class="cc-field cc-bpm-row">
+                    <label for="cc-bpm">BPM</label>
+                    <input class="cc-input" id="cc-bpm" type="number" inputmode="numeric" min="33" max="888" step="1" value="120">
+                    <label class="cc-check cc-rand-bpm-box">
+                        <input type="checkbox" id="cc-rand-bpm" title="Randomise BPM 70–140" aria-label="Randomise BPM">
+                    </label>
+                    <div class="cc-key-inline">
+                        <label for="cc-key">Key</label>
+                        <select class="cc-select" id="cc-key">
+                            <option value="C" selected>C</option>
+                            <option value="C#">C#</option>
+                            <option value="D">D</option>
+                            <option value="Eb">Eb</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="F#">F#</option>
+                            <option value="G">G</option>
+                            <option value="Ab">Ab</option>
+                            <option value="A">A</option>
+                            <option value="Bb">Bb</option>
+                            <option value="B">B</option>
+                        </select>
+                        <label class="cc-check cc-rand-bpm-box" title="Randomise key">
+                            <input type="checkbox" id="cc-rand-key" aria-label="Randomise key" checked>
+                        </label>
+                    </div>
+                </div>
+                <div class="cc-checklist">
+                    <label class="cc-check"><input type="checkbox" id="cc-rand-chords" checked><strong>Chords</strong></label>
+                    <label class="cc-check"><input type="checkbox" id="cc-rand-rhythm" checked><strong>Rhythm</strong></label>
+                    <label class="cc-check"><input type="checkbox" id="cc-rand-notes" checked><strong>Notes</strong></label>
+                    <label class="cc-check"><input type="checkbox" id="cc-rand-human" checked><strong>Human</strong></label>
+                    <label class="cc-check"><input type="checkbox" id="cc-rand-sound" checked><strong>Sound</strong></label>
+                </div>
+                <div class="cc-dock-hint" style="margin-top:-4px;margin-bottom:12px;">
+                    Rules: Chords=4 random. Rhythm randomizes dropdowns; if “Randomise BPM” is checked, BPM 70–140 (otherwise unchanged, default 120). Notes: velocity from input (default 74). Human won’t change intensity fields. Sound: randomizes bass/treble every-bar dropdowns (Sound panel).
+                </div>
+                <!-- No cancel button; close via outside click or Escape key -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Save popup -->
+    <div class="cc-modal" id="cc-save-modal" role="dialog" aria-label="Save chords" aria-modal="true">
+        <div class="cc-modal-card">
+            <div class="cc-modal-head">
+                <div class="cc-modal-title">Save</div>
+            </div>
+            <div class="cc-modal-body">
+                <div class="cc-modal-actions" style="justify-content:flex-start;margin-bottom:10px;">
+                    <button type="button" class="cc-btn cc-btn-primary" id="cc-save-midi-btn">MIDI (.mid)</button>
+                    <button type="button" class="cc-btn" id="cc-save-wav-btn">WAV (.wav)</button>
+                </div>
+                <div id="cc-save-row-only-wrap" class="cc-save-row-only-wrap" style="display:none;">
+                    <label class="cc-check cc-save-row-only-label">
+                        <input type="checkbox" id="cc-save-this-row-only" aria-label="Save this row only">
+                        Save this row only
+                    </label>
+                </div>
+                <!-- No cancel button; close via outside click or Escape key -->
+            </div>
+        </div>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <!-- GSL handler (empty manifest for producers: piano-only via JS synths) -->
+    <script src="instruments/instruhandle.js"></script>
+    <!-- Piano-only: Soft Piano + E-Piano -->
+    <script src="instruments/jssound/instrument-soft-piano.js"></script>
+    <script src="instruments/jssound/instrument-epiano.js"></script>
+    <script src="audio/gsl-synth.js"></script>
+    <!-- Keyboard Visual & Input Modules -->
+    <script src="keyboard/key-highlight/key-highlight.js"></script>
+    <script src="keyboard/key-movement/key-movement.js"></script>
+    <script src="keyboard/key-labels/key-labels.js"></script>
+    <script src="keyboard/keypress-input/keypress-input.js"></script>
+    <script src="keyboard/keyboard-visual-settings/keyboard-visual-settings.js"></script>
+    <!-- MIDI mapping for keyboard playback (no MIDI hardware input) -->
+    <script src="midi/midi-mapping/midi-mapping.js"></script>
+    <!-- MIDI file export (jsmidgen, local) -->
+    <script src="lib/jsmidgen.js"></script>
+    <!-- Shared event generator: MIDI/WAV match live playback -->
+    <script src="lib/primidi-save.js"></script>
+    <!-- ChordCanvas-derived chord engine (local) -->
+    <script src="cc/chord-intervals-config.js"></script>
+    <script src="cc/core.js"></script>
+    <script src="cc/chord-player.js"></script>
+    <script type="module" src="main.js"></script>
+    <script>
+        // Initialize keyboard visual settings when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Chords dock: hide/show (persisted)
+            const dock = document.getElementById('cc-dock');
+            const hideBtn = document.getElementById('cc-hide-overlay-btn');
+            const showBtn = document.getElementById('cc-show-btn');
+            const STORAGE_KEY = 'primidi_ccDockHidden';
+            function setDockHidden(hidden) {
+                if (!dock) return;
+                dock.classList.toggle('cc-hidden', !!hidden);
+            }
+            if (hideBtn) hideBtn.addEventListener('click', () => setDockHidden(true));
+            if (showBtn) showBtn.addEventListener('click', () => setDockHidden(false));
+
+            // Chords dock: tabs
+            const tabButtons = Array.from(document.querySelectorAll('.cc-tab'));
+            function setActiveTab(panelId) {
+                tabButtons.forEach((btn) => {
+                    const isActive = btn.getAttribute('data-panel') === panelId;
+                    btn.classList.toggle('active', isActive);
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                });
+                document.querySelectorAll('.cc-tab-panel').forEach((panel) => {
+                    panel.classList.toggle('active', panel.id === panelId);
+                });
+                if (panelId === 'cc-panel-chords') {
+                    requestAnimationFrame(() => {
+                        const activeRow = document.querySelector('#cc-panel-chords .cc-chord-row.focused');
+                        const ta = activeRow && activeRow.querySelector('.cc-chord-input');
+                        if (ta) ta.focus();
+                    });
+                }
+            }
+            tabButtons.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const panelId = btn.getAttribute('data-panel');
+                    if (panelId === 'app-popup-sound') {
+                        const appPopup = document.getElementById('app-popup');
+                        const soundTab = document.querySelector('.app-popup-tab[data-panel="settings-panel-sound"]');
+                        if (appPopup) appPopup.classList.add('visible');
+                        if (soundTab) {
+                            document.querySelectorAll('.app-popup-tab').forEach((t) => t.classList.remove('active'));
+                            document.querySelectorAll('.app-popup-body .settings-panel').forEach((p) => p.classList.remove('active'));
+                            soundTab.classList.add('active');
+                            const panel = document.getElementById('settings-panel-sound');
+                            if (panel) panel.classList.add('active');
+                            if (typeof window.ccApplyCurrentRowSoundToGlobals === 'function') window.ccApplyCurrentRowSoundToGlobals();
+                            if (window.updateSoundLayerVolumesUI) window.updateSoundLayerVolumesUI();
+                            if (window.updatePopupPianoLayerFromChordRow) window.updatePopupPianoLayerFromChordRow();
+                        }
+                        return;
+                    }
+                    setActiveTab(panelId);
+                });
+            });
+            // Always start on the default tab (Chords) on page load; no persistence.
+            setActiveTab('cc-panel-chords');
+
+            // Chords dock: Random modal
+            const randomBtn = document.getElementById('cc-random-btn');
+            const randomModal = document.getElementById('cc-random-modal');
+            function closeRandom() {
+                if (randomModal) randomModal.classList.remove('visible');
+            }
+            function openRandom() {
+                if (randomModal) randomModal.classList.add('visible');
+            }
+            function runImagineQuick() {
+                const wasPlaying = typeof window.ccIsChordPlaying === 'function' && window.ccIsChordPlaying();
+                if (wasPlaying && typeof window.ccStopChords === 'function') {
+                    window.ccStopChords();
+                }
+                const opts = {
+                    chords: !!document.getElementById('cc-rand-chords')?.checked,
+                    rhythm: !!document.getElementById('cc-rand-rhythm')?.checked,
+                    notes: !!document.getElementById('cc-rand-notes')?.checked,
+                    human: !!document.getElementById('cc-rand-human')?.checked,
+                    sound: !!document.getElementById('cc-rand-sound')?.checked,
+                    bpm: !!document.getElementById('cc-rand-bpm')?.checked
+                };
+                if (typeof window.ccRandomize === 'function') {
+                    window.ccRandomize(opts);
+                }
+                closeRandom();
+                if (wasPlaying && typeof window.ccStartChords === 'function') {
+                    window.ccStartChords();
+                }
+            }
+            // Long-press to open ✦ imagine (same hold time as chord-row drag tap threshold)
+            if (randomBtn) {
+                const RANDOM_HOLD_MS = 200;
+                let randomHoldTimer = null;
+                let randomOpenedByHold = false;
+                randomBtn.addEventListener('pointerdown', () => {
+                    // Flash white overlay briefly on any press
+                    randomBtn.classList.add('cc-style-flash');
+                    setTimeout(() => {
+                        randomBtn.classList.remove('cc-style-flash');
+                    }, 180);
+                    randomOpenedByHold = false;
+                    if (randomHoldTimer) {
+                        clearTimeout(randomHoldTimer);
+                        randomHoldTimer = null;
+                    }
+                    randomHoldTimer = setTimeout(() => {
+                        openRandom();
+                        randomOpenedByHold = true;
+                        randomHoldTimer = null;
+                    }, RANDOM_HOLD_MS);
+                });
+                randomBtn.addEventListener('pointerup', () => {
+                    if (randomHoldTimer) {
+                        clearTimeout(randomHoldTimer);
+                        randomHoldTimer = null;
+                        if (!randomOpenedByHold) {
+                            runImagineQuick();
+                        }
+                    }
+                });
+                const cancelRandomHold = () => {
+                    if (randomHoldTimer) {
+                        clearTimeout(randomHoldTimer);
+                        randomHoldTimer = null;
+                    }
+                };
+                randomBtn.addEventListener('pointerleave', cancelRandomHold);
+                randomBtn.addEventListener('pointercancel', cancelRandomHold);
+            }
+            if (randomModal) {
+                randomModal.addEventListener('click', (e) => {
+                    if (e.target === randomModal) closeRandom();
+                });
+            }
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && randomModal && randomModal.classList.contains('visible')) closeRandom();
+            });
+            // (Removed) cc-feeling-lucky-btn: quick tap on ✦ imagine now runs the same action.
+
+            // Chords dock: Save modal
+            const saveBtn = document.getElementById('cc-save-btn');
+            const saveModal = document.getElementById('cc-save-modal');
+            const saveMidiBtn = document.getElementById('cc-save-midi-btn');
+            const saveWavBtn = document.getElementById('cc-save-wav-btn');
+            function closeSave() {
+                if (saveModal) saveModal.classList.remove('visible');
+            }
+            function openSave() {
+                if (typeof window.ccUpdateSaveModalOptions === 'function') window.ccUpdateSaveModalOptions();
+                if (saveModal) saveModal.classList.add('visible');
+            }
+            if (saveBtn) saveBtn.addEventListener('click', openSave);
+            if (saveModal) {
+                saveModal.addEventListener('click', (e) => {
+                    if (e.target === saveModal) closeSave();
+                });
+            }
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && saveModal && saveModal.classList.contains('visible')) closeSave();
+            });
+            if (saveMidiBtn) {
+                saveMidiBtn.addEventListener('click', () => {
+                    if (typeof window.ccExport === 'function') {
+                        window.ccExport('midi');
+                    }
+                    closeSave();
+                });
+            }
+            if (saveWavBtn) {
+                saveWavBtn.addEventListener('click', () => {
+                    if (typeof window.ccExport === 'function') {
+                        window.ccExport('wav');
+                    } else {
+                        alert('WAV export is not available in this version.');
+                    }
+                    closeSave();
+                });
+            }
+
+            // Scene: glow in from dark to normal over 4s (no hold)
+            requestAnimationFrame(() => {
+                const bgReveal = document.getElementById('bg-reveal');
+                if (bgReveal) bgReveal.classList.add('revealed');
+            });
+            // Initialize keyboard visual settings module (binds to panels inside app-popup)
+            if (window.initKeyboardVisualSettings) {
+                window.initKeyboardVisualSettings();
+            }
+
+            // Logo click: fade in/out big popup (Instrument, Keyboard, Sound, Camera, About)
+            const appLogo = document.getElementById('app-logo');
+            const appPopup = document.getElementById('app-popup');
+            if (appLogo && appPopup) {
+                appLogo.addEventListener('click', () => {
+                    appPopup.classList.toggle('visible');
+                });
+            }
+            // Close: button, Escape, click on backdrop
+            const closeBtn = document.getElementById('app-popup-close');
+            if (closeBtn && appPopup) {
+                closeBtn.addEventListener('click', () => appPopup.classList.remove('visible'));
+            }
+            if (appPopup) {
+                appPopup.addEventListener('click', (e) => { if (e.target === appPopup) appPopup.classList.remove('visible'); });
+            }
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && appPopup && appPopup.classList.contains('visible')) {
+                    appPopup.classList.remove('visible');
+                }
+            });
+            // Popup tabs: switch panel
+            document.querySelectorAll('.app-popup-tab').forEach((tab) => {
+                tab.addEventListener('click', () => {
+                    const panelId = tab.getAttribute('data-panel');
+                    if (!panelId) return;
+                    document.querySelectorAll('.app-popup-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.app-popup-body .settings-panel').forEach(p => p.classList.remove('active'));
+                    tab.classList.add('active');
+                    const panel = document.getElementById(panelId);
+                    if (panel) panel.classList.add('active');
+                    if (panelId === 'settings-panel-sound') {
+                        if (typeof window.ccApplyCurrentRowSoundToGlobals === 'function') window.ccApplyCurrentRowSoundToGlobals();
+                    }
+                    if (panelId === 'settings-panel-sound') {
+                        if (window.updateSoundLayerVolumesUI) window.updateSoundLayerVolumesUI();
+                        var flickerSel = document.getElementById('sound-flicker-select');
+                        if (flickerSel && window.gslFlickerMode) flickerSel.value = window.gslFlickerMode;
+                        if (window.updatePopupPianoLayerFromChordRow) window.updatePopupPianoLayerFromChordRow();
+                    }
+                });
+            });
+            // Piano layer in popup: sync from chord row when opening Sound tab, and push changes to cc-* so row state persists
+            function updatePopupPianoLayerFromChordRow() {
+                var bassEl = document.getElementById('cc-bass-everybar');
+                var trebleEl = document.getElementById('cc-treble-everybar');
+                var bassIntEl = document.getElementById('cc-bass-everybar-intensity');
+                var trebleIntEl = document.getElementById('cc-treble-everybar-intensity');
+                var popupBass = document.getElementById('popup-piano-bass-everybar');
+                var popupTreble = document.getElementById('popup-piano-treble-everybar');
+                var popupBassInt = document.getElementById('popup-piano-bass-intensity');
+                var popupTrebleInt = document.getElementById('popup-piano-treble-intensity');
+                var popupBassIntVal = document.getElementById('popup-piano-bass-intensity-value');
+                var popupTrebleIntVal = document.getElementById('popup-piano-treble-intensity-value');
+                if (bassEl && popupBass) popupBass.value = bassEl.value || 'uphill';
+                if (trebleEl && popupTreble) popupTreble.value = trebleEl.value || 'uphill';
+                var bassPct = bassIntEl ? Math.max(0, Math.min(100, parseInt(bassIntEl.value, 10) || 51)) : 51;
+                var treblePct = trebleIntEl ? Math.max(0, Math.min(100, parseInt(trebleIntEl.value, 10) || 51)) : 51;
+                if (popupBassInt) { popupBassInt.value = bassPct; if (popupBassIntVal) popupBassIntVal.textContent = bassPct + '%'; }
+                if (popupTrebleInt) { popupTrebleInt.value = treblePct; if (popupTrebleIntVal) popupTrebleIntVal.textContent = treblePct + '%'; }
+            }
+            window.updatePopupPianoLayerFromChordRow = updatePopupPianoLayerFromChordRow;
+            function applyPopupPianoLayerToChordRow() {
+                var bassEl = document.getElementById('cc-bass-everybar');
+                var trebleEl = document.getElementById('cc-treble-everybar');
+                var bassIntEl = document.getElementById('cc-bass-everybar-intensity');
+                var trebleIntEl = document.getElementById('cc-treble-everybar-intensity');
+                var popupBass = document.getElementById('popup-piano-bass-everybar');
+                var popupTreble = document.getElementById('popup-piano-treble-everybar');
+                var popupBassInt = document.getElementById('popup-piano-bass-intensity');
+                var popupTrebleInt = document.getElementById('popup-piano-treble-intensity');
+                if (popupBass && bassEl) { bassEl.value = popupBass.value; bassEl.dispatchEvent(new Event('change', { bubbles: true })); }
+                if (popupTreble && trebleEl) { trebleEl.value = popupTreble.value; trebleEl.dispatchEvent(new Event('change', { bubbles: true })); }
+                if (popupBassInt && bassIntEl) { var v = Math.max(0, Math.min(100, parseInt(popupBassInt.value, 10) || 51)); bassIntEl.value = v; bassIntEl.dispatchEvent(new Event('input', { bubbles: true })); }
+                if (popupTrebleInt && trebleIntEl) { var v = Math.max(0, Math.min(100, parseInt(popupTrebleInt.value, 10) || 51)); trebleIntEl.value = v; trebleIntEl.dispatchEvent(new Event('input', { bubbles: true })); }
+            }
+            (function wirePopupPianoLayer() {
+                var popupBass = document.getElementById('popup-piano-bass-everybar');
+                var popupTreble = document.getElementById('popup-piano-treble-everybar');
+                var popupBassInt = document.getElementById('popup-piano-bass-intensity');
+                var popupTrebleInt = document.getElementById('popup-piano-treble-intensity');
+                var popupBassIntVal = document.getElementById('popup-piano-bass-intensity-value');
+                var popupTrebleIntVal = document.getElementById('popup-piano-treble-intensity-value');
+                if (popupBass) popupBass.addEventListener('change', applyPopupPianoLayerToChordRow);
+                if (popupTreble) popupTreble.addEventListener('change', applyPopupPianoLayerToChordRow);
+                if (popupBassInt) {
+                    popupBassInt.addEventListener('input', function () {
+                        var pct = parseInt(this.value, 10);
+                        if (popupBassIntVal) popupBassIntVal.textContent = (isNaN(pct) ? 51 : Math.max(0, Math.min(100, pct))) + '%';
+                        applyPopupPianoLayerToChordRow();
+                    });
+                }
+                if (popupTrebleInt) {
+                    popupTrebleInt.addEventListener('input', function () {
+                        var pct = parseInt(this.value, 10);
+                        if (popupTrebleIntVal) popupTrebleIntVal.textContent = (isNaN(pct) ? 51 : Math.max(0, Math.min(100, pct))) + '%';
+                        applyPopupPianoLayerToChordRow();
+                    });
+                }
+            })();
+            // Instrument grid: sound state is per-row from chord dock; never set independent global defaults.
+            if (!window.gslPresetSlots || window.gslPresetSlots.length === 0) {
+                if (typeof window.ccApplyCurrentRowSoundToGlobals === 'function') window.ccApplyCurrentRowSoundToGlobals();
+            }
+            window.gslDelayIntensity = window.gslDelayIntensity != null ? window.gslDelayIntensity : 1;
+            window.gslBpm = window.gslBpm != null ? window.gslBpm : 120;
+            if (window.primidiGlobalTimeOrigin == null) window.primidiGlobalTimeOrigin = performance.now() / 1000;
+            window.primidiGetBarPhase = function () {
+                var bpm = Math.max(40, Math.min(240, Number(window.gslBpm) || 120));
+                var barLen = 60 / bpm;
+                var elapsed = (performance.now() / 1000) - (window.primidiGlobalTimeOrigin || 0);
+                var barIndex = Math.floor(elapsed / barLen);
+                var phase = barLen > 0 ? ((elapsed % barLen) / barLen) : 0;
+                return { barIndex: barIndex, phase: phase };
+            };
+            // Flicker disabled; keep a placeholder for compatibility.
+            window.gslFlickerMode = 'none';
+            window.gslSlugToDisplayName = window.gslSlugToDisplayName || {};
+            const GM_CATEGORIES = { '000': 'Piano & Keys', '001': 'Piano & Keys', '008': 'Synth', '009': 'Ethnic', '011': 'Organs & Keys', '012': 'Orchestral', '013': 'Synth', '016': 'Organ', '025': 'Pipe', '026': 'Pipe', '120': 'Drums', '128': 'SFX' };
+            const MAX_INSTRUMENT_SLOTS = 6;
+            function displayName(entry) {
+                if (entry.label && typeof entry.label === 'string') return entry.label;
+                if (entry.id && typeof entry.id === 'string') return entry.id.replace(/^\d+_\d+_\s*/, '');
+                return entry.slug || '';
+            }
+            function getDefaultSemitoneForSlug(slug) {
+                if (!slug) return 0;
+                var map = window.gslSlugToDefaultSemitone || {};
+                var v = map[slug];
+                return (v != null && !isNaN(v)) ? parseFloat(v) : 0;
+            }
+            function clearLayer(slotIndex) {
+                const slots = window.gslPresetSlots;
+                if (slotIndex < 0 || slotIndex >= slots.length) return;
+                slots.splice(slotIndex, 1);
+                if (!window.gslSlotVolumes) window.gslSlotVolumes = [33, 33, 33, 33, 33, 33];
+                if (!window.gslSlotSemitones) window.gslSlotSemitones = [0, 0, 0, 0, 0, 0];
+                if (!window.gslSlotMuted) window.gslSlotMuted = [false, false, false, false, false, false];
+                if (!window.gslEveryBarPattern) window.gslEveryBarPattern = ['uphill', 'uphill', 'uphill', 'none', 'none', 'none'];
+                if (!window.gslEveryBarIntensity) window.gslEveryBarIntensity = [0.20, 0.20, 0.20, 0.20, 0.20, 0.20];
+                window.gslSlotVolumes.splice(slotIndex, 1);
+                window.gslSlotSemitones.splice(slotIndex, 1);
+                window.gslSlotMuted.splice(slotIndex, 1);
+                window.gslEveryBarPattern.splice(slotIndex, 1);
+                window.gslEveryBarIntensity.splice(slotIndex, 1);
+                while (window.gslSlotVolumes.length < MAX_INSTRUMENT_SLOTS) window.gslSlotVolumes.push(33);
+                while (window.gslSlotSemitones.length < MAX_INSTRUMENT_SLOTS) window.gslSlotSemitones.push(0);
+                while (window.gslSlotMuted.length < MAX_INSTRUMENT_SLOTS) window.gslSlotMuted.push(false);
+                while (window.gslEveryBarPattern.length < MAX_INSTRUMENT_SLOTS) window.gslEveryBarPattern.push('none');
+                while (window.gslEveryBarIntensity.length < MAX_INSTRUMENT_SLOTS) window.gslEveryBarIntensity.push(0.20);
+                if (window.startBackgroundPreloadSlots) window.startBackgroundPreloadSlots();
+                buildSoundLayerVolumesUI();
+                if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+            }
+            var EVERY_BAR_OPTIONS = '<option value="none">none</option><option value="uphill">uphill</option><option value="downhill">downhill</option><option value="valley">valley</option><option value="hill">hill</option><option value="2valley">2 valley</option><option value="2hill">2 hill</option>';
+            function buildSoundLayerVolumesUI() {
+                const container = document.getElementById('sound-layer-volumes-container');
+                if (!container) return;
+                const defaultVol = 33;
+                const defaults = [defaultVol, defaultVol, defaultVol, defaultVol, defaultVol, defaultVol];
+                // Ensure preset slots array exists and matches expected length.
+                if (!window.gslPresetSlots || !Array.isArray(window.gslPresetSlots)) {
+                    window.gslPresetSlots = [];
+                }
+                while (window.gslPresetSlots.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslPresetSlots.push(null);
+                }
+                // Default to pure piano when no preset is set (sister request: sound purely piano on page load)
+                var hasAny = window.gslPresetSlots.some(function (s) { return s != null && String(s).trim() !== ''; });
+                if (!hasAny) {
+                    window.gslPresetSlots[0] = 'gsl_piano';
+                    window.gslPresetSlots[3] = 'gsl_piano';
+                    if (window.gslEveryBarPattern && Array.isArray(window.gslEveryBarPattern)) {
+                        for (var i = 0; i < MAX_INSTRUMENT_SLOTS; i++) window.gslEveryBarPattern[i] = 'none';
+                    } else {
+                        window.gslEveryBarPattern = ['none', 'none', 'none', 'none', 'none', 'none'];
+                    }
+                } else if (window.gslPresetSlots[0] && !window.gslPresetSlots[3]) {
+                    window.gslPresetSlots[3] = window.gslPresetSlots[0];
+                }
+                if (!window.gslSlotVolumes || window.gslSlotVolumes.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslSlotVolumes = (window.gslSlotVolumes || []).slice();
+                    while (window.gslSlotVolumes.length < MAX_INSTRUMENT_SLOTS) window.gslSlotVolumes.push(defaultVol);
+                }
+                if (!window.gslSlotSemitones || window.gslSlotSemitones.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslSlotSemitones = (window.gslSlotSemitones || []).slice();
+                    while (window.gslSlotSemitones.length < MAX_INSTRUMENT_SLOTS) window.gslSlotSemitones.push(0);
+                }
+                if (!window.gslEveryBarPattern || window.gslEveryBarPattern.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslEveryBarPattern = (window.gslEveryBarPattern || []).slice();
+                    while (window.gslEveryBarPattern.length < MAX_INSTRUMENT_SLOTS) window.gslEveryBarPattern.push('none');
+                }
+                if (!window.gslEveryBarIntensity || window.gslEveryBarIntensity.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslEveryBarIntensity = (window.gslEveryBarIntensity || []).slice();
+                    while (window.gslEveryBarIntensity.length < MAX_INSTRUMENT_SLOTS) window.gslEveryBarIntensity.push(0.20);
+                }
+                if (!window.gslSlotMuted || window.gslSlotMuted.length < MAX_INSTRUMENT_SLOTS) {
+                    window.gslSlotMuted = (window.gslSlotMuted || []).slice();
+                    while (window.gslSlotMuted.length < MAX_INSTRUMENT_SLOTS) window.gslSlotMuted.push(false);
+                }
+                container.innerHTML = '';
+                for (var i = 0; i < MAX_INSTRUMENT_SLOTS; i++) {
+                    const slotIndex = i;
+                    const slug = (window.gslPresetSlots || [])[i];
+                    const label = slug ? (window.gslSlugToDisplayName[slug] || slug) : '(none)';
+                    const vol = (window.gslSlotVolumes || defaults)[slotIndex];
+                    const volNum = (vol !== undefined && !isNaN(vol)) ? vol : defaultVol;
+                    const semi = (window.gslSlotSemitones || [0, 0, 0, 0, 0, 0])[slotIndex];
+                    const semiNum = (semi !== undefined && !isNaN(semi)) ? semi : 0;
+                    const everyBarPattern = (window.gslEveryBarPattern || [])[slotIndex] || 'none';
+                    const isMuted = !!((window.gslSlotMuted || [])[slotIndex]);
+                    const isEmpty = !slug;
+                    const div = document.createElement('div');
+                    div.className = 'keyboard-visual-setting-item sound-layer-item' + (isEmpty ? ' sound-layer-empty' : '') + (isMuted ? ' sound-layer-muted' : '');
+                    var sideLabel = (i < 3 ? 'L' : 'R') + (i < 3 ? (i + 1) : (i - 2));
+                    div.innerHTML = '<div class="sound-layer-row-inner">' +
+                        '<span class="sound-layer-label-wrap" data-slot="' + i + '">' +
+                        '<button type="button" class="sound-layer-label-btn" data-slot="' + i + '" aria-haspopup="true" aria-expanded="false">' + sideLabel + ': ' + (label || '(none)').replace(/</g, '&lt;') + '</button>' +
+                        '<div class="sound-layer-dropdown" role="menu">' +
+                        '<button type="button" role="menuitem" data-action="clear">Clear</button>' +
+                        '<button type="button" role="menuitem" data-action="replace">Replace</button>' +
+                        '<button type="button" role="menuitem" data-action="choose">Choose…</button>' +
+                        '<button type="button" role="menuitem" class="sound-layer-dropdown-mute" data-action="toggle-mute">' + (isMuted ? 'Unmute' : 'Mute') + '</button>' +
+                        '</div></span>' +
+                        '<span class="sound-layer-vol-wrap"><input type="range" class="sound-layer-volume" data-slot="' + i + '" min="0" max="100" value="' + volNum + '" step="2" ' + (isEmpty ? ' disabled' : '') + '><span class="sound-layer-vol-value">' + volNum + '%</span></span>' +
+                        '<span class="sound-layer-semi-wrap"><span class="sound-layer-semi-label">Transpose</span><button type="button" class="sound-layer-semi-minus" data-slot="' + i + '" aria-label="Transpose -1" ' + (isEmpty ? ' disabled' : '') + '>▼</button><input type="text" class="sound-layer-semitone-input" data-slot="' + i + '" value="' + semiNum + '" inputmode="decimal" aria-label="Transpose (semitones)" ' + (isEmpty ? ' disabled' : '') + '><button type="button" class="sound-layer-semi-plus" data-slot="' + i + '" aria-label="Transpose +1" ' + (isEmpty ? ' disabled' : '') + '>▲</button></span>' +
+                        '<span class="sound-layer-everybar-wrap"><label class="every-bar-label" data-every-bar-slot="' + i + '" title="Click to set filter %">Every bar</label><select class="sound-layer-everybar-select" data-slot="' + i + '">' + EVERY_BAR_OPTIONS + '</select></span>' +
+                        '</div>';
+                    const volSlider = div.querySelector('.sound-layer-volume');
+                    const volValueSpan = div.querySelector('.sound-layer-vol-value');
+                    if (volSlider && volValueSpan) {
+                        volSlider.addEventListener('input', function () {
+                            var p = parseInt(this.value, 10);
+                            if (!window.gslSlotVolumes) window.gslSlotVolumes = [33, 33, 33, 33, 33, 33];
+                            while (window.gslSlotVolumes.length < MAX_INSTRUMENT_SLOTS) window.gslSlotVolumes.push(33);
+                            window.gslSlotVolumes[slotIndex] = p;
+                            volValueSpan.textContent = p + '%';
+                            if (window.gslSynth && typeof window.gslSynth.setSlotVolumePercent === 'function') {
+                                window.gslSynth.setSlotVolumePercent(slotIndex, p);
+                            }
+                            if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                        });
+                    }
+                    const semiInput = div.querySelector('.sound-layer-semitone-input');
+                    const semiMinusBtn = div.querySelector('.sound-layer-semi-minus');
+                    const semiPlusBtn = div.querySelector('.sound-layer-semi-plus');
+                    function setSemitoneValue(s) {
+                        s = Math.max(-24, Math.min(24, Number(s)));
+                        if (isNaN(s)) return;
+                        if (!window.gslSlotSemitones) window.gslSlotSemitones = [0, 0, 0, 0, 0, 0];
+                        while (window.gslSlotSemitones.length <= slotIndex) window.gslSlotSemitones.push(0);
+                        window.gslSlotSemitones[slotIndex] = s;
+                        if (semiInput) semiInput.value = s;
+                        if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                    }
+                    function getCurrentSemitone() {
+                        if (!window.gslSlotSemitones || !window.gslSlotSemitones[slotIndex]) return 0;
+                        var v = parseFloat(window.gslSlotSemitones[slotIndex], 10);
+                        return isNaN(v) ? 0 : v;
+                    }
+                    if (semiMinusBtn) semiMinusBtn.addEventListener('click', function () { setSemitoneValue(getCurrentSemitone() - 1); });
+                    if (semiPlusBtn) semiPlusBtn.addEventListener('click', function () { setSemitoneValue(getCurrentSemitone() + 1); });
+                    if (semiInput) {
+                        semiInput.addEventListener('blur', function () {
+                            var raw = this.value.trim();
+                            var num = raw === '' ? 0 : parseFloat(raw, 10);
+                            if (isNaN(num)) {
+                                this.value = getCurrentSemitone();
+                                return;
+                            }
+                            num = Math.max(-24, Math.min(24, num));
+                            if (!window.gslSlotSemitones) window.gslSlotSemitones = [0, 0, 0, 0, 0, 0];
+                            while (window.gslSlotSemitones.length <= slotIndex) window.gslSlotSemitones.push(0);
+                            window.gslSlotSemitones[slotIndex] = num;
+                            this.value = num;
+                            if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                        });
+                    }
+                    const labelBtn = div.querySelector('.sound-layer-label-btn');
+                    const labelWrap = div.querySelector('.sound-layer-label-wrap');
+                    const dropdown = div.querySelector('.sound-layer-dropdown');
+                    const muteBtn = div.querySelector('.sound-layer-dropdown-mute');
+                    if (labelBtn && dropdown) {
+                        labelBtn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            document.querySelectorAll('.sound-layer-dropdown.visible').forEach(function (d) { d.classList.remove('visible'); });
+                            document.querySelectorAll('.sound-layer-item').forEach(function (row) { row.classList.remove('dropdown-open'); });
+                            document.querySelectorAll('.sound-layer-label-btn').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+                            if (muteBtn) muteBtn.textContent = !!((window.gslSlotMuted || [])[slotIndex]) ? 'Unmute' : 'Mute';
+                            dropdown.classList.toggle('visible');
+                            labelBtn.setAttribute('aria-expanded', dropdown.classList.contains('visible'));
+                            if (dropdown.classList.contains('visible')) div.classList.add('dropdown-open'); else div.classList.remove('dropdown-open');
+                        });
+                        dropdown.addEventListener('click', function (e) { e.stopPropagation(); });
+                        dropdown.querySelectorAll('[data-action]').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                var slot = parseInt(labelWrap.getAttribute('data-slot'), 10);
+                                if (this.getAttribute('data-action') === 'clear') clearLayer(slot);
+                                else if (this.getAttribute('data-action') === 'replace') replaceLayerWithRandom(slot);
+                                else if (this.getAttribute('data-action') === 'choose') { window._instrumentPickerSlot = slot; openInstrumentPicker(); }
+                                else if (this.getAttribute('data-action') === 'toggle-mute') {
+                                    if (!window.gslSlotMuted) window.gslSlotMuted = [false, false, false, false, false, false];
+                                    while (window.gslSlotMuted.length < MAX_INSTRUMENT_SLOTS) window.gslSlotMuted.push(false);
+                                    window.gslSlotMuted[slot] = !window.gslSlotMuted[slot];
+                                    buildSoundLayerVolumesUI();
+                                    if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                                }
+                                dropdown.classList.remove('visible');
+                                labelBtn.setAttribute('aria-expanded', 'false');
+                                div.classList.remove('dropdown-open');
+                            });
+                        });
+                    }
+                    var everyBarSelect = div.querySelector('.sound-layer-everybar-select');
+                    if (everyBarSelect) {
+                        everyBarSelect.value = everyBarPattern;
+                        everyBarSelect.addEventListener('change', function () {
+                            if (!window.gslEveryBarPattern) window.gslEveryBarPattern = ['uphill', 'uphill', 'uphill', 'none', 'none', 'none'];
+                            window.gslEveryBarPattern[slotIndex] = this.value;
+                            if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                        });
+                    }
+                    var everyBarLabel = div.querySelector('.every-bar-label');
+                    if (everyBarLabel) {
+                        everyBarLabel.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window._everyBarIntensitySlot = slotIndex;
+                            var modal = document.getElementById('every-bar-intensity-modal');
+                            var slider = document.getElementById('every-bar-intensity-slider');
+                            var valueEl = document.getElementById('every-bar-intensity-value');
+                            if (!modal || !slider || !valueEl) return;
+                            var pct = Math.round(((window.gslEveryBarIntensity || [])[slotIndex] ?? 0.20) * 100);
+                            slider.value = pct;
+                            valueEl.textContent = pct + '%';
+                            modal.style.display = 'flex';
+                            modal.setAttribute('aria-hidden', 'false');
+                        });
+                    }
+                    container.appendChild(div);
+                }
+            }
+            window.updateSoundLayerVolumesUI = function () {
+                buildSoundLayerVolumesUI();
+            };
+            function closeAllLayerDropdowns() {
+                document.querySelectorAll('.sound-layer-dropdown.visible').forEach(function (d) { d.classList.remove('visible'); });
+                document.querySelectorAll('.sound-layer-item').forEach(function (row) { row.classList.remove('dropdown-open'); });
+                document.querySelectorAll('.sound-layer-label-btn').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+            }
+            function replaceLayerWithRandom(slotIndex) {
+                var handler = window.InstrumentSampleHandler;
+                if (!handler || typeof handler.ensureGslManifest !== 'function') return;
+                handler.ensureGslManifest().then(function (list) {
+                    if (!list || list.length === 0) return;
+                    var slugs = list.map(function (e) { return e.slug; });
+                    var idx = Math.floor(Math.random() * slugs.length);
+                    var slug = slugs[idx];
+                    if (!window.gslPresetSlots) window.gslPresetSlots = [];
+                    while (window.gslPresetSlots.length <= slotIndex) window.gslPresetSlots.push(null);
+                    if (!window.gslSlotVolumes) window.gslSlotVolumes = [33, 33, 33, 33, 33, 33];
+                    while (window.gslSlotVolumes.length <= slotIndex) window.gslSlotVolumes.push(33);
+                    if (!window.gslSlotSemitones) window.gslSlotSemitones = [0, 0, 0, 0, 0, 0];
+                    while (window.gslSlotSemitones.length <= slotIndex) window.gslSlotSemitones.push(0);
+                    window.gslPresetSlots[slotIndex] = slug;
+                    window.gslSlotSemitones[slotIndex] = getDefaultSemitoneForSlug(slug);
+                    if (window.startBackgroundPreloadSlots) window.startBackgroundPreloadSlots();
+                    buildSoundLayerVolumesUI();
+                    if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                }).catch(function () {});
+            }
+            function applyInstrumentToLayer(slotIndex, slug) {
+                if (slotIndex == null || slotIndex < 0 || slotIndex >= MAX_INSTRUMENT_SLOTS) return;
+                if (!window.gslPresetSlots) window.gslPresetSlots = [];
+                while (window.gslPresetSlots.length < MAX_INSTRUMENT_SLOTS) window.gslPresetSlots.push(null);
+                if (!window.gslSlotVolumes || !Array.isArray(window.gslSlotVolumes)) window.gslSlotVolumes = [33, 33, 33, 33, 33, 33];
+                while (window.gslSlotVolumes.length < MAX_INSTRUMENT_SLOTS) window.gslSlotVolumes.push(33);
+                if (!window.gslSlotSemitones || !Array.isArray(window.gslSlotSemitones)) window.gslSlotSemitones = [0, 0, 0, 0, 0, 0];
+                while (window.gslSlotSemitones.length < MAX_INSTRUMENT_SLOTS) window.gslSlotSemitones.push(0);
+                if (!window.gslSlotMuted || !Array.isArray(window.gslSlotMuted)) window.gslSlotMuted = [false, false, false, false, false, false];
+                while (window.gslSlotMuted.length < MAX_INSTRUMENT_SLOTS) window.gslSlotMuted.push(false);
+                window.gslPresetSlots[slotIndex] = slug;
+                window.gslSlotSemitones[slotIndex] = getDefaultSemitoneForSlug(slug);
+                // If you pick an instrument, treat that layer as active by default.
+                window.gslSlotMuted[slotIndex] = false;
+                if (window.InstrumentSampleHandler && window.gslSynth && window.gslSynth.synth && window.gslSynth.synth.audioCtx) {
+                    const ctx = window.gslSynth.synth.audioCtx;
+                    const baseUrl = (document.baseURI || window.location.href || '').replace(/\/[^/]*$/, '/');
+                    window.InstrumentSampleHandler.ensurePresetLoaded(ctx, slug, baseUrl).catch(function () {});
+                }
+                if (window.startBackgroundPreloadSlots) window.startBackgroundPreloadSlots();
+                buildSoundLayerVolumesUI();
+                if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+            }
+            document.addEventListener('click', function () { closeAllLayerDropdowns(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAllLayerDropdowns(); });
+
+            // Instrument picker modal (per-layer "Choose…")
+            var instrumentPickerModal = document.getElementById('instrument-picker-modal');
+            var instrumentPickerClose = document.getElementById('instrument-picker-close');
+            var instrumentPickerSearch = document.getElementById('instrument-picker-search');
+            var instrumentPickerListEl = document.getElementById('instrument-picker-list');
+            window._gslInstrumentList = window._gslInstrumentList || null;
+            function ensureInstrumentList() {
+                var handler = window.InstrumentSampleHandler;
+                if (!handler || typeof handler.ensureGslManifest !== 'function') return Promise.resolve([]);
+                return handler.ensureGslManifest().then(function (list) {
+                    if (!list || !list.length) return [];
+                    window.gslSlugToDisplayName = window.gslSlugToDisplayName || {};
+                    window.gslSlugToDefaultSemitone = window.gslSlugToDefaultSemitone || {};
+                    list.forEach(function (entry) {
+                        window.gslSlugToDisplayName[entry.slug] = displayName(entry);
+                        if (entry.defaultSemitone != null && !isNaN(entry.defaultSemitone)) {
+                            window.gslSlugToDefaultSemitone[entry.slug] = parseFloat(entry.defaultSemitone);
+                        }
+                    });
+                    var sorted = list.slice().sort(function (a, b) {
+                        var na = (displayName(a) || '').toLowerCase();
+                        var nb = (displayName(b) || '').toLowerCase();
+                        return na.localeCompare(nb, 'en', { sensitivity: 'base' });
+                    });
+                    window._gslInstrumentList = sorted;
+                    return sorted;
+                }).catch(function () { return []; });
+            }
+            function renderInstrumentPickerList(term) {
+                if (!instrumentPickerListEl) return;
+                var list = window._gslInstrumentList || [];
+                var q = (term || '').trim().toLowerCase();
+                instrumentPickerListEl.innerHTML = '';
+                var frag = document.createDocumentFragment();
+                list.forEach(function (entry) {
+                    var name = displayName(entry) || entry.slug;
+                    var searchText = (name + ' ' + (entry.slug || '')).toLowerCase();
+                    if (q && searchText.indexOf(q) === -1) return;
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = name;
+                    b.addEventListener('click', function () {
+                        var slot = window._instrumentPickerSlot;
+                        closeInstrumentPicker();
+                        applyInstrumentToLayer(slot, entry.slug);
+                    });
+                    frag.appendChild(b);
+                });
+                // JS synth instruments (oscillator-based presets)
+                var jsInstruments = [
+                    { preset: 'softPiano', label: 'Soft Piano' },
+                    { preset: 'epiano', label: 'E-Piano' }
+                ];
+                jsInstruments.forEach(function (js) {
+                    var name = js.label;
+                    var searchText = name.toLowerCase();
+                    if (q && searchText.indexOf(q) === -1) return;
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = name;
+                    b.addEventListener('click', function () {
+                        var slot = window._instrumentPickerSlot;
+                        closeInstrumentPicker();
+                        applyInstrumentToLayer(slot, js.preset);
+                    });
+                    frag.appendChild(b);
+                });
+                instrumentPickerListEl.appendChild(frag);
+            }
+            function openInstrumentPicker() {
+                if (!instrumentPickerModal) return;
+                ensureInstrumentList().then(function () {
+                    if (instrumentPickerSearch) instrumentPickerSearch.value = '';
+                    renderInstrumentPickerList('');
+                    instrumentPickerModal.style.display = 'flex';
+                    instrumentPickerModal.setAttribute('aria-hidden', 'false');
+                    setTimeout(function () { if (instrumentPickerSearch) instrumentPickerSearch.focus(); }, 0);
+                });
+            }
+            function closeInstrumentPicker() {
+                if (!instrumentPickerModal) return;
+                instrumentPickerModal.style.display = 'none';
+                instrumentPickerModal.setAttribute('aria-hidden', 'true');
+            }
+            if (instrumentPickerClose) instrumentPickerClose.addEventListener('click', closeInstrumentPicker);
+            if (instrumentPickerModal) instrumentPickerModal.addEventListener('click', function (e) { if (e.target === instrumentPickerModal) closeInstrumentPicker(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeInstrumentPicker(); });
+            if (instrumentPickerSearch) instrumentPickerSearch.addEventListener('input', function () { renderInstrumentPickerList(this.value || ''); });
+            var everyBarIntensityModal = document.getElementById('every-bar-intensity-modal');
+            var everyBarIntensitySlider = document.getElementById('every-bar-intensity-slider');
+            var everyBarIntensityValue = document.getElementById('every-bar-intensity-value');
+            var everyBarIntensityClose = document.getElementById('every-bar-intensity-close');
+            if (everyBarIntensitySlider && everyBarIntensityValue) {
+                everyBarIntensitySlider.addEventListener('input', function () {
+                    var slot = window._everyBarIntensitySlot;
+                    if (slot == null) return;
+                    var pct = Math.max(0, Math.min(100, parseInt(this.value, 10)));
+                    if (!window.gslEveryBarIntensity) window.gslEveryBarIntensity = [0.20, 0.20, 0.20, 0.20, 0.20, 0.20];
+                    window.gslEveryBarIntensity[slot] = pct / 100;
+                    everyBarIntensityValue.textContent = pct + '%';
+                    if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+                });
+            }
+            function closeEveryBarIntensityModal() {
+                if (everyBarIntensityModal) {
+                    everyBarIntensityModal.style.display = 'none';
+                    everyBarIntensityModal.setAttribute('aria-hidden', 'true');
+                }
+            }
+            if (everyBarIntensityClose) everyBarIntensityClose.addEventListener('click', closeEveryBarIntensityModal);
+            if (everyBarIntensityModal) everyBarIntensityModal.addEventListener('click', function (e) { if (e.target === everyBarIntensityModal) closeEveryBarIntensityModal(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeEveryBarIntensityModal(); });
+            var layerPlayModeEl = document.getElementById('sound-layer-play-mode');
+            if (layerPlayModeEl) layerPlayModeEl.addEventListener('change', function () {
+                window.gslLayerPlayMode = (this.value === 'split' || this.value === 'scatter') ? this.value : 'leftRight';
+                if (typeof window.ccSaveGlobalsToCurrentRowSound === 'function') window.ccSaveGlobalsToCurrentRowSound();
+            });
+            // Flicker UI is removed; no need to wire sound-flicker-select.
+            // (Popup Human tab removed – per-row Human / delay controls now live only in the chord dock.)
+            // Prime instrument list + defaults on startup (used by per-layer "Choose…", Replace, and Lucky).
+            ensureInstrumentList().then(function (list) {
+                if (!window.gslPresetSlots || window.gslPresetSlots.length === 0) {
+                    if (typeof window.ccApplyCurrentRowSoundToGlobals === 'function') window.ccApplyCurrentRowSoundToGlobals();
+                }
+                buildSoundLayerVolumesUI();
+            });
+
+            // View 0: Front horizontal — position + target only; OrbitControls gives level view, no special case
+            const cameraView0 = {
+                position: { x: 0, y: 0.5, z: 1.8 },
+                target: { x: 0, y: 0, z: 0 }
+            };
+            
+            // View 1
+            const cameraView1 = {
+                position: { x: 0.750, y: 1.326, z: 1.407 },
+                rotation: { x: -0.756, y: 0.370, z: 0.328 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 2: Third camera settings
+            const cameraView2 = {
+                position: { x: 0.000, y: 1.060, z: 2.382 },
+                rotation: { x: -0.419, y: 0.000, z: 0.000 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 3: Fourth camera settings
+            const cameraView3 = {
+                position: { x: -0.808, y: 1.398, z: 1.652 },
+                rotation: { x: -0.702, y: -0.357, z: -0.288 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 4: Fifth camera settings
+            const cameraView4 = {
+                position: { x: 2.302, y: 1.176, z: -0.018 },
+                rotation: { x: -1.586, y: 1.098, z: 1.588 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // Camera view 5: Sixth camera settings
+            const cameraView5 = {
+                position: { x: 0.003, y: 3.821, z: 2.390 },
+                rotation: { x: -1.012, y: 0.001, z: 0.001 },
+                target: { x: 0.000, y: 0.000, z: 0.000 }
+            };
+            
+            // View 6: Hero / product shot — front three-quarter, slightly low
+            const cameraView6 = {
+                position: { x: 1.18, y: 0.48, z: 1.32 },
+                target: { x: 0, y: 0.02, z: 0 }
+            };
+            
+            // View 7: Bird's eye from top (captured with keypress C)
+            const cameraView7 = {
+                position: { x: -0.07, y: 3.407, z: -0.862 },
+                target: { x: -0.07, y: 0, z: -0.862 }
+            };
+            
+            // View 8: Front center (page load start)
+            const cameraView8 = {
+                position: { x: 0, y: 0, z: 2.588 },
+                target: { x: 0, y: 0, z: 0 }
+            };
+            
+            // View 9 (captured with keypress C)
+            const cameraView9 = {
+                position: { x: 3.212, y: 0.32, z: 0.329 },
+                target: { x: 0.271, y: -0.368, z: -0.909 }
+            };
+            
+            // View 10 (captured with keypress C)
+            const cameraView10 = {
+                position: { x: -4.329, y: 0.336, z: -0.043 },
+                target: { x: -0.144, y: -0.587, z: 0.328 }
+            };
+            
+            // View 11: default on page load (captured with keypress C)
+            const cameraView11 = {
+                position: { x: -0.135, y: -0.145, z: -4 },
+                target: { x: -0.07, y: 0, z: -1.2 }
+            };
+            
+            // View 12: sister-requested first-click view
+            const cameraView12 = {
+                position: { x: 0.025, y: 3.591, z: 2.092 },
+                target: { x: 0.025, y: 0.426, z: -0.547 }
+            };
+            
+            const cameraViews = [cameraView0, cameraView1, cameraView2, cameraView3, cameraView4, cameraView5, cameraView6, cameraView7, cameraView8, cameraView9, cameraView10, cameraView11, cameraView12];
+            const DEFAULT_CAMERA_VIEW_INDEX = 12;
+
+            // Apply a view (position + target) to the camera. Used for initial load and by dropdown.
+            function applyCameraView(viewIndex) {
+                if (!window.camera || !window.controls || viewIndex < 0 || viewIndex >= cameraViews.length) return;
+                var v = cameraViews[viewIndex];
+                window.camera.position.set(v.position.x, v.position.y, v.position.z);
+                window.controls.target.set(v.target.x, v.target.y, v.target.z);
+                window.controls.update();
+            }
+            window.applyCameraView = applyCameraView;
+
+            // Initial view = view 12 (single source of truth; no hardcoding in main.js).
+            window.currentCameraViewIndex = DEFAULT_CAMERA_VIEW_INDEX;
+            applyCameraView(DEFAULT_CAMERA_VIEW_INDEX);
+
+            // Idle orbit: slow rotation around current look-at. When toggled ON (R), uses current camera position/target so it works from any view.
+            window.cameraIdleOrbit = {
+                active: false,
+                angle: 0,
+                radius: 2.4,
+                height: 1.06,
+                speed: 0.08,
+                targetX: 0,
+                targetY: 0,
+                targetZ: 0
+            };
+
+            // Click on piano (canvas): jump to next camera view. If orbit is on, sync orbit to new view so it keeps rotating from there.
+            window.cycleToNextCameraView = function() {
+                if (!window.camera || !window.controls || !cameraViews.length) return;
+                var current = (typeof window.currentCameraViewIndex === 'number') ? window.currentCameraViewIndex : 0;
+                var next = (current + 1) % cameraViews.length;
+                window.currentCameraViewIndex = next;
+                applyCameraView(next);
+                if (window.cameraIdleOrbit && window.cameraIdleOrbit.active && window.camera && window.controls) {
+                    var o = window.cameraIdleOrbit;
+                    var t = window.controls.target;
+                    var p = window.camera.position;
+                    o.targetX = t.x;
+                    o.targetY = t.y;
+                    o.targetZ = t.z;
+                    var dx = p.x - t.x, dz = p.z - t.z;
+                    o.radius = Math.sqrt(dx * dx + dz * dz) || 2.4;
+                    o.height = p.y;
+                    o.angle = Math.atan2(dx, dz);
+                    var currentSpeed = Math.abs(o.speed) || 0.08;
+                    var newSpeed = currentSpeed * (0.5 + Math.random() * 0.5);
+                    if (Math.random() < 0.33) newSpeed = -newSpeed;
+                    o.speed = newSpeed;
+                }
+            };
+
+            // Keyboard shortcut: 9 to log camera settings (for debug and future use)
+            window.addEventListener('keydown', (e) => {
+                if (e.key === '9' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    if (window.camera && window.controls) {
+                        const camera = window.camera;
+                        const controls = window.controls;
+                        const cameraSettings = {
+                            position: {
+                                x: camera.position.x.toFixed(3),
+                                y: camera.position.y.toFixed(3),
+                                z: camera.position.z.toFixed(3)
+                            },
+                            rotation: {
+                                x: camera.rotation.x.toFixed(3),
+                                y: camera.rotation.y.toFixed(3),
+                                z: camera.rotation.z.toFixed(3)
+                            },
+                            fov: camera.fov,
+                            aspect: camera.aspect,
+                            near: camera.near,
+                            far: camera.far,
+                            target: {
+                                x: controls.target.x.toFixed(3),
+                                y: controls.target.y.toFixed(3),
+                                z: controls.target.z.toFixed(3)
+                            },
+                            minDistance: controls.minDistance,
+                            maxDistance: controls.maxDistance,
+                            enableDamping: controls.enableDamping,
+                            dampingFactor: controls.dampingFactor,
+                            enableRotate: controls.enableRotate,
+                            enableZoom: controls.enableZoom,
+                            enablePan: controls.enablePan
+                        };
+                        console.log('📷 Camera Settings:', cameraSettings);
+                        console.log('📋 Copy-paste format:', JSON.stringify(cameraSettings, null, 2));
+                    } else {
+                        console.warn('Camera or controls not available yet');
+                    }
+                }
+            });
+
+            // Camera: one checkbox (enables Spacebar + R); ? button shows overlay popup (window.cameraSettings set in main.js)
+            var camEnabled = document.getElementById('camera-enabled');
+            var camHelpBtn = document.getElementById('camera-help-btn');
+            if (window.cameraSettings) {
+                if (camEnabled) {
+                    camEnabled.checked = !!(window.cameraSettings.spacebarCyclesViews && window.cameraSettings.rOrbitsCamera);
+                    camEnabled.addEventListener('change', function () {
+                        var on = camEnabled.checked;
+                        window.cameraSettings.spacebarCyclesViews = on;
+                        window.cameraSettings.rOrbitsCamera = on;
+                        if (!on && window.cameraIdleOrbit) window.cameraIdleOrbit.active = false;
+                    });
+                }
+                if (camHelpBtn) {
+                    var camHelpOverlay = document.getElementById('camera-help-overlay');
+                    var camHelpOverlayClose = document.getElementById('camera-help-overlay-close');
+                    function closeCameraHelp() {
+                        if (camHelpOverlay) camHelpOverlay.classList.remove('visible');
+                    }
+                    camHelpBtn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (camHelpOverlay) camHelpOverlay.classList.add('visible');
+                    });
+                    if (camHelpOverlayClose) camHelpOverlayClose.addEventListener('click', closeCameraHelp);
+                    if (camHelpOverlay) {
+                        camHelpOverlay.addEventListener('click', function (e) {
+                            if (e.target === camHelpOverlay) closeCameraHelp();
+                        });
+                    }
+                    document.addEventListener('keydown', function (e) {
+                        if (e.key === 'Escape' && camHelpOverlay && camHelpOverlay.classList.contains('visible')) closeCameraHelp();
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
