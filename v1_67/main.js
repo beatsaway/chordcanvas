@@ -368,6 +368,7 @@ for (let i = 0; i < numWhiteKeys; i++) {
             pressedMaterial: pressedMaterial,
             label: fullLabel,
             originalY: whiteKeyHeight / 2, // Store original position: center of key at y = 0.05
+            baseY: whiteKeyHeight / 2, // Unchanging rest Y for vertical drag offset
             isPressed: false, // Track visual press state
             midiNote: midiNote // Store for animation tracking
         };
@@ -540,6 +541,7 @@ for (let i = 0; i < numWhiteKeys - 1; i++) {
                 pressedMaterial: pressedMaterial,
                 label: sharpNoteName,
                 originalY: blackKeyY, // Store original position
+                baseY: blackKeyY, // Unchanging rest Y for vertical drag offset
                 isPressed: false, // Track visual press state
                 midiNote: midiNote // Store for animation tracking
             };
@@ -573,21 +575,35 @@ if (window.updateAllLabelFormats) {
     window.updateAllLabelFormats();
 }
 
-// Piano horizontal drag: tap/drag on piano moves it left-right (x) within limits
+// Piano drag: tap/drag on piano moves it horizontally and/or vertically within limits
 const pianoKeyMeshes = Array.from(keyMap.values()).map(function (d) { return d.mesh; });
 const PIANO_X_MIN = -4;
 const PIANO_X_MAX = 4;
+const PIANO_Y_MIN = -1.5;
+const PIANO_Y_MAX = 1.5;
 let pianoOffsetX = 0;
+let pianoOffsetY = 0;
 let isDraggingPiano = false;
 let pianoDragStartClientX = 0;
-let pianoDragStartOffset = 0;
+let pianoDragStartClientY = 0;
+let pianoDragStartOffsetX = 0;
+let pianoDragStartOffsetY = 0;
+// Axis lock: once user moves past this many px, we lock to the dominant axis for this gesture. Set to 0 for free 2D drag.
+const PIANO_DRAG_AXIS_THRESHOLD_PX = 8;
+let pianoDragAxis = null; // 'x' | 'y' | null (null = not yet decided)
+
 const PIXELS_TO_WORLD = 0.002;
 
 function applyPianoOffset() {
     keyMap.forEach(function (keyData) {
         const mesh = keyData.mesh;
         const baseX = mesh.userData.baseX;
+        const baseY = keyData.baseY !== undefined ? keyData.baseY : keyData.originalY;
         if (typeof baseX === 'number') mesh.position.x = baseX + pianoOffsetX;
+        if (typeof baseY === 'number') {
+            mesh.position.y = baseY + pianoOffsetY;
+            keyData.originalY = baseY + pianoOffsetY; // keep press/release in sync
+        }
     });
 }
 
@@ -602,14 +618,33 @@ function onPianoPointerDown(e) {
     const hits = pianoRaycaster.intersectObjects(pianoKeyMeshes, false);
     if (hits.length === 0) return;
     isDraggingPiano = true;
+    pianoDragAxis = null;
     pianoDragStartClientX = e.clientX;
-    pianoDragStartOffset = pianoOffsetX;
+    pianoDragStartClientY = e.clientY;
+    pianoDragStartOffsetX = pianoOffsetX;
+    pianoDragStartOffsetY = pianoOffsetY;
 }
 
 function onPianoPointerMove(e) {
     if (!isDraggingPiano) return;
-    const delta = (e.clientX - pianoDragStartClientX) * PIXELS_TO_WORLD;
-    pianoOffsetX = Math.max(PIANO_X_MIN, Math.min(PIANO_X_MAX, pianoDragStartOffset + delta));
+    const dx = e.clientX - pianoDragStartClientX;
+    const dy = e.clientY - pianoDragStartClientY;
+    // Axis lock: decide axis once pointer has moved past threshold
+    if (pianoDragAxis === null && PIANO_DRAG_AXIS_THRESHOLD_PX > 0) {
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist >= PIANO_DRAG_AXIS_THRESHOLD_PX) {
+            pianoDragAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        }
+    }
+    if (PIANO_DRAG_AXIS_THRESHOLD_PX === 0) {
+        // Free 2D: move both
+        pianoOffsetX = Math.max(PIANO_X_MIN, Math.min(PIANO_X_MAX, pianoDragStartOffsetX + dx * PIXELS_TO_WORLD));
+        pianoOffsetY = Math.max(PIANO_Y_MIN, Math.min(PIANO_Y_MAX, pianoDragStartOffsetY - dy * PIXELS_TO_WORLD));
+    } else if (pianoDragAxis === 'x') {
+        pianoOffsetX = Math.max(PIANO_X_MIN, Math.min(PIANO_X_MAX, pianoDragStartOffsetX + dx * PIXELS_TO_WORLD));
+    } else if (pianoDragAxis === 'y') {
+        pianoOffsetY = Math.max(PIANO_Y_MIN, Math.min(PIANO_Y_MAX, pianoDragStartOffsetY - dy * PIXELS_TO_WORLD));
+    }
     applyPianoOffset();
 }
 
