@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Segment row above the piano */
+        .segments-container {
+            position: absolute;
+            left: 0;
+            bottom: 15vh; /* sits right above the piano row */
+            width: 100%;
+            height: 35vh; /* increased height for taller cells */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .segment-row {
+            width: 100%;
+            height: calc(100% / 8); /* each row takes 1/8 of the container height */
+            display: flex;
+        }
+
+        .segment-cell {
+            width: calc(100% / 8);
+            height: 100%;
+            background: #f1eee7;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.73rem;
+            color: #111;
+            user-select: none;
+            cursor: pointer;
+            border: 1px solid #f1eee7;
+        }
+
+        .segment-cell.cell-selected {
+            background: #b2ebf2;
+        }
+
+        .segment-cell.cell-playing {
+            background: #90EE90;
+            box-shadow: 0 0 10px rgba(144, 238, 144, 0.5);
+        }
+
+        body {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            background: #f7f5f2;
+            color: #111;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .title-bar {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 0 6px 0 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 12;
+            letter-spacing: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            position: relative;
+        }
+
+        .menu-toggle {
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: #111;
+            cursor: pointer;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.1s ease;
+            z-index: 13;
+        }
+
+        .menu-toggle:hover {
+            opacity: 0.7;
+        }
+
+        .title-link {
+            font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            color: #111;
+            text-decoration: none;
+            margin-right: 6px;
+        }
+
+        .title-by {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #111;
+        }
+
+        .title-by .by-link {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #d9d4cc;
+            padding-bottom: 1px;
+        }
+
+        .title-by .by-link:hover {
+            border-bottom-color: #111;
+        }
+
+        .top-bar {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 0 12px 4px 12px;
+            display: flex;
+            gap: 0;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        select {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8rem;
+            padding: 6px 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            color: #2d7a2d;
+            cursor: pointer;
+            appearance: none;
+            background-image: none;
+            min-width: 120px;
+            transition: border-color 0.1s ease;
+            border-radius: 2px;
+        }
+
+        select:hover {
+            border-color: #b0b0b0;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #111;
+        }
+
+        .save-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.9rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #111;
+            color: #ffffff;
+            border: 1px solid #111;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .save-button:hover:not(:disabled) {
+            background: #333;
+        }
+
+        .save-button:disabled {
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed;
+        }
+
+        .save-button:active:not(:disabled) {
+            background: #000;
+        }
+
+        .play-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #90EE90;
+            color: #111;
+            border: 1px solid #90EE90;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .play-button:hover {
+            background: #7dd87d;
+        }
+
+        .play-button:active {
+            background: #6bc26b;
+        }
+
+        .play-button.playing {
+            background: #e04f2b;
+            border-color: #e04f2b;
+        }
+
+        .play-button.playing:hover {
+            background: #d03a1a;
+        }
+
+        .play-button:disabled {
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed;
+        }
+
+        .play-button:disabled:hover {
+            background: #f5f5f5;
+        }
+
+        .settings-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #ffffff;
+            color: #111;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease, border-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .settings-button:hover {
+            background: #f8f8f8;
+            border-color: #b0b0b0;
+        }
+
+        .settings-button:active {
+            background: #f0f0f0;
+        }
+
+        /* Settings modal */
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 30;
+        }
+
+        .settings-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+        }
+
+        .settings-modal h3 {
+            margin: 0 0 12px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .settings-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+        }
+
+        .settings-field label {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .settings-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-range {
+            width: 100%;
+        }
+
+        .settings-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d9d4cc;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            color: #111;
+            background: #fff;
+        }
+
+        .settings-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn-ghost, .btn-primary {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+
+        .btn-ghost {
+            background: #fff;
+            color: #111;
+            border-color: #d9d4cc;
+        }
+
+        .btn-ghost:hover {
+            border-color: #c8c2b8;
+        }
+
+        .btn-primary {
+            background: #111;
+            color: #fff;
+            border-color: #111;
+        }
+
+        .btn-primary:hover {
+            background: #222;
+            border-color: #222;
+        }
+
+        .info-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .info-modal a {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #c8c2b8;
+        }
+
+        .info-modal a:hover {
+            border-bottom-color: #111;
+        }
+
+        @media (max-width: 768px) {
+            .top-bar {
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 0 6px 4px 6px;
+                gap: 0;
+            }
+            
+            .title-bar {
+                padding: 0 6px 0 6px;
+            }
+
+            select {
+                flex: 1;
+                min-width: 0;
+                font-size: 0.75rem;
+                padding: 6px 10px;
+                padding-right: 28px;
+            }
+        }
+
+        .piano-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 15vh;
+            display: flex;
+            z-index: 1;
+        }
+
+        .white-key {
+            width: calc(100% / 21);
+            height: 100%;
+            background: white;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .key-solfege {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: #666;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .black-key .key-solfege {
+            color: #aaa;
+            font-size: 0.65rem;
+            bottom: 2px;
+        }
+
+        .black-key {
+            position: absolute;
+            top: 0;
+            width: calc((100% / 21) * 0.571); /* Black key is ~57% width of white key */
+            height: 60%; /* Black key is 60% height of white key */
+            background: #1a1a1a;
+            z-index: 2;
+            border: 1px solid #000;
+        }
+
+        /* Black key positioning using CSS calc() - no JavaScript resize needed */
+        /* Formula: left = (100% / 21) * (Math.ceil(position) - 0.2855) */
+        /* where 0.2855 = (blackKeyWidth / 2) / whiteKeyWidth = (0.571 / 2) */
+        .black-key[data-position="0.5"] { left: calc((100% / 21) * (1 - 0.2855)); }
+        .black-key[data-position="1.5"] { left: calc((100% / 21) * (2 - 0.2855)); }
+        .black-key[data-position="3.5"] { left: calc((100% / 21) * (4 - 0.2855)); }
+        .black-key[data-position="4.5"] { left: calc((100% / 21) * (5 - 0.2855)); }
+        .black-key[data-position="5.5"] { left: calc((100% / 21) * (6 - 0.2855)); }
+        .black-key[data-position="7.5"] { left: calc((100% / 21) * (8 - 0.2855)); }
+        .black-key[data-position="8.5"] { left: calc((100% / 21) * (9 - 0.2855)); }
+        .black-key[data-position="10.5"] { left: calc((100% / 21) * (11 - 0.2855)); }
+        .black-key[data-position="11.5"] { left: calc((100% / 21) * (12 - 0.2855)); }
+        .black-key[data-position="12.5"] { left: calc((100% / 21) * (13 - 0.2855)); }
+        .black-key[data-position="14.5"] { left: calc((100% / 21) * (15 - 0.2855)); }
+        .black-key[data-position="15.5"] { left: calc((100% / 21) * (16 - 0.2855)); }
+        .black-key[data-position="17.5"] { left: calc((100% / 21) * (18 - 0.2855)); }
+        .black-key[data-position="18.5"] { left: calc((100% / 21) * (19 - 0.2855)); }
+        .black-key[data-position="19.5"] { left: calc((100% / 21) * (20 - 0.2855)); }
+
+        .key-highlighted {
+            background: #90EE90 !important;
+        }
+
+        .white-key.key-highlighted {
+            background: #90EE90 !important;
+        }
+
+        .black-key.key-highlighted {
+            background: #90EE90 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-bar">
+        <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">☰</button>
+        <a class="title-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Chord Canvas</a>
+        <span class="title-by"> by <a class="by-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Beats Away</a></span>
+    </div>
+    <div class="top-bar">
+        <select id="noteSelect">
+            <option value="">Select note</option>
+            <option value="C">C</option>
+            <option value="C#">C# / Db</option>
+            <option value="D">D</option>
+            <option value="D#">D# / Eb</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="F#">F# / Gb</option>
+            <option value="G">G</option>
+            <option value="G#">G# / Ab</option>
+            <option value="A">A</option>
+            <option value="A#">A# / Bb</option>
+            <option value="B">B</option>
+        </select>
+        <select id="qualitySelect">
+            <option value="">Select quality</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+            <option value="dominant">Dominant</option>
+            <option value="diminished">Diminished</option>
+            <option value="augmented">Augmented</option>
+            <option value="sus">Sus</option>
+        </select>
+        <select id="chordTypeSelect">
+            <option value="">Select type</option>
+        </select>
+        <button id="saveButton" class="save-button" disabled>+</button>
+        <button id="playButton" class="play-button" disabled>►</button>
+        <button id="settingsButton" class="settings-button">…</button>
+    </div>
+    <div id="settingsOverlay" class="settings-overlay"></div>
+    <div id="settingsModal" class="settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
+        <div class="settings-field">
+            <label for="bpmSlider">BPM</label>
+            <div class="settings-inline">
+                <input id="bpmSlider" class="settings-range" type="range" min="20" max="300" step="1">
+                <span id="bpmValue" style="min-width:40px;text-align:right;font-variant-numeric:tabular-nums;">120</span>
+            </div>
+        </div>
+        <div class="settings-field">
+            <label for="keySelect" style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap;">
+                <span>Key signature</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 400;">
+                    (<input type="checkbox" id="showSolfegeCheckbox" style="margin: 0; vertical-align: middle;"> show solfa names on piano)
+                </span>
+            </label>
+            <select id="keySelect" class="settings-select">
+                <option value="C">C major / A minor</option>
+                <option value="G">G major / E minor</option>
+                <option value="D">D major / B minor</option>
+                <option value="A">A major / F# minor</option>
+                <option value="E">E major / C# minor</option>
+                <option value="B">B major / G# minor</option>
+                <option value="F">F major / D minor</option>
+                <option value="Bb">Bb major / G minor</option>
+                <option value="Eb">Eb major / C minor</option>
+                <option value="Ab">Ab major / F minor</option>
+                <option value="Db">Db major / Bb minor</option>
+                <option value="Gb">Gb major / Eb minor</option>
+            </select>
+        </div>
+        <div class="settings-actions">
+            <button id="settingsCancel" class="btn-ghost">Cancel</button>
+            <button id="settingsSave" class="btn-primary">Save</button>
+        </div>
+    </div>
+    <div id="infoModal" class="info-modal" role="dialog" aria-modal="true" aria-label="About">
+        Developed by <a href="https://youtube.com/beatsaway" target="_blank">BeatsAway</a> <br>
+        <a href="https://buymeacoffee.com/beatsaway" target="_blank">Support this developer</a>
+    </div>
+    <div class="segments-container">
+        <div class="segment-row" id="row0">
+            <div class="segment-cell" data-index="0"></div>
+            <div class="segment-cell" data-index="1"></div>
+            <div class="segment-cell" data-index="2"></div>
+            <div class="segment-cell" data-index="3"></div>
+            <div class="segment-cell" data-index="4"></div>
+            <div class="segment-cell" data-index="5"></div>
+            <div class="segment-cell" data-index="6"></div>
+            <div class="segment-cell" data-index="7"></div>
+        </div>
+        <div class="segment-row" id="row1">
+            <div class="segment-cell" data-index="8"></div>
+            <div class="segment-cell" data-index="9"></div>
+            <div class="segment-cell" data-index="10"></div>
+            <div class="segment-cell" data-index="11"></div>
+            <div class="segment-cell" data-index="12"></div>
+            <div class="segment-cell" data-index="13"></div>
+            <div class="segment-cell" data-index="14"></div>
+            <div class="segment-cell" data-index="15"></div>
+        </div>
+        <div class="segment-row" id="row2">
+            <div class="segment-cell" data-index="16"></div>
+            <div class="segment-cell" data-index="17"></div>
+            <div class="segment-cell" data-index="18"></div>
+            <div class="segment-cell" data-index="19"></div>
+            <div class="segment-cell" data-index="20"></div>
+            <div class="segment-cell" data-index="21"></div>
+            <div class="segment-cell" data-index="22"></div>
+            <div class="segment-cell" data-index="23"></div>
+        </div>
+        <div class="segment-row" id="row3">
+            <div class="segment-cell" data-index="24"></div>
+            <div class="segment-cell" data-index="25"></div>
+            <div class="segment-cell" data-index="26"></div>
+            <div class="segment-cell" data-index="27"></div>
+            <div class="segment-cell" data-index="28"></div>
+            <div class="segment-cell" data-index="29"></div>
+            <div class="segment-cell" data-index="30"></div>
+            <div class="segment-cell" data-index="31"></div>
+        </div>
+        <div class="segment-row" id="row4">
+            <div class="segment-cell" data-index="32"></div>
+            <div class="segment-cell" data-index="33"></div>
+            <div class="segment-cell" data-index="34"></div>
+            <div class="segment-cell" data-index="35"></div>
+            <div class="segment-cell" data-index="36"></div>
+            <div class="segment-cell" data-index="37"></div>
+            <div class="segment-cell" data-index="38"></div>
+            <div class="segment-cell" data-index="39"></div>
+        </div>
+        <div class="segment-row" id="row5">
+            <div class="segment-cell" data-index="40"></div>
+            <div class="segment-cell" data-index="41"></div>
+            <div class="segment-cell" data-index="42"></div>
+            <div class="segment-cell" data-index="43"></div>
+            <div class="segment-cell" data-index="44"></div>
+            <div class="segment-cell" data-index="45"></div>
+            <div class="segment-cell" data-index="46"></div>
+            <div class="segment-cell" data-index="47"></div>
+        </div>
+        <div class="segment-row" id="row6">
+            <div class="segment-cell" data-index="48"></div>
+            <div class="segment-cell" data-index="49"></div>
+            <div class="segment-cell" data-index="50"></div>
+            <div class="segment-cell" data-index="51"></div>
+            <div class="segment-cell" data-index="52"></div>
+            <div class="segment-cell" data-index="53"></div>
+            <div class="segment-cell" data-index="54"></div>
+            <div class="segment-cell" data-index="55"></div>
+        </div>
+        <div class="segment-row" id="row7">
+            <div class="segment-cell" data-index="56"></div>
+            <div class="segment-cell" data-index="57"></div>
+            <div class="segment-cell" data-index="58"></div>
+            <div class="segment-cell" data-index="59"></div>
+            <div class="segment-cell" data-index="60"></div>
+            <div class="segment-cell" data-index="61"></div>
+            <div class="segment-cell" data-index="62"></div>
+            <div class="segment-cell" data-index="63"></div>
+        </div>
+    </div>
+    <div class="piano-container">
+        <!-- White keys -->
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+    </div>
+
+    <script>
+        // Piano note frequencies (C4 as base)
+        const notes = [
+            { name: 'C', freq: 261.63, isBlack: false },
+            { name: 'C#', freq: 277.18, isBlack: true },
+            { name: 'D', freq: 293.66, isBlack: false },
+            { name: 'D#', freq: 311.13, isBlack: true },
+            { name: 'E', freq: 329.63, isBlack: false },
+            { name: 'F', freq: 349.23, isBlack: false },
+            { name: 'F#', freq: 369.99, isBlack: true },
+            { name: 'G', freq: 392.00, isBlack: false },
+            { name: 'G#', freq: 415.30, isBlack: true },
+            { name: 'A', freq: 440.00, isBlack: false },
+            { name: 'A#', freq: 466.16, isBlack: true },
+            { name: 'B', freq: 493.88, isBlack: false },
+        ];
+
+        // Create three octaves: lower (C3), middle (C4), and upper (C5)
+        const lowerOctave = notes.map(n => ({ ...n, freq: n.freq / 2 })); // C3 to B3
+        const middleOctave = notes; // C4 to B4
+        const upperOctave = notes.map(n => ({ ...n, freq: n.freq * 2 })); // C5 to B5
+        
+        const pianoNotes = [...lowerOctave, ...middleOctave, ...upperOctave];
+
+        let audioContext;
+        let activeOscillators = {};
+
+        // Chord type options for each quality
+        const chordTypeOptions = {
+            major: [
+                { value: 'triad', label: 'Triad' },
+                { value: '6th', label: '6th' },
+                { value: '7th', label: '7th' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: 'add9', label: 'Add9' },
+                { value: 'add11', label: 'Add11' },
+                { value: '6/9', label: '6/9' },
+                { value: '7sharp11', label: '7(#11)' },
+                { value: '9sharp11', label: '9(#11)' },
+                { value: '13sharp11', label: '13(#11)' }
+            ],
+            minor: [
+                { value: 'triad', label: 'Triad' },
+                { value: '6th', label: '6th' },
+                { value: '7th', label: '7th (min7)' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: 'add9', label: 'Add9' },
+                { value: 'add11', label: 'Add11' },
+                { value: '6/9', label: '6/9' },
+                { value: 'maj7', label: 'Minor Major 7th' },
+                { value: '9maj7', label: '9th (Maj7)' }
+            ],
+            dominant: [
+                { value: '7th', label: '7th' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: '7sharp9', label: '7(#9)' },
+                { value: '7flat9', label: '7(b9)' },
+                { value: '7sharp11', label: '7(#11)' },
+                { value: '9sharp11', label: '9(#11)' },
+                { value: '13sharp11', label: '13(#11)' },
+                { value: '7sus4', label: '7sus4' }
+            ],
+            diminished: [
+                { value: 'triad', label: 'Triad' },
+                { value: '7th', label: '7th' },
+                { value: 'halfdim7', label: 'Half Diminished 7th' }
+            ],
+            augmented: [
+                { value: 'triad', label: 'Triad' },
+                { value: '7th', label: '7th' },
+                { value: 'maj7', label: 'Augmented Major 7th' }
+            ],
+            sus: [
+                { value: 'sus2', label: 'Sus2' },
+                { value: 'sus4', label: 'Sus4' },
+                { value: '7sus2', label: '7sus2' },
+                { value: '7sus4', label: '7sus4' },
+                { value: '9sus4', label: '9sus4' }
+            ]
+        };
+
+        // Chord intervals (in semitones from root)
+        const chordIntervals = {
+            // Major chords
+            'major-triad': [0, 4, 7],
+            'major-6th': [0, 4, 7, 9],
+            'major-7th': [0, 4, 7, 11],
+            'major-9th': [0, 4, 7, 11, 14],
+            'major-11th': [0, 4, 7, 11, 14, 17],
+            'major-13th': [0, 4, 7, 11, 14, 17, 21],
+            'major-add9': [0, 4, 7, 14],
+            'major-add11': [0, 4, 7, 17],
+            'major-6/9': [0, 4, 7, 9, 14],
+            'major-7sharp11': [0, 4, 7, 11, 18],
+            'major-9sharp11': [0, 4, 7, 11, 14, 18],
+            'major-13sharp11': [0, 4, 7, 11, 14, 17, 18, 21],
+            
+            // Minor chords
+            'minor-triad': [0, 3, 7],
+            'minor-6th': [0, 3, 7, 9],
+            'minor-7th': [0, 3, 7, 10],
+            'minor-9th': [0, 3, 7, 10, 14],
+            'minor-11th': [0, 3, 7, 10, 14, 17],
+            'minor-13th': [0, 3, 7, 10, 14, 17, 21],
+            'minor-add9': [0, 3, 7, 14],
+            'minor-add11': [0, 3, 7, 17],
+            'minor-6/9': [0, 3, 7, 9, 14],
+            'minor-maj7': [0, 3, 7, 11],
+            'minor-9maj7': [0, 3, 7, 11, 14],
+            
+            // Dominant chords
+            'dominant-7th': [0, 4, 7, 10],
+            'dominant-9th': [0, 4, 7, 10, 14],
+            'dominant-11th': [0, 4, 7, 10, 14, 17],
+            'dominant-13th': [0, 4, 7, 10, 14, 17, 21],
+            'dominant-7sharp9': [0, 4, 7, 10, 15],
+            'dominant-7flat9': [0, 4, 7, 10, 13],
+            'dominant-7sharp11': [0, 4, 7, 10, 18],
+            'dominant-9sharp11': [0, 4, 7, 10, 14, 18],
+            'dominant-13sharp11': [0, 4, 7, 10, 14, 17, 18, 21],
+            'dominant-7sus4': [0, 5, 7, 10],
+            
+            // Diminished chords
+            'diminished-triad': [0, 3, 6],
+            'diminished-7th': [0, 3, 6, 9],
+            'diminished-halfdim7': [0, 3, 6, 10],
+            
+            // Augmented chords
+            'augmented-triad': [0, 4, 8],
+            'augmented-7th': [0, 4, 8, 10],
+            'augmented-maj7': [0, 4, 8, 11],
+            
+            // Sus chords
+            'sus-sus2': [0, 2, 7],
+            'sus-sus4': [0, 5, 7],
+            'sus-7sus2': [0, 2, 7, 10],
+            'sus-7sus4': [0, 5, 7, 10],
+            'sus-9sus4': [0, 5, 7, 10, 14]
+        };
+
+        // Note name to index mapping
+        const noteToIndex = {
+            'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+            'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
+            'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+        };
+
+        // Solfege names
+        const solfegeNames = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Ti'];
+        
+        // Global settings for solfege display
+        let keySignature = 'C';
+        let showSolfege = false;
+
+        // Get solfege name for a note in a given key signature
+        function getSolfegeName(noteName, keySignature) {
+            // Get the root note index for the key signature
+            const keyRootIndex = noteToIndex[keySignature];
+            if (keyRootIndex === undefined) return '';
+            
+            // Get the note index (handle both sharp and flat versions)
+            let noteIndex = noteToIndex[noteName];
+            if (noteIndex === undefined) {
+                // Try alternative names
+                if (noteName === 'Cb') noteIndex = 11; // B
+                else if (noteName === 'Fb') noteIndex = 4; // E
+                else if (noteName === 'E#') noteIndex = 5; // F
+                else if (noteName === 'B#') noteIndex = 0; // C
+                else return '';
+            }
+            
+            // Calculate the interval from the key root (in semitones)
+            let interval = (noteIndex - keyRootIndex + 12) % 12;
+            
+            // Major scale intervals: 0=Do, 2=Re, 4=Mi, 5=Fa, 7=Sol, 9=La, 11=Ti
+            // Map to diatonic solfege for scale degrees
+            const diatonicMap = {
+                0: 'Do', 2: 'Re', 4: 'Mi', 5: 'Fa', 7: 'Sol', 9: 'La', 11: 'Ti'
+            };
+            
+            // If it's a scale degree, return diatonic solfege
+            if (diatonicMap[interval] !== undefined) {
+                return diatonicMap[interval];
+            }
+            
+            // For chromatic notes (sharps/flats), use chromatic solfege
+            const chromaticMap = {
+                1: 'Di', 3: 'Ri', 6: 'Fi', 8: 'Si', 10: 'Li'
+            };
+            
+            return chromaticMap[interval] || '';
+        }
+
+        // Update piano keys with solfege names
+        function updatePianoKeysSolfege() {
+            updatePianoKeysSolfegeWithValues(keySignature, showSolfege);
+        }
+
+        // Update piano keys with solfege names using provided values (for preview)
+        function updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege) {
+            const keys = document.querySelectorAll('.white-key, .black-key');
+            keys.forEach(key => {
+                // Remove existing solfege label
+                const existingSolfege = key.querySelector('.key-solfege');
+                if (existingSolfege) {
+                    existingSolfege.remove();
+                }
+                
+                // Add solfege label if enabled
+                if (tempShowSolfege) {
+                    const noteName = key.dataset.noteName;
+                    if (noteName) {
+                        const solfege = getSolfegeName(noteName, tempKeySignature);
+                        if (solfege) {
+                            const solfegeLabel = document.createElement('div');
+                            solfegeLabel.className = 'key-solfege';
+                            solfegeLabel.textContent = solfege;
+                            key.appendChild(solfegeLabel);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize Web Audio API
+        function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.error('Web Audio API not supported');
+            }
+        }
+
+        // Play a note
+        function playNote(frequency, keyElement, stopExisting = true, duration = 1.5) {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            if (stopExisting) {
+                stopNote(keyElement);
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = 'sine';
+
+            const now = audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+
+            const keyId = keyElement ? keyElement.dataset.noteId : null;
+            if (keyId) {
+                if (stopExisting) {
+                    activeOscillators[keyId] = { oscillator, gainNode };
+                } else {
+                    if (!activeOscillators[keyId]) {
+                        activeOscillators[keyId] = [];
+                    }
+                    if (Array.isArray(activeOscillators[keyId])) {
+                        activeOscillators[keyId].push({ oscillator, gainNode });
+                    } else {
+                        activeOscillators[keyId] = [{ oscillator, gainNode }];
+                    }
+                }
+            }
+        }
+
+        // Stop a note
+        function stopNote(keyElement) {
+            const keyId = keyElement.dataset.noteId;
+            if (activeOscillators[keyId]) {
+                const oscillators = Array.isArray(activeOscillators[keyId]) 
+                    ? activeOscillators[keyId] 
+                    : [activeOscillators[keyId]];
+                oscillators.forEach(osc => {
+                    if (osc.oscillator) {
+                        osc.oscillator.stop();
+                    }
+                });
+                delete activeOscillators[keyId];
+            }
+        }
+
+        function clearKeyHighlights() {
+            document.querySelectorAll('.key-highlighted').forEach(key => {
+                key.classList.remove('key-highlighted');
+            });
+        }
+
+        // Play a chord
+        function playChord(rootNote, chordType, durationSec = 1.5) {
+            if (!rootNote || !chordType) return;
+
+            if (!audioContext) {
+                initAudio();
+            }
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            // Clear previous highlights
+            clearKeyHighlights();
+
+            const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+            const rootIndex = noteToIndex[rootNoteName];
+            if (rootIndex === undefined) {
+                console.warn('Root note not found:', rootNoteName);
+                return;
+            }
+
+            const intervals = chordIntervals[chordType];
+            if (!intervals) {
+                console.warn('Chord intervals not found for:', chordType);
+                return;
+            }
+
+            const rootNoteInMiddleOctave = 12 + rootIndex;
+            const rootFreq = pianoNotes[rootNoteInMiddleOctave].freq;
+
+            intervals.forEach((interval) => {
+                const noteIndex = rootNoteInMiddleOctave + interval;
+                if (noteIndex < pianoNotes.length) {
+                    const noteFreq = pianoNotes[noteIndex].freq;
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    
+                    if (keyElement) {
+                        // Highlight the key
+                        keyElement.classList.add('key-highlighted');
+                        // Play the note
+                        playNote(noteFreq, keyElement, false, durationSec);
+                    } else {
+                        // If key element doesn't exist, play note without visual feedback
+                        playNote(noteFreq, null, false, durationSec);
+                    }
+                }
+            });
+        }
+
+        // Highlight a single note
+        function highlightNote(rootNote) {
+            if (!rootNote) return;
+
+            const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+            const rootIndex = noteToIndex[rootNoteName];
+            if (rootIndex === undefined) return;
+
+            // Clear previous highlights
+            clearKeyHighlights();
+
+            const rootNoteInMiddleOctave = 12 + rootIndex;
+            
+            for (let octave = 0; octave < 3; octave++) {
+                const noteIndex = (octave * 12) + rootIndex;
+                if (noteIndex < pianoNotes.length) {
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        keyElement.classList.add('key-highlighted');
+                    }
+                }
+            }
+        }
+
+        // Handle dropdown changes
+        function setupChordControls() {
+            const noteSelect = document.getElementById('noteSelect');
+            const qualitySelect = document.getElementById('qualitySelect');
+            const chordTypeSelect = document.getElementById('chordTypeSelect');
+            
+            // Flag to track if we're still in initial setup (skip audio during this)
+            let isInitialSetup = true;
+
+            function ensureAudioReady() {
+                // Initialize audio context on first user interaction
+                if (!audioContext) {
+                    initAudio();
+                }
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            }
+
+            // Update chord type dropdown based on quality selection
+            qualitySelect.addEventListener('change', (e) => {
+                // Only mark as user interaction if it's not a programmatic event
+                if (e.isTrusted) {
+                    isInitialSetup = false;
+                }
+                if (!isInitialSetup) {
+                    ensureAudioReady();
+                }
+                const quality = qualitySelect.value;
+                chordTypeSelect.innerHTML = '<option value="">Select type</option>';
+                
+                if (quality && chordTypeOptions[quality]) {
+                    chordTypeOptions[quality].forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option.value;
+                        optionElement.textContent = option.label;
+                        chordTypeSelect.appendChild(optionElement);
+                    });
+                    
+                    if (chordTypeOptions[quality].length > 0) {
+                        chordTypeSelect.value = chordTypeOptions[quality][0].value;
+                    }
+                }
+                
+                setTimeout(() => {
+                    updateChord();
+                }, 10);
+            });
+
+            function updateChord() {
+                const rootNote = noteSelect.value;
+                const quality = qualitySelect.value;
+                const chordType = chordTypeSelect.value;
+                
+                // Update save button state
+                updateSaveButtonState(rootNote, quality, chordType);
+                
+                // If all three dropdowns have values and there are selected cells, replace them
+                if (rootNote && quality && chordType && selectedCells.size > 0) {
+                    const chord = {
+                        note: rootNote,
+                        quality: quality,
+                        type: chordType,
+                        chordKey: `${quality}-${chordType}`
+                    };
+                    
+                    // Replace values in selected cells
+                    selectedCells.forEach(idx => {
+                        if (idx >= 0 && idx < cellValues.length) {
+                            cellValues[idx] = chord;
+                        }
+                    });
+                    
+                    // Update cell displays
+                    updateCells();
+                    
+                    // Update play button state
+                    setTimeout(() => {
+                        updatePlayButtonState();
+                    }, 0);
+                }
+                
+                document.querySelectorAll('.key-highlighted').forEach(key => {
+                    key.classList.remove('key-highlighted');
+                });
+
+                // Only initialize audio and play when user actually interacts (not on page load)
+                if (!isInitialSetup) {
+                    if (rootNote && quality && chordType) {
+                        ensureAudioReady();
+                        const chordKey = `${quality}-${chordType}`;
+                        playChord(rootNote, chordKey);
+                    } else if (rootNote) {
+                        ensureAudioReady();
+                        highlightNote(rootNote);
+                        
+                        // Play the note sound
+                        const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+                        const rootIndex = noteToIndex[rootNoteName];
+                        if (rootIndex !== undefined) {
+                            const rootNoteInMiddleOctave = 12 + rootIndex;
+                            const noteFreq = pianoNotes[rootNoteInMiddleOctave].freq;
+                            const keyElement = document.querySelector(`[data-note-id="${rootNoteInMiddleOctave}"]`);
+                            
+                            if (keyElement) {
+                                playNote(noteFreq, keyElement);
+                            } else {
+                                playNote(noteFreq, null);
+                            }
+                        }
+                    }
+                }
+            }
+
+            function updateSaveButtonState(rootNote, quality, chordType) {
+                const saveButton = document.getElementById('saveButton');
+                if (rootNote && quality && chordType) {
+                    saveButton.disabled = false;
+                } else {
+                    saveButton.disabled = true;
+                }
+            }
+
+            // Variable to store saved chords
+            let savedChords = [];
+            
+            // Array to remember each cell's value (64 cells: 8 rows x 8 cells)
+            let cellValues = new Array(64).fill(null);
+
+            // Playback state (declared early so helpers can access)
+            let isPlaying = false;
+            let playTimeout = null;
+            let currentPlayIndex = 0;
+            let playSequence = [];
+            let playbackBpm = 120; // default BPM
+            // keySignature and showSolfege are defined at top level
+
+        // Track selected cells
+        const selectedCells = new Set();
+        // Track dragged selection payload
+        let dragSelection = [];
+
+            // Function to update cell display
+            function updateCells() {
+                cellValues.forEach((value, index) => {
+                    const cell = document.querySelector(`[data-index="${index}"]`);
+                    if (cell) {
+                        if (value) {
+                        const displayText = formatChordLabel(value);
+                            cell.textContent = displayText;
+                        } else {
+                            cell.textContent = '';
+                        }
+                    }
+                });
+                // Update play button state after cells change
+                if (typeof updatePlayButtonState === 'function') {
+                    updatePlayButtonState();
+                }
+            }
+
+        // Short label formatting for cells
+        function formatChordLabel(chord) {
+            const { note, quality, type } = chord;
+
+            const majorMap = {
+                triad: '',
+                '6th': '6',
+                '7th': 'M7',
+                '9th': 'M9',
+                '11th': 'M11',
+                '13th': 'M13',
+                add9: 'add9',
+                add11: 'add11',
+                '6/9': '6/9',
+                '7sharp11': 'M7#11',
+                '9sharp11': 'M9#11',
+                '13sharp11': 'M13#11'
+            };
+
+            const minorMap = {
+                triad: 'm',
+                '6th': 'm6',
+                '7th': 'm7',
+                '9th': 'm9',
+                '11th': 'm11',
+                '13th': 'm13',
+                add9: 'madd9',
+                add11: 'madd11',
+                '6/9': 'm6/9',
+                maj7: 'mMaj7',
+                '9maj7': 'm9Maj7'
+            };
+
+            const domMap = {
+                '7th': '7',
+                '9th': '9',
+                '11th': '11',
+                '13th': '13',
+                '7sharp9': '7#9',
+                '7flat9': '7b9',
+                '7sharp11': '7#11',
+                '9sharp11': '9#11',
+                '13sharp11': '13#11',
+                '7sus4': '7sus4'
+            };
+
+            const dimMap = {
+                triad: 'dim',
+                '7th': 'dim7',
+                halfdim7: 'ø7'
+            };
+
+            const augMap = {
+                triad: 'aug',
+                '7th': 'aug7',
+                maj7: 'augMaj7'
+            };
+
+            const susMap = {
+                sus2: 'sus2',
+                sus4: 'sus4',
+                '7sus2': '7sus2',
+                '7sus4': '7sus4',
+                '9sus4': '9sus4'
+            };
+
+            let suffix = '';
+
+            switch (quality) {
+                case 'major':
+                    suffix = majorMap[type] ?? '';
+                    break;
+                case 'minor':
+                    suffix = minorMap[type] ?? 'm';
+                    break;
+                case 'dominant':
+                    suffix = domMap[type] ?? '';
+                    break;
+                case 'diminished':
+                    suffix = dimMap[type] ?? 'dim';
+                    break;
+                case 'augmented':
+                    suffix = augMap[type] ?? 'aug';
+                    break;
+                case 'sus':
+                    suffix = susMap[type] ?? 'sus';
+                    break;
+                default:
+                    suffix = '';
+            }
+
+            // If major triad (suffix empty), just show note.
+            if (quality === 'major' && (type === 'triad' || suffix === '')) {
+                return note;
+            }
+
+            // If suffix already includes the quality (like m6), just prepend note.
+            if (suffix) {
+                return `${note}${suffix}`;
+            }
+
+            // Fallback to note + quality
+            return `${note}${quality}`;
+        }
+
+        function clearSelection() {
+            selectedCells.clear();
+            document.querySelectorAll('.segment-cell.cell-selected').forEach(cell => {
+                cell.classList.remove('cell-selected');
+            });
+            // Update play button state after selection changes
+            if (typeof updatePlayButtonState === 'function') {
+                updatePlayButtonState();
+            }
+        }
+
+        function attachCellListeners() {
+            document.querySelectorAll('.segment-cell').forEach(cell => {
+                // make draggable
+                cell.setAttribute('draggable', 'true');
+
+                cell.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering body click handler
+                    const idx = Number(cell.dataset.index);
+                    const hasAnyValue = cellValues.some(val => val !== null);
+                    // Allow selection if cell has a value, or if at least one cell has a value
+                    if (cellValues[idx] || hasAnyValue) {
+                        if (selectedCells.has(idx)) {
+                            selectedCells.delete(idx);
+                            cell.classList.remove('cell-selected');
+                        } else {
+                            selectedCells.add(idx);
+                            cell.classList.add('cell-selected');
+                        }
+                        // Update play button state after selection changes
+                        if (typeof updatePlayButtonState === 'function') {
+                            updatePlayButtonState();
+                        }
+
+                        // Play the chord assigned to this cell (if any)
+                        const chord = cellValues[idx];
+                        if (chord && chord.chordKey) {
+                            ensureAudioReady();
+                            const cellDurationMs = (60000 / playbackBpm) * 4;
+                            const durationSec = cellDurationMs / 1000;
+                            playChord(chord.note, chord.chordKey, durationSec);
+                        }
+                    }
+                });
+
+                cell.addEventListener('dragstart', (e) => {
+                    const idx = Number(cell.dataset.index);
+                    const hasAnyValue = cellValues.some(val => val !== null);
+                    // Only allow drag if there is at least one selected cell or this cell has a value
+                    if (!hasAnyValue) {
+                        e.preventDefault();
+                        return;
+                    }
+                    const selectionIndices = selectedCells.size > 0
+                        ? Array.from(selectedCells).sort((a, b) => a - b)
+                        : (cellValues[idx] ? [idx] : []);
+                    dragSelection = selectionIndices
+                        .map(i => cellValues[i])
+                        .filter(v => v !== null);
+                    if (dragSelection.length === 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+
+                cell.addEventListener('dragover', (e) => {
+                    // Allow drop
+                    if (dragSelection.length > 0) {
+                        e.preventDefault();
+                    }
+                });
+
+                cell.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (dragSelection.length === 0) return;
+                    const targetIdx = Number(cell.dataset.index);
+                    // Place dragged chords into target and subsequent cells
+                    dragSelection.forEach((chord, i) => {
+                        const idx = targetIdx + i;
+                        if (idx < cellValues.length) {
+                            cellValues[idx] = chord;
+                        }
+                    });
+                    updateCells();
+                    dragSelection = [];
+                });
+
+                cell.addEventListener('dragend', () => {
+                    dragSelection = [];
+                });
+            });
+        }
+
+            // Save chord button handler
+            const saveButton = document.getElementById('saveButton');
+            saveButton.addEventListener('click', () => {
+                // Initialize audio on plus button click
+                ensureAudioReady();
+                
+                const rootNote = noteSelect.value;
+                const quality = qualitySelect.value;
+                const chordType = chordTypeSelect.value;
+                
+                if (rootNote && quality && chordType) {
+                    const chord = {
+                        note: rootNote,
+                        quality: quality,
+                        type: chordType,
+                        chordKey: `${quality}-${chordType}`
+                    };
+                    savedChords.push(chord);
+                    
+                    // Always append to the last available cell (ignore selected cells)
+                    const firstEmptyIndex = cellValues.findIndex(val => val === null);
+                    if (firstEmptyIndex !== -1) {
+                        cellValues[firstEmptyIndex] = chord;
+                    } else {
+                        // If all cells are filled, append to the end (shifts array)
+                        cellValues.push(chord);
+                        if (cellValues.length > 64) {
+                            cellValues.shift(); // Remove first item if exceeds 64
+                        }
+                    }
+                    
+                    // Update cell displays
+                    updateCells();
+                    
+                    // Update play button state after saving chord
+                    // Will be called after updatePlayButtonState is defined
+                    setTimeout(() => {
+                        updatePlayButtonState();
+                    }, 0);
+                    
+                    console.log('Saved chord:', chord);
+                    console.log('All saved chords:', savedChords);
+                    console.log('Cell values:', cellValues);
+                }
+            });
+            
+            // Get button references early
+            const playButton = document.getElementById('playButton');
+            const menuToggle = document.getElementById('menuToggle');
+            const settingsButton = document.getElementById('settingsButton');
+            const settingsOverlay = document.getElementById('settingsOverlay');
+            const settingsModal = document.getElementById('settingsModal');
+            const bpmSlider = document.getElementById('bpmSlider');
+            const bpmValue = document.getElementById('bpmValue');
+            const keySelect = document.getElementById('keySelect');
+            const showSolfegeCheckbox = document.getElementById('showSolfegeCheckbox');
+            const settingsSave = document.getElementById('settingsSave');
+            const settingsCancel = document.getElementById('settingsCancel');
+            const titleLink = document.querySelector('.title-link');
+            const infoModal = document.getElementById('infoModal');
+            
+            // Menu toggle button (placeholder for future use)
+            menuToggle.addEventListener('click', () => {
+                // TODO: Add menu toggle functionality
+                console.log('Menu toggle clicked');
+            });
+            
+            // Initialize cells display
+            updateCells();
+        attachCellListeners();
+
+            // Deselect cells when clicking on empty space
+            document.body.addEventListener('click', (e) => {
+                // Check if the click target is a cell or inside a cell
+                const clickedCell = e.target.closest('.segment-cell');
+                // Also check if clicking on interactive elements (buttons, selects, modals)
+                const isInteractiveElement = e.target.closest('button, select, .settings-modal, .info-modal, .settings-overlay');
+                
+                // Only clear selection if clicking on empty space (not on a cell or interactive element)
+                if (!clickedCell && !isInteractiveElement) {
+                    clearSelection();
+                }
+            });
+
+            // Function to check if there's anything to play
+            function hasChordsToPlay() {
+                if (selectedCells.size > 0) {
+                    // Check if any selected cell has a value
+                    for (const idx of selectedCells) {
+                        if (cellValues[idx] !== null) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } else {
+                    // Check if any cell has a value
+                    return cellValues.some(val => val !== null);
+                }
+            }
+
+            // Function to update play button state
+            function updatePlayButtonState() {
+                if (!playButton) return; // Safety check - button might not be initialized yet
+                if (hasChordsToPlay() && !isPlaying) {
+                    playButton.disabled = false;
+                } else if (!hasChordsToPlay() && !isPlaying) {
+                    playButton.disabled = true;
+                }
+            }
+            
+            // Expose to global scope so updateCells can access it
+            window.updatePlayButtonState = updatePlayButtonState;
+            
+            function stopPlayback() {
+                isPlaying = false;
+                if (playTimeout) {
+                    clearTimeout(playTimeout);
+                    playTimeout = null;
+                }
+                playButton.textContent = '►';
+                playButton.classList.remove('playing');
+                currentPlayIndex = 0;
+                playSequence = [];
+                
+                // Clear highlights
+                document.querySelectorAll('.key-highlighted').forEach(key => {
+                    key.classList.remove('key-highlighted');
+                });
+                
+                // Clear cell playing state
+                document.querySelectorAll('.cell-playing').forEach(cell => {
+                    cell.classList.remove('cell-playing');
+                });
+                
+                // Update button state after stopping
+                updatePlayButtonState();
+            }
+
+            function playNextChord() {
+                if (!isPlaying || currentPlayIndex >= playSequence.length) {
+                    stopPlayback();
+                    return;
+                }
+
+                const chordIndex = playSequence[currentPlayIndex];
+                const chord = cellValues[chordIndex];
+                
+                if (chord) {
+                    // Highlight the cell being played
+                    const cell = document.querySelector(`[data-index="${chordIndex}"]`);
+                    if (cell) {
+                        cell.classList.add('cell-playing');
+                    }
+                    
+                    // Play the chord with duration based on BPM (4 beats)
+                    const chordKey = chord.chordKey;
+                    const cellDurationMs = (60000 / playbackBpm) * 4;
+                    const durationSec = cellDurationMs / 1000;
+                    playChord(chord.note, chordKey, durationSec);
+                    
+                    // Move to next chord after delay
+                    currentPlayIndex++;
+                    const intervalMs = cellDurationMs;
+                    playTimeout = setTimeout(() => {
+                        // Remove highlight from current cell
+                        if (cell) {
+                            cell.classList.remove('cell-playing');
+                        }
+                        playNextChord();
+                    }, intervalMs);
+                } else {
+                    // Skip empty cells
+                    currentPlayIndex++;
+                    playNextChord();
+                }
+            }
+
+            playButton.addEventListener('click', () => {
+                if (playButton.disabled) return;
+                
+                // Initialize audio on play button click
+                ensureAudioReady();
+                
+                if (isPlaying) {
+                    // Stop playback
+                    stopPlayback();
+                } else {
+                    // Start playback
+                    isPlaying = true;
+                    playButton.textContent = '■';
+                    playButton.classList.add('playing');
+                    playButton.disabled = false; // Keep enabled while playing so user can stop
+                    playButton.disabled = false; // Keep enabled while playing so user can stop
+                    
+                    // Determine starting point
+                    if (selectedCells.size > 0) {
+                        // Play all cells from first selected to last selected (inclusive range)
+                        const selectedArray = Array.from(selectedCells).sort((a, b) => a - b);
+                        const firstSelected = selectedArray[0];
+                        const lastSelected = selectedArray[selectedArray.length - 1];
+                        playSequence = [];
+                        for (let i = firstSelected; i <= lastSelected; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    } else {
+                        // Play from first cell with value
+                        playSequence = [];
+                        for (let i = 0; i < cellValues.length; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    }
+                    
+                    currentPlayIndex = 0;
+                    if (playSequence.length > 0) {
+                        playNextChord();
+                    } else {
+                        stopPlayback();
+                    }
+                }
+            });
+            
+            // Initialize play button state (ensure it's disabled on page load)
+            // Since cellValues starts as all null, button should be disabled
+            playButton.disabled = true;
+            updatePlayButtonState();
+
+            // Store original values for cancel functionality
+            let originalKeySignature = keySignature;
+            let originalShowSolfege = showSolfege;
+
+            // Settings button to adjust BPM
+            settingsButton.addEventListener('click', () => {
+                // Store original values
+                originalKeySignature = keySignature;
+                originalShowSolfege = showSolfege;
+                
+                // Populate current values
+                bpmSlider.value = playbackBpm;
+                bpmValue.textContent = playbackBpm.toString();
+                keySelect.value = keySignature;
+                showSolfegeCheckbox.checked = showSolfege;
+                settingsOverlay.style.display = 'block';
+                settingsModal.style.display = 'block';
+            });
+
+            bpmSlider.addEventListener('input', () => {
+                bpmValue.textContent = bpmSlider.value;
+            });
+
+            // Real-time updates for solfege display (temporary, only applied on save)
+            showSolfegeCheckbox.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
+            });
+
+            keySelect.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
+            });
+
+            function closeSettings() {
+                settingsOverlay.style.display = 'none';
+                settingsModal.style.display = 'none';
+                infoModal.style.display = 'none';
+            }
+
+            settingsCancel.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
+                closeSettings();
+            });
+
+            settingsOverlay.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
+                closeSettings();
+            });
+
+            settingsSave.addEventListener('click', () => {
+                const value = parseInt(bpmSlider.value, 10);
+                const clamped = Math.min(300, Math.max(20, value));
+                playbackBpm = clamped;
+                keySignature = keySelect.value;
+                showSolfege = showSolfegeCheckbox.checked;
+                updatePianoKeysSolfege();
+                if (isPlaying) {
+                    stopPlayback();
+                }
+                closeSettings();
+            });
+
+            // Title click (Chord Canvas) opens info modal (only the link, not the whole bar)
+            if (titleLink) {
+                titleLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    settingsOverlay.style.display = 'block';
+                    infoModal.style.display = 'block';
+                });
+            }
+
+            noteSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
+            chordTypeSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
+            
+            // Initial button state
+            updateSaveButtonState(noteSelect.value, qualitySelect.value, chordTypeSelect.value);
+
+            // Set default selection: C major 7 (without triggering audio)
+            noteSelect.value = 'C';
+            qualitySelect.value = 'major';
+            qualitySelect.dispatchEvent(new Event('change')); // This won't set isInitialSetup=false because e.isTrusted is false
+            // After options are populated, set to 7th if available
+            const defaultChordType = '7th';
+            if (Array.from(chordTypeSelect.options).some(opt => opt.value === defaultChordType)) {
+                chordTypeSelect.value = defaultChordType;
+            }
+            updateChord(); // This will skip audio because isInitialSetup is still true
+        }
+
+        // Piano pattern: black keys appear between C-D, D-E, F-G, G-A, A-B
+        // But NOT between E-F and B-C
+        // For 21 white keys (3 octaves), black keys appear at these positions:
+        const blackKeyPositions = [
+            0.5,   // Between C-D (keys 0-1)
+            1.5,   // Between D-E (keys 1-2)
+            // Skip between E-F (keys 2-3)
+            3.5,   // Between F-G (keys 3-4)
+            4.5,   // Between G-A (keys 4-5)
+            5.5,   // Between A-B (keys 5-6)
+            // Skip between B-C (keys 6-7)
+            7.5,   // Between C-D (keys 7-8)
+            8.5,   // Between D-E (keys 8-9)
+            // Skip between E-F (keys 9-10)
+            10.5,  // Between F-G (keys 10-11)
+            11.5,  // Between G-A (keys 11-12)
+            12.5,  // Between A-B (keys 12-13)
+            // Skip between B-C (keys 13-14)
+            14.5,  // Between C-D (keys 14-15)
+            15.5,  // Between D-E (keys 15-16)
+            // Skip between E-F (keys 16-17)
+            17.5,  // Between F-G (keys 17-18)
+            18.5,  // Between G-A (keys 18-19)
+            19.5   // Between A-B (keys 19-20)
+        ];
+
+        const container = document.querySelector('.piano-container');
+        
+        // Remove existing white keys
+        container.innerHTML = '';
+
+        // Create white keys first
+        let whiteKeyIndex = 0;
+        pianoNotes.forEach((note, index) => {
+            if (!note.isBlack) {
+                const key = document.createElement('div');
+                key.className = 'white-key';
+                key.dataset.noteId = index;
+                key.dataset.frequency = note.freq;
+                key.dataset.noteName = note.name;
+                container.appendChild(key);
+                whiteKeyIndex++;
+            }
+        });
+
+        // Create black keys positioned between white keys
+        let positionIndex = 0;
+        pianoNotes.forEach((note, index) => {
+            if (note.isBlack && positionIndex < blackKeyPositions.length) {
+                const key = document.createElement('div');
+                key.className = 'black-key';
+                key.dataset.noteId = index;
+                key.dataset.frequency = note.freq;
+                key.dataset.noteName = note.name;
+                key.setAttribute('data-position', blackKeyPositions[positionIndex].toString());
+                container.appendChild(key);
+                positionIndex++;
+            }
+        });
+
+        // Initialize (audio context will be initialized on user interaction)
+        setupChordControls();
+        
+        // Update solfege names on piano keys if enabled
+        updatePianoKeysSolfege();
+    </script>
+</body>
+</html>
+

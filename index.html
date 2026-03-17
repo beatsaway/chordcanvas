@@ -1,184 +1,396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soundplayground</title>
+    <title>Chord Canvas</title>
     <link rel="icon" href="data:,">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Pacifico&display=swap" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7087223830347836"
+     crossorigin="anonymous"></script>
     <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f7f9;
+            --panel: #ffffff;
+            --text: #0f172a;
+            --muted: #475569;
+            --border: #e2e8f0;
+            --accent: #0f766e;
+            --accent-soft: rgba(15, 118, 110, 0.12);
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
-        
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #0a0a0f;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text);
+            background: #ffffff;
+            font-size: 14px;
+            line-height: 1.6;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse 75% 65% at 50% 45%, transparent 0%, transparent 70%, rgba(0, 0, 0, 0.02) 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .page {
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        .text-link {
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .ghost-button {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+        }
+
+        .ghost-button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(15, 118, 110, 0.06);
+        }
+
+        main {
+            flex: 1;
+            width: min(100%, 980px);
+            margin: 0 auto;
+            padding: 0 clamp(20px, 4vw, 48px) 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .hero {
+            margin-top: clamp(16px, 3vw, 28px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: clamp(10px, 2vw, 18px) clamp(20px, 4vw, 40px);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        .eyebrow {
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.16em;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 4vw, 44px);
+            line-height: 1.1;
+            text-align: center;
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .versions-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            align-items: center;
+        }
+
+        .versions-brand {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .versions-brand .brand {
+            font-family: "Pacifico", cursive;
+            font-size: 22px;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            padding: 0;
+            transition: color 0.2s ease;
+        }
+
+        .versions-brand .brand:hover {
+            color: var(--accent);
+        }
+
+        .versions {
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #e8e8e8;
-            padding: 40px 20px;
+            gap: 12px;
+            flex-wrap: wrap;
         }
-        
-        .container {
-            max-width: 480px;
-            width: 100%;
-        }
-        
-        h1 {
-            font-size: 2rem;
-            font-weight: 300;
-            margin-bottom: 0.75rem;
-            color: #ffffff;
-            letter-spacing: -0.5px;
-            text-align: center;
-        }
-        
-        .subtitle {
-            font-size: 0.875rem;
-            color: rgba(255, 255, 255, 0.4);
-            margin-bottom: 3rem;
-            font-weight: 400;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .projects {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        
-        .project-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 8px;
-            padding: 1.5rem;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            text-decoration: none;
-            color: inherit;
+
+        .version-picker {
             display: flex;
             align-items: center;
-            gap: 1.25rem;
+            gap: 4px;
         }
-        
-        .project-card:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.12);
+
+        .versions .version-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .versions select {
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .launch-btn {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        .launch-btn:hover {
+            background: #0d5c56;
             transform: translateY(-1px);
         }
-        
-        .project-icon {
-            font-size: 2rem;
-            flex-shrink: 0;
-            line-height: 1;
-            filter: grayscale(0.3);
-            transition: filter 0.25s;
-        }
-        
-        .project-card:hover .project-icon {
-            filter: grayscale(0);
-        }
-        
-        .project-info {
-            flex: 1;
-            text-align: left;
-        }
-        
-        .project-title {
-            font-size: 1rem;
-            font-weight: 500;
-            color: #ffffff;
-            margin-bottom: 0.25rem;
-            letter-spacing: -0.2px;
-        }
-        
-        .project-description {
-            font-size: 0.8125rem;
-            color: rgba(255, 255, 255, 0.35);
+
+        .version-desc {
+            color: var(--muted);
+            font-size: 14px;
             line-height: 1.5;
+            margin-top: 8px;
+        }
+
+        .version-desc ul {
+            margin: 0;
+            padding-left: 1.2em;
+            list-style: disc;
+        }
+
+        .version-desc li {
+            margin-bottom: 2px;
+        }
+
+        .version-desc li:last-child {
+            margin-bottom: 0;
+        }
+
+        #aboutModal {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            backdrop-filter: blur(6px);
+        }
+
+        #aboutModal[aria-hidden="false"] {
+            display: flex;
+        }
+
+        #aboutModal > div {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 440px;
+            width: 100%;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        #aboutModal .about-title {
+            font-family: "Pacifico", cursive;
+            font-size: 24px;
             font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-bottom: 14px;
         }
-        
-        .project-arrow {
-            font-size: 1rem;
-            color: rgba(255, 255, 255, 0.2);
-            flex-shrink: 0;
-            transition: all 0.25s;
-            font-weight: 300;
+
+        #aboutModal p {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            line-height: 1.55;
+            color: var(--text);
         }
-        
-        .project-card:hover .project-arrow {
-            transform: translateX(2px);
-            color: rgba(255, 255, 255, 0.5);
+
+        #aboutModal p:last-of-type {
+            margin-bottom: 0;
         }
-        
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.75rem;
-            }
-            
-            .subtitle {
-                font-size: 0.75rem;
-            }
-            
-            .project-card {
-                padding: 1.25rem;
-            }
-            
-            .project-icon {
-                font-size: 1.75rem;
-            }
-            
-            .project-title {
-                font-size: 0.9375rem;
-            }
-            
-            .project-description {
-                font-size: 0.75rem;
+
+        #aboutModal a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        #aboutModal a:hover {
+            text-decoration: underline;
+        }
+
+
+        @media (max-width: 640px) {
+            .versions {
+                gap: 8px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Soundplayground</h1>
-        <p class="subtitle">Interactive Audio</p>
-        
-        <div class="projects">
-            <a href="dice4beat/index.html" class="project-card">
-                <span class="project-icon">🎲</span>
-                <div class="project-info">
-                    <div class="project-title">Dice4Beat</div>
-                    <div class="project-description">Drum Machine</div>
+    <div class="page">
+        <main>
+            <section class="hero">
+                <h1>Write chords. Hear them instantly.</h1>
+                <p></p>
+            </section>
+            <section class="versions-wrap">
+                <div class="versions-brand">
+                    <button class="brand" id="titleLink" type="button">Chord Canvas</button>
                 </div>
-                <span class="project-arrow">→</span>
-            </a>
-            <a href="dancer/index.html" class="project-card">
-                <span class="project-icon">💃</span>
-                <div class="project-info">
-                    <div class="project-title">Dancer</div>
-                    <div class="project-description">Dance / motion</div>
+                <div class="versions">
+                    <span class="version-picker">
+                        <span class="version-label">Version</span>
+                        <select id="versionSelect"></select>
+                    </span>
+                    <button type="button" class="launch-btn" id="launchBtn">Launch</button>
                 </div>
-                <span class="project-arrow">→</span>
-            </a>
-            <a href="fingerchords/index.html" class="project-card">
-                <span class="project-icon">🎸</span>
-                <div class="project-info">
-                    <div class="project-title">Fingerchords</div>
-                    <div class="project-description">Chord shapes</div>
-                </div>
-                <span class="project-arrow">→</span>
-            </a>
+                <div class="version-desc" id="versionDesc"></div>
+            </section>
+        </main>
+    </div>
+    <div id="aboutModal" aria-hidden="true">
+        <div>
+            <div class="about-title">Chord Canvas</div>
+            <p><strong>Chord Canvas</strong> is an <a href="https://github.com/beatsaway/chordcanvas" target="_blank" rel="noopener noreferrer">open source project</a> under the MIT License. Do you like Chord Canvas? 🤗 <a href="https://buymeacoffee.com/beatsaway" target="_blank" rel="noopener noreferrer">Buy me a coffee</a> ☕ so I can continue developing more music and art related projects!</p>
+            <p>My name is <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">Beats Away</a>, a music producer and sound designer. I started this project because I have always wanted to just type in any chords to generate customisable MIDI patterns or quality WAV audio without having to purchase a DAW or subscribe to a sound library.</p>
+            <p>Special thanks to S. Christian Collins. His <a href="https://www.schristiancollins.com/generaluser" target="_blank" rel="noopener noreferrer">GeneralUser GS</a> soundfont project (SF2) is converted into WAV files for providing many of the instruments here.</p>
         </div>
     </div>
+    <script>
+        if (typeof window !== 'undefined' && window.location && !/\/v1_67\//.test(window.location.pathname || '')) {
+            setTimeout(function () { window.location.replace('v1_67/index.html'); }, 2000);
+        }
+        const VERSIONS = [
+            { label: 'V1.67', path: 'v1_67/index.html', desc: ['Separate bass (70) and treble (74) velocity in Note settings', 'WAV export uses reverb, stereo width and row volume from Sound panel', 'Row volume percentage readout removed from Sound panel', 'Multi-row playback fix; version picker defaults to V1.67'] },
+            { label: 'V1.66', path: 'v1_66/index.html', desc: ['Chord, Rhythm & Sound ideas with dice randomise', 'Non-diatonic key modal with solfege', 'Ideas panel'] },
+            { label: 'V1.65', path: 'v1_65/index.html', desc: ['Chord presets and refinements', 'Stable build before the Ideas panel'] },
+            { label: 'V1.64', path: 'v1_64/index.html', desc: ['Refinements to the UI and playback'] },
+            { label: 'V1.63', path: 'v1_63/index.html', desc: ['Tempo and grid behaviour improvements'] },
+            { label: 'V1.62', path: 'v1_62/index.html', desc: ['Instrument and mix options added'] },
+            { label: 'V1.61', path: 'v1_61/index.html', desc: ['Fixes for sequence and chord entry'] },
+            { label: 'V1.60', path: 'v1_60/index.html', desc: ['Export and file-handling fixes'] },
+            { label: 'V1.59', path: 'v1_59/index.html', desc: ['Keyboard and touch behaviour improvements'] },
+            { label: 'V1.58', path: 'v1_58/index.html', desc: ['Layout and styling refinements'] },
+            { label: 'V1.57', path: 'v1_57/index.html', desc: ['Sound and playback refinements following WAV export'] },
+            { label: 'V1.56', path: 'v1_56/index.html', desc: ['WAV export with synth sounds'] },
+            { label: 'V1.55', path: 'v1_55/index.html', desc: ['Multiple sequences in a single session'] },
+            { label: 'V1.54', path: 'v1_54/index.html', desc: ['Performance and stability improvements'] },
+            { label: 'V1.53', path: 'v1_53/index.html', desc: ['MIDI export added'] },
+            { label: 'V1.51', path: 'v1_51/index.html', desc: ['Legacy build'] },
+            { label: 'V1.5', path: 'v1_5/index.html', desc: ['Legacy build'] },
+            { label: 'V1.4', path: 'v1_4/index.html', desc: ['Legacy build'] },
+            { label: 'V1.3', path: 'v1_3/index.html', desc: ['Legacy build'] },
+            { label: 'V1.2', path: 'v1_2/index.html', desc: ['Legacy build'] },
+            { label: 'V1.1', path: 'v1_1/index.html', desc: ['Legacy build'] },
+            { label: 'V1.0', path: 'v1_0.html', desc: ['First release: type chords and hear them with built-in sounds'] }
+        ];
+
+        const versionSelect = document.getElementById('versionSelect');
+        const versionDesc = document.getElementById('versionDesc');
+        const launchBtn = document.getElementById('launchBtn');
+
+        function updateDesc() {
+            const path = versionSelect.value;
+            const v = VERSIONS.find(x => x.path === path);
+            versionDesc.innerHTML = '';
+            if (v && Array.isArray(v.desc) && v.desc.length) {
+                const ul = document.createElement('ul');
+                v.desc.forEach(point => {
+                    const li = document.createElement('li');
+                    li.textContent = point;
+                    ul.appendChild(li);
+                });
+                versionDesc.appendChild(ul);
+            }
+        }
+
+        VERSIONS.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.path;
+            opt.textContent = v.label.replace(/^V/, '');
+            versionSelect.appendChild(opt);
+        });
+
+        versionSelect.addEventListener('change', updateDesc);
+        updateDesc();
+
+        launchBtn.addEventListener('click', () => {
+            const path = versionSelect.value;
+            if (path) window.open(path, '_blank', 'noopener,noreferrer');
+        });
+
+        const titleLink = document.getElementById('titleLink');
+        const aboutModal = document.getElementById('aboutModal');
+
+        function openModal() {
+            aboutModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeModal() {
+            aboutModal.setAttribute('aria-hidden', 'true');
+        }
+
+        if (titleLink) titleLink.addEventListener('click', openModal);
+        if (aboutModal) aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) closeModal(); });
+    </script>
 </body>
 </html>
-

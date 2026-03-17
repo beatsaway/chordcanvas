@@ -1,0 +1,3464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Segment container: 40vh height, positioned from bottom */
+        .segments-container {
+            position: absolute;
+            left: 0;
+            bottom: 15vh; /* Above piano (15vh) in normal mode */
+            width: 100%;
+            height: 40vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Adjust segments container when live mode is active (whitespace takes 10vh between piano and cells) */
+        body.live-mode .segments-container {
+            bottom: calc(15vh + 10vh); /* Piano (15vh) + whitespace (10vh) */
+        }
+
+        .segment-row {
+            width: 100%;
+            flex: 1; /* Each row takes equal space */
+            display: flex;
+        }
+        
+        /* Reduce to 8 rows on mobile for better space */
+        @media (max-width: 768px) {
+            .segment-row:nth-child(n+9) {
+                display: none; /* Hide rows 9 and 10 on mobile */
+            }
+        }
+
+        .segment-cell {
+            width: calc(100% / 8);
+            height: 100%;
+            background: #f1eee7;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            font-size: 0.73rem;
+            color: #111;
+            user-select: none;
+            cursor: pointer;
+            border: 1px solid #f1eee7;
+        }
+
+        .segment-cell-row {
+            width: 100%;
+            height: calc(100% / 2); /* each row takes 1/2 of the cell height */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cell-duration-select {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            background: transparent;
+            font-size: 0.65rem;
+            color: #111;
+            cursor: pointer;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            text-align: center;
+            appearance: none;
+            outline: none;
+        }
+
+        .cell-duration-select:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .segment-cell.cell-selected {
+            background: #b2ebf2;
+        }
+
+        .segment-cell.cell-playing {
+            background: #90EE90;
+            box-shadow: 0 0 10px rgba(144, 238, 144, 0.5);
+        }
+
+        body {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            background: #f7f5f2;
+            color: #111;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .title-bar {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 0 6px 0 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 12;
+            letter-spacing: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            position: relative;
+            height: 8vh;
+            min-height: 40px;
+            max-height: 50px;
+        }
+
+        .menu-toggle {
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: #111;
+            cursor: pointer;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.1s ease;
+            z-index: 13;
+        }
+
+        .menu-toggle:hover {
+            opacity: 0.7;
+        }
+
+        .title-link {
+            font-family: 'Pacifico', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            color: #111;
+            text-decoration: none;
+            margin-right: 6px;
+        }
+
+        .title-by {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #111;
+        }
+
+        .title-by .by-link {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #d9d4cc;
+            padding-bottom: 1px;
+        }
+
+        .title-by .by-link:hover {
+            border-bottom-color: #111;
+        }
+
+        .top-bar {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 0 12px 4px 12px;
+            display: flex;
+            gap: 0;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 10;
+            height: 8vh;
+            min-height: 50px;
+            max-height: 60px;
+        }
+
+        select {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8rem;
+            padding: 6px 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            color: #2d7a2d;
+            cursor: pointer;
+            appearance: none;
+            background-image: none;
+            min-width: 120px;
+            transition: border-color 0.1s ease;
+            border-radius: 2px;
+        }
+
+        select:hover {
+            border-color: #b0b0b0;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #111;
+        }
+
+        .save-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.9rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #111;
+            color: #ffffff;
+            border: 1px solid #111;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .save-button:hover:not(:disabled) {
+            background: #333;
+        }
+
+        .save-button:disabled {
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed;
+        }
+
+        .save-button:active:not(:disabled) {
+            background: #000;
+        }
+
+        .play-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #90EE90;
+            color: #111;
+            border: 1px solid #90EE90;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .play-button:hover {
+            background: #7dd87d;
+        }
+
+        .play-button:active {
+            background: #6bc26b;
+        }
+
+        .play-button.playing {
+            background: #e04f2b;
+            border-color: #e04f2b;
+        }
+
+        .play-button.playing:hover {
+            background: #d03a1a;
+        }
+
+        .play-button:disabled {
+            background: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed;
+        }
+
+        .play-button:disabled:hover {
+            background: #f5f5f5;
+        }
+
+        .settings-button {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            font-weight: 400;
+            width: 28px;
+            height: 28px;
+            background: #ffffff;
+            color: #111;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease, border-color 0.1s ease;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .settings-button:hover {
+            background: #f8f8f8;
+            border-color: #b0b0b0;
+        }
+
+        .settings-button:active {
+            background: #f0f0f0;
+        }
+
+        /* Settings modal */
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 30;
+        }
+
+        .settings-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+        }
+
+        .settings-modal h3 {
+            margin: 0 0 12px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .settings-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+        }
+
+        .settings-field label {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .settings-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-range {
+            width: 100%;
+        }
+
+        .settings-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d9d4cc;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            color: #111;
+            background: #fff;
+        }
+
+        .settings-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn-ghost, .btn-primary {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+
+        .btn-ghost {
+            background: #fff;
+            color: #111;
+            border-color: #d9d4cc;
+        }
+
+        .btn-ghost:hover {
+            border-color: #c8c2b8;
+        }
+
+        .btn-primary {
+            background: #111;
+            color: #fff;
+            border-color: #111;
+        }
+
+        .btn-primary:hover {
+            background: #222;
+            border-color: #222;
+        }
+
+        .info-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 1px solid #e2ddd5;
+            border-radius: 8px;
+            padding: 16px;
+            width: min(320px, 90vw);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: none;
+            z-index: 31;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .info-modal a {
+            color: #111;
+            text-decoration: none;
+            border-bottom: 1px solid #c8c2b8;
+        }
+
+        .info-modal a:hover {
+            border-bottom-color: #111;
+        }
+
+        @media (max-width: 768px) {
+            .top-bar {
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 0 6px 4px 6px;
+                gap: 0;
+                height: 10vh; /* Slightly taller on mobile for better touch targets */
+                min-height: 60px;
+                max-height: 70px;
+            }
+            
+            .title-bar {
+                padding: 0 6px 0 6px;
+                height: 8vh;
+                min-height: 45px;
+                max-height: 55px;
+            }
+
+            select {
+                flex: 1;
+                min-width: 0;
+                font-size: 0.75rem;
+                padding: 6px 10px;
+                padding-right: 28px;
+            }
+        }
+
+        .piano-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 15vh;
+            display: flex;
+            z-index: 1;
+        }
+
+        .white-key {
+            width: calc(100% / 21);
+            height: 100%;
+            background: white;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .key-solfege {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: #666;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .black-key .key-solfege {
+            color: #aaa;
+            font-size: 0.65rem;
+            bottom: 2px;
+        }
+
+        .black-key {
+            position: absolute;
+            top: 0;
+            width: calc((100% / 21) * 0.571); /* Black key is ~57% width of white key */
+            height: 60%; /* Black key is 60% height of white key */
+            background: #1a1a1a;
+            z-index: 2;
+            border: 1px solid #000;
+        }
+
+        /* Black key positioning using CSS calc() - no JavaScript resize needed */
+        /* Formula: left = (100% / 21) * (Math.ceil(position) - 0.2855) */
+        /* where 0.2855 = (blackKeyWidth / 2) / whiteKeyWidth = (0.571 / 2) */
+        .black-key[data-position="0.5"] { left: calc((100% / 21) * (1 - 0.2855)); }
+        .black-key[data-position="1.5"] { left: calc((100% / 21) * (2 - 0.2855)); }
+        .black-key[data-position="3.5"] { left: calc((100% / 21) * (4 - 0.2855)); }
+        .black-key[data-position="4.5"] { left: calc((100% / 21) * (5 - 0.2855)); }
+        .black-key[data-position="5.5"] { left: calc((100% / 21) * (6 - 0.2855)); }
+        .black-key[data-position="7.5"] { left: calc((100% / 21) * (8 - 0.2855)); }
+        .black-key[data-position="8.5"] { left: calc((100% / 21) * (9 - 0.2855)); }
+        .black-key[data-position="10.5"] { left: calc((100% / 21) * (11 - 0.2855)); }
+        .black-key[data-position="11.5"] { left: calc((100% / 21) * (12 - 0.2855)); }
+        .black-key[data-position="12.5"] { left: calc((100% / 21) * (13 - 0.2855)); }
+        .black-key[data-position="14.5"] { left: calc((100% / 21) * (15 - 0.2855)); }
+        .black-key[data-position="15.5"] { left: calc((100% / 21) * (16 - 0.2855)); }
+        .black-key[data-position="17.5"] { left: calc((100% / 21) * (18 - 0.2855)); }
+        .black-key[data-position="18.5"] { left: calc((100% / 21) * (19 - 0.2855)); }
+        .black-key[data-position="19.5"] { left: calc((100% / 21) * (20 - 0.2855)); }
+
+        .key-highlighted {
+            background: #90EE90 !important;
+        }
+
+        .white-key.key-highlighted {
+            background: #90EE90 !important;
+        }
+
+        .black-key.key-highlighted {
+            background: #90EE90 !important;
+            border: 1px solid #000 !important;
+        }
+
+        /* Live mode palette - green notes that can be clicked */
+        .key-palette {
+            background: #90EE90 !important;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .black-key.key-palette {
+            border: 1px solid #000 !important;
+            position: absolute !important; /* Maintain absolute positioning for black keys */
+        }
+
+        .key-palette::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(144, 238, 144, 0.3);
+            pointer-events: none;
+        }
+
+        /* Hide UI elements in live mode */
+        body.live-mode #noteSelect,
+        body.live-mode #qualitySelect,
+        body.live-mode #chordTypeSelect,
+        body.live-mode #saveButton,
+        body.live-mode #playButton,
+        body.live-mode #settingsButton {
+            display: none;
+        }
+
+        /* Disable interactions in live mode */
+        body.live-mode select:not(.drum-pattern-select):not(.bass-type-select),
+        body.live-mode button:not(.menu-toggle),
+        body.live-mode .segment-cell {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        body.live-mode .menu-toggle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Drum control area - only visible in live mode, positioned between piano and cells */
+        /* Whitespace: 10vh height, positioned above piano, only visible in live mode */
+        .whitespace-area {
+            position: fixed;
+            left: 0;
+            bottom: 15vh; /* Above piano (15vh) */
+            width: 100%;
+            height: 10vh;
+            background: transparent;
+            display: none;
+            z-index: 2; /* Above piano (z-index: 1) but below other UI elements */
+        }
+
+        body.live-mode .whitespace-area {
+            display: block;
+        }
+
+        .drum-control-area {
+            position: absolute;
+            left: 0;
+            bottom: 0; /* Within whitespace area */
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 21;
+            border-top: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .drum-control-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .drum-control-canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: crosshair;
+        }
+
+        .drum-control-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #111;
+            border: 2px solid #fff;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Drum pattern dropdown - positioned below title bar */
+        .drum-pattern-select {
+            position: fixed;
+            top: 50px; /* Below title bar */
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            color: #111;
+            cursor: pointer;
+            appearance: none;
+            min-width: 120px;
+            border-radius: 2px;
+            display: none;
+            z-index: 21;
+        }
+
+        body.live-mode .drum-pattern-select {
+            display: block;
+        }
+
+        .drum-pattern-select:hover {
+            border-color: #b0b0b0;
+        }
+
+        .drum-pattern-select:focus {
+            outline: none;
+            border-color: #111;
+        }
+
+        /* Bass type dropdown - positioned next to drum preset dropdown */
+        .bass-type-select {
+            position: fixed;
+            top: 50px; /* Below title bar */
+            left: calc(50% + 70px); /* Position to the right of drum preset dropdown */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            color: #111;
+            cursor: pointer;
+            appearance: none;
+            min-width: 120px;
+            border-radius: 2px;
+            display: none;
+            z-index: 21;
+        }
+
+        body.live-mode .bass-type-select {
+            display: block;
+        }
+
+        .bass-type-select:hover {
+            border-color: #b0b0b0;
+        }
+
+        .bass-type-select:focus {
+            outline: none;
+            border-color: #111;
+        }
+
+        /* Disable transitions on piano keys to prevent visual changes */
+        .white-key,
+        .black-key {
+            transition: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-bar">
+        <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">☰</button>
+        <a class="title-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Chord Canvas</a>
+        <span class="title-by"> by <a class="by-link" href="https://beatsaway.com" target="_blank" rel="noopener noreferrer">Beats Away</a></span>
+    </div>
+    <div class="top-bar">
+        <select id="noteSelect">
+            <option value="">Select note</option>
+            <option value="C">C</option>
+            <option value="C#">C# / Db</option>
+            <option value="D">D</option>
+            <option value="D#">D# / Eb</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="F#">F# / Gb</option>
+            <option value="G">G</option>
+            <option value="G#">G# / Ab</option>
+            <option value="A">A</option>
+            <option value="A#">A# / Bb</option>
+            <option value="B">B</option>
+        </select>
+        <select id="qualitySelect">
+            <option value="">Select quality</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+            <option value="dominant">Dominant</option>
+            <option value="diminished">Diminished</option>
+            <option value="augmented">Augmented</option>
+            <option value="sus">Sus</option>
+        </select>
+        <select id="chordTypeSelect">
+            <option value="">Select type</option>
+        </select>
+    </div>
+    <div class="top-bar">
+        <button id="saveButton" class="save-button" disabled>+</button>
+        <button id="playButton" class="play-button" disabled>►</button>
+        <button id="settingsButton" class="settings-button">…</button>
+    </div>
+    <div id="settingsOverlay" class="settings-overlay"></div>
+    <div id="settingsModal" class="settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
+        <div class="settings-field">
+            <label for="bpmSlider">BPM</label>
+            <div class="settings-inline">
+                <input id="bpmSlider" class="settings-range" type="range" min="20" max="300" step="1">
+                <span id="bpmValue" style="min-width:40px;text-align:right;font-variant-numeric:tabular-nums;">95</span>
+            </div>
+        </div>
+        <div class="settings-field">
+            <label for="keySelect" style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap;">
+                <span>Key signature</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 400;">
+                    (<input type="checkbox" id="showSolfegeCheckbox" style="margin: 0; vertical-align: middle;"> show solfa names on piano)
+                </span>
+            </label>
+            <select id="keySelect" class="settings-select">
+                <option value="C">C major / A minor</option>
+                <option value="G">G major / E minor</option>
+                <option value="D">D major / B minor</option>
+                <option value="A">A major / F# minor</option>
+                <option value="E">E major / C# minor</option>
+                <option value="B">B major / G# minor</option>
+                <option value="F">F major / D minor</option>
+                <option value="Bb">Bb major / G minor</option>
+                <option value="Eb">Eb major / C minor</option>
+                <option value="Ab">Ab major / F minor</option>
+                <option value="Db">Db major / Bb minor</option>
+                <option value="Gb">Gb major / Eb minor</option>
+            </select>
+        </div>
+        <div class="settings-actions">
+            <button id="settingsCancel" class="btn-ghost">Cancel</button>
+            <button id="settingsSave" class="btn-primary">Save</button>
+        </div>
+    </div>
+    <div id="infoModal" class="info-modal" role="dialog" aria-modal="true" aria-label="About">
+        Developed by <a href="https://youtube.com/beatsaway" target="_blank">BeatsAway</a> <br>
+        <a href="https://buymeacoffee.com/beatsaway" target="_blank">Support this developer</a>
+    </div>
+    <div class="segments-container">
+        <div class="segment-row" id="row0">
+            <div class="segment-cell" data-index="0"></div>
+            <div class="segment-cell" data-index="1"></div>
+            <div class="segment-cell" data-index="2"></div>
+            <div class="segment-cell" data-index="3"></div>
+            <div class="segment-cell" data-index="4"></div>
+            <div class="segment-cell" data-index="5"></div>
+            <div class="segment-cell" data-index="6"></div>
+            <div class="segment-cell" data-index="7"></div>
+        </div>
+        <div class="segment-row" id="row1">
+            <div class="segment-cell" data-index="8"></div>
+            <div class="segment-cell" data-index="9"></div>
+            <div class="segment-cell" data-index="10"></div>
+            <div class="segment-cell" data-index="11"></div>
+            <div class="segment-cell" data-index="12"></div>
+            <div class="segment-cell" data-index="13"></div>
+            <div class="segment-cell" data-index="14"></div>
+            <div class="segment-cell" data-index="15"></div>
+        </div>
+        <div class="segment-row" id="row2">
+            <div class="segment-cell" data-index="16"></div>
+            <div class="segment-cell" data-index="17"></div>
+            <div class="segment-cell" data-index="18"></div>
+            <div class="segment-cell" data-index="19"></div>
+            <div class="segment-cell" data-index="20"></div>
+            <div class="segment-cell" data-index="21"></div>
+            <div class="segment-cell" data-index="22"></div>
+            <div class="segment-cell" data-index="23"></div>
+        </div>
+        <div class="segment-row" id="row3">
+            <div class="segment-cell" data-index="24"></div>
+            <div class="segment-cell" data-index="25"></div>
+            <div class="segment-cell" data-index="26"></div>
+            <div class="segment-cell" data-index="27"></div>
+            <div class="segment-cell" data-index="28"></div>
+            <div class="segment-cell" data-index="29"></div>
+            <div class="segment-cell" data-index="30"></div>
+            <div class="segment-cell" data-index="31"></div>
+        </div>
+        <div class="segment-row" id="row4">
+            <div class="segment-cell" data-index="32"></div>
+            <div class="segment-cell" data-index="33"></div>
+            <div class="segment-cell" data-index="34"></div>
+            <div class="segment-cell" data-index="35"></div>
+            <div class="segment-cell" data-index="36"></div>
+            <div class="segment-cell" data-index="37"></div>
+            <div class="segment-cell" data-index="38"></div>
+            <div class="segment-cell" data-index="39"></div>
+        </div>
+        <div class="segment-row" id="row5">
+            <div class="segment-cell" data-index="40"></div>
+            <div class="segment-cell" data-index="41"></div>
+            <div class="segment-cell" data-index="42"></div>
+            <div class="segment-cell" data-index="43"></div>
+            <div class="segment-cell" data-index="44"></div>
+            <div class="segment-cell" data-index="45"></div>
+            <div class="segment-cell" data-index="46"></div>
+            <div class="segment-cell" data-index="47"></div>
+        </div>
+        <div class="segment-row" id="row6">
+            <div class="segment-cell" data-index="48"></div>
+            <div class="segment-cell" data-index="49"></div>
+            <div class="segment-cell" data-index="50"></div>
+            <div class="segment-cell" data-index="51"></div>
+            <div class="segment-cell" data-index="52"></div>
+            <div class="segment-cell" data-index="53"></div>
+            <div class="segment-cell" data-index="54"></div>
+            <div class="segment-cell" data-index="55"></div>
+        </div>
+        <div class="segment-row" id="row7">
+            <div class="segment-cell" data-index="56"></div>
+            <div class="segment-cell" data-index="57"></div>
+            <div class="segment-cell" data-index="58"></div>
+            <div class="segment-cell" data-index="59"></div>
+            <div class="segment-cell" data-index="60"></div>
+            <div class="segment-cell" data-index="61"></div>
+            <div class="segment-cell" data-index="62"></div>
+            <div class="segment-cell" data-index="63"></div>
+        </div>
+        <div class="segment-row" id="row8">
+            <div class="segment-cell" data-index="64"></div>
+            <div class="segment-cell" data-index="65"></div>
+            <div class="segment-cell" data-index="66"></div>
+            <div class="segment-cell" data-index="67"></div>
+            <div class="segment-cell" data-index="68"></div>
+            <div class="segment-cell" data-index="69"></div>
+            <div class="segment-cell" data-index="70"></div>
+            <div class="segment-cell" data-index="71"></div>
+        </div>
+        <div class="segment-row" id="row9">
+            <div class="segment-cell" data-index="72"></div>
+            <div class="segment-cell" data-index="73"></div>
+            <div class="segment-cell" data-index="74"></div>
+            <div class="segment-cell" data-index="75"></div>
+            <div class="segment-cell" data-index="76"></div>
+            <div class="segment-cell" data-index="77"></div>
+            <div class="segment-cell" data-index="78"></div>
+            <div class="segment-cell" data-index="79"></div>
+        </div>
+    </div>
+    <select id="drumPatternSelect" class="drum-pattern-select">
+        <option value="none">None</option>
+        <option value="house">House</option>
+        <option value="break">Break</option>
+        <option value="trap">Trap</option>
+        <option value="glitch">Glitch</option>
+        <option value="brostep">Brostep</option>
+        <option value="dnb">DnB</option>
+        <option value="garage">Garage</option>
+        <option value="lofi">LoFi</option>
+        <option value="afro">Afro</option>
+        <option value="chillstep">Chillstep</option>
+        <option value="drill">Drill</option>
+        <option value="reggaeton">Reggaeton</option>
+        <option value="jersey">Jersey</option>
+        <option value="amapiano">Amapiano</option>
+        <option value="techno">Techno</option>
+        <option value="baile">Baile</option>
+    </select>
+    <select id="bassTypeSelect" class="bass-type-select">
+        <option value="none">None</option>
+        <option value="classic">Classic</option>
+        <option value="wobble">Wobble</option>
+        <option value="roar">Roar</option>
+        <option value="beast">Beast</option>
+        <option value="sweep">Sweep</option>
+        <option value="stutter">Stutter</option>
+        <option value="deep" selected>Deep</option>
+        <option value="aggressive">Aggressive</option>
+    </select>
+    <div class="whitespace-area">
+        <div class="drum-control-area">
+            <div class="drum-control-container">
+                <div class="drum-control-canvas" id="drumControlCanvas">
+                    <div class="drum-control-dot" id="drumControlDot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="piano-container">
+        <!-- White keys -->
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+        <div class="white-key"></div>
+    </div>
+
+    <script src="watersynth.js"></script>
+    <script src="drummachine.js"></script>
+    <script src="realdrum-app.js"></script>
+    <script src="basssynth.js"></script>
+    <script>
+        // Piano note frequencies (C4 as base)
+        const notes = [
+            { name: 'C', freq: 261.63, isBlack: false },
+            { name: 'C#', freq: 277.18, isBlack: true },
+            { name: 'D', freq: 293.66, isBlack: false },
+            { name: 'D#', freq: 311.13, isBlack: true },
+            { name: 'E', freq: 329.63, isBlack: false },
+            { name: 'F', freq: 349.23, isBlack: false },
+            { name: 'F#', freq: 369.99, isBlack: true },
+            { name: 'G', freq: 392.00, isBlack: false },
+            { name: 'G#', freq: 415.30, isBlack: true },
+            { name: 'A', freq: 440.00, isBlack: false },
+            { name: 'A#', freq: 466.16, isBlack: true },
+            { name: 'B', freq: 493.88, isBlack: false },
+        ];
+
+        // Create three octaves: lower (C3), middle (C4), and upper (C5)
+        const lowerOctave = notes.map(n => ({ ...n, freq: n.freq / 2 })); // C3 to B3
+        const middleOctave = notes; // C4 to B4
+        const upperOctave = notes.map(n => ({ ...n, freq: n.freq * 2 })); // C5 to B5
+        
+        const pianoNotes = [...lowerOctave, ...middleOctave, ...upperOctave];
+
+        let waterSynth = null;
+        let activeOscillators = {};
+
+        // Detect mobile device for performance optimization
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                        (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ||
+                        ('ontouchstart' in window);
+
+        // Master audio routing - shared compressor/limiter for all sources
+        let masterAudioContext = null;
+        let masterCompressor = null;
+        let masterLimiter = null;
+        let masterGainNode = null;
+
+        // Chord type options for each quality
+        const chordTypeOptions = {
+            major: [
+                { value: 'triad', label: 'Triad' },
+                { value: '6th', label: '6th' },
+                { value: '7th', label: '7th' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: 'add9', label: 'Add9' },
+                { value: 'add11', label: 'Add11' },
+                { value: '6/9', label: '6/9' },
+                { value: '7sharp11', label: '7(#11)' },
+                { value: '9sharp11', label: '9(#11)' }
+            ],
+            minor: [
+                { value: 'triad', label: 'Triad' },
+                { value: '6th', label: '6th' },
+                { value: '7th', label: '7th (min7)' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: 'add9', label: 'Add9' },
+                { value: 'add11', label: 'Add11' },
+                { value: '6/9', label: '6/9' },
+                { value: 'maj7', label: 'Minor Major 7th' },
+                { value: '9maj7', label: '9th (Maj7)' }
+            ],
+            dominant: [
+                { value: '7th', label: '7th' },
+                { value: '9th', label: '9th' },
+                { value: '11th', label: '11th' },
+                { value: '13th', label: '13th' },
+                { value: '7sharp9', label: '7(#9)' },
+                { value: '7flat9', label: '7(b9)' },
+                { value: '7sharp11', label: '7(#11)' },
+                { value: '9sharp11', label: '9(#11)' },
+                { value: '7sus4', label: '7sus4' }
+            ],
+            diminished: [
+                { value: 'triad', label: 'Triad' },
+                { value: '7th', label: '7th' },
+                { value: 'halfdim7', label: 'Half Diminished 7th' }
+            ],
+            augmented: [
+                { value: 'triad', label: 'Triad' },
+                { value: '7th', label: '7th' },
+                { value: 'maj7', label: 'Augmented Major 7th' }
+            ],
+            sus: [
+                { value: 'sus2', label: 'Sus2' },
+                { value: 'sus4', label: 'Sus4' },
+                { value: '7sus2', label: '7sus2' },
+                { value: '7sus4', label: '7sus4' },
+                { value: '9sus4', label: '9sus4' }
+            ]
+        };
+
+        // Chord intervals (in semitones from root)
+        const chordIntervals = {
+            // Major chords
+            'major-triad': [0, 4, 7],
+            'major-6th': [0, 4, 7, 9],
+            'major-7th': [0, 4, 7, 11],
+            'major-9th': [0, 4, 7, 11, 14],
+            'major-11th': [0, 4, 7, 11, 14, 17],
+            'major-13th': [0, 4, 7, 11, 14, 17, 21],
+            'major-add9': [0, 4, 7, 14],
+            'major-add11': [0, 4, 7, 17],
+            'major-6/9': [0, 4, 7, 9, 14],
+            'major-7sharp11': [0, 4, 7, 11, 18],
+            'major-9sharp11': [0, 4, 7, 11, 14, 18],
+            'major-13sharp11': [0, 4, 7, 11, 14, 17, 18, 21],
+            
+            // Minor chords
+            'minor-triad': [0, 3, 7],
+            'minor-6th': [0, 3, 7, 9],
+            'minor-7th': [0, 3, 7, 10],
+            'minor-9th': [0, 3, 7, 10, 14],
+            'minor-11th': [0, 3, 7, 10, 14, 17],
+            'minor-13th': [0, 3, 7, 10, 14, 17, 21],
+            'minor-add9': [0, 3, 7, 14],
+            'minor-add11': [0, 3, 7, 17],
+            'minor-6/9': [0, 3, 7, 9, 14],
+            'minor-maj7': [0, 3, 7, 11],
+            'minor-9maj7': [0, 3, 7, 11, 14],
+            
+            // Dominant chords
+            'dominant-7th': [0, 4, 7, 10],
+            'dominant-9th': [0, 4, 7, 10, 14],
+            'dominant-11th': [0, 4, 7, 10, 14, 17],
+            'dominant-13th': [0, 4, 7, 10, 14, 17, 21],
+            'dominant-7sharp9': [0, 4, 7, 10, 15],
+            'dominant-7flat9': [0, 4, 7, 10, 13],
+            'dominant-7sharp11': [0, 4, 7, 10, 18],
+            'dominant-9sharp11': [0, 4, 7, 10, 14, 18],
+            'dominant-13sharp11': [0, 4, 7, 10, 14, 17, 18, 21],
+            'dominant-7sus4': [0, 5, 7, 10],
+            
+            // Diminished chords
+            'diminished-triad': [0, 3, 6],
+            'diminished-7th': [0, 3, 6, 9],
+            'diminished-halfdim7': [0, 3, 6, 10],
+            
+            // Augmented chords
+            'augmented-triad': [0, 4, 8],
+            'augmented-7th': [0, 4, 8, 10],
+            'augmented-maj7': [0, 4, 8, 11],
+            
+            // Sus chords
+            'sus-sus2': [0, 2, 7],
+            'sus-sus4': [0, 5, 7],
+            'sus-7sus2': [0, 2, 7, 10],
+            'sus-7sus4': [0, 5, 7, 10],
+            'sus-9sus4': [0, 5, 7, 10, 14]
+        };
+
+        // Note name to index mapping
+        const noteToIndex = {
+            'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+            'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
+            'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+        };
+
+        // Solfege names
+        const solfegeNames = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Ti'];
+        
+        // Global settings for solfege display
+        let keySignature = 'C';
+        let showSolfege = false;
+
+        // Get solfege name for a note in a given key signature
+        function getSolfegeName(noteName, keySignature) {
+            // Get the root note index for the key signature
+            const keyRootIndex = noteToIndex[keySignature];
+            if (keyRootIndex === undefined) return '';
+            
+            // Get the note index (handle both sharp and flat versions)
+            let noteIndex = noteToIndex[noteName];
+            if (noteIndex === undefined) {
+                // Try alternative names
+                if (noteName === 'Cb') noteIndex = 11; // B
+                else if (noteName === 'Fb') noteIndex = 4; // E
+                else if (noteName === 'E#') noteIndex = 5; // F
+                else if (noteName === 'B#') noteIndex = 0; // C
+                else return '';
+            }
+            
+            // Calculate the interval from the key root (in semitones)
+            let interval = (noteIndex - keyRootIndex + 12) % 12;
+            
+            // Major scale intervals: 0=Do, 2=Re, 4=Mi, 5=Fa, 7=Sol, 9=La, 11=Ti
+            // Map to diatonic solfege for scale degrees
+            const diatonicMap = {
+                0: 'Do', 2: 'Re', 4: 'Mi', 5: 'Fa', 7: 'Sol', 9: 'La', 11: 'Ti'
+            };
+            
+            // If it's a scale degree, return diatonic solfege
+            if (diatonicMap[interval] !== undefined) {
+                return diatonicMap[interval];
+            }
+            
+            // For chromatic notes (sharps/flats), use chromatic solfege
+            const chromaticMap = {
+                1: 'Di', 3: 'Ri', 6: 'Fi', 8: 'Si', 10: 'Li'
+            };
+            
+            return chromaticMap[interval] || '';
+        }
+
+        // Update piano keys with solfege names
+        function updatePianoKeysSolfege() {
+            updatePianoKeysSolfegeWithValues(keySignature, showSolfege);
+        }
+
+        // Update piano keys with solfege names using provided values (for preview)
+        function updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege) {
+            const keys = document.querySelectorAll('.white-key, .black-key');
+            keys.forEach(key => {
+                // Remove existing solfege label
+                const existingSolfege = key.querySelector('.key-solfege');
+                if (existingSolfege) {
+                    existingSolfege.remove();
+                }
+                
+                // Add solfege label if enabled
+                if (tempShowSolfege) {
+                    const noteName = key.dataset.noteName;
+                    if (noteName) {
+                        const solfege = getSolfegeName(noteName, tempKeySignature);
+                        if (solfege) {
+                            const solfegeLabel = document.createElement('div');
+                            solfegeLabel.className = 'key-solfege';
+                            solfegeLabel.textContent = solfege;
+                            key.appendChild(solfegeLabel);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize WaterSynth
+        function initAudio() {
+            try {
+                // Initialize master audio routing first (creates masterAudioContext if needed)
+                initMasterAudioRouting();
+                
+                if (!waterSynth) {
+                    waterSynth = new WaterSynth();
+                    // Route watersynth through master compressor
+                    // watersynth should already be using masterAudioContext (set in constructor)
+                    if (masterCompressor && waterSynth.compressor && window.masterAudioContext) {
+                        // Only connect if both use the same AudioContext
+                        if (waterSynth.audioContext === window.masterAudioContext) {
+                            try {
+                                waterSynth.compressor.disconnect();
+                                waterSynth.compressor.connect(masterCompressor);
+                            } catch (e) {
+                                // May already be disconnected or connected differently
+                                console.warn('Could not connect watersynth to master compressor:', e);
+                            }
+                        } else {
+                            console.warn('Watersynth AudioContext mismatch - not connecting to master compressor');
+                        }
+                    }
+                } else {
+                    // Re-route if already exists
+                    if (masterCompressor && waterSynth.compressor && window.masterAudioContext) {
+                        // Only connect if both use the same AudioContext
+                        if (waterSynth.audioContext === window.masterAudioContext) {
+                            try {
+                                waterSynth.compressor.disconnect();
+                                waterSynth.compressor.connect(masterCompressor);
+                            } catch (e) {
+                                // Ignore errors
+                            }
+                        }
+                    }
+                }
+                // Resume audio context if suspended
+                if (waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                    waterSynth.audioContext.resume();
+                }
+            } catch (e) {
+                console.error('Web Audio API not supported:', e);
+            }
+        }
+
+        // Play a note
+        function playNote(frequency, keyElement, stopExisting = true, duration = 1.5) {
+            if (!waterSynth) {
+                initAudio();
+            }
+            
+            if (waterSynth && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+
+            if (stopExisting && keyElement) {
+                stopNote(keyElement);
+            }
+
+            // Use WaterSynth's playNote method
+            if (waterSynth) {
+                waterSynth.playNote(frequency, duration);
+            }
+        }
+
+        // Stop a note
+        function stopNote(keyElement) {
+            if (!keyElement) return;
+            const keyId = keyElement.dataset.noteId;
+            if (activeOscillators[keyId]) {
+                const oscillators = Array.isArray(activeOscillators[keyId]) 
+                    ? activeOscillators[keyId] 
+                    : [activeOscillators[keyId]];
+                oscillators.forEach(osc => {
+                    if (osc && osc.gainNode && waterSynth && waterSynth.audioContext) {
+                        try {
+                            const now = waterSynth.audioContext.currentTime;
+                            osc.gainNode.gain.cancelScheduledValues(now);
+                            osc.gainNode.gain.setValueAtTime(osc.gainNode.gain.value, now);
+                            osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                            
+                            // Cleanup function to disconnect all nodes
+                            const cleanup = () => {
+                                try {
+                                    if (osc.oscillator) osc.oscillator.disconnect();
+                                    if (osc.gainNode) osc.gainNode.disconnect();
+                                    if (osc.panNode) osc.panNode.disconnect();
+                                    if (osc.noise) osc.noise.disconnect();
+                                    if (osc.noiseGain) osc.noiseGain.disconnect();
+                                } catch (e) {
+                                    // Nodes might already be disconnected
+                                }
+                            };
+                            
+                            if (osc.oscillator) {
+                                osc.oscillator.onended = cleanup;
+                                osc.oscillator.stop(now + 0.1);
+                            }
+                            if (osc.noise) {
+                                osc.noise.onended = cleanup;
+                                osc.noise.stop(now + 0.1);
+                            }
+                        } catch (e) {
+                            // Oscillator might already be stopped
+                        }
+                    }
+                });
+                delete activeOscillators[keyId];
+            }
+        }
+
+        function clearKeyHighlights() {
+            // Clear highlights in both play mode and live mode
+            document.querySelectorAll('.key-highlighted').forEach(key => {
+                key.classList.remove('key-highlighted');
+            });
+        }
+
+        function addPalette(noteIndex) {
+            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+            if (keyElement) {
+                keyElement.classList.add('key-palette');
+                if (window.activePalettes) {
+                    window.activePalettes.add(noteIndex);
+                }
+            }
+        }
+
+        function removePalette(noteIndex) {
+            const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+            if (keyElement) {
+                keyElement.classList.remove('key-palette');
+                if (window.activePalettes) {
+                    window.activePalettes.delete(noteIndex);
+                }
+            }
+        }
+
+        function clearPalettes() {
+            document.querySelectorAll('.key-palette').forEach(key => {
+                key.classList.remove('key-palette');
+            });
+            if (window.activePalettes) {
+                window.activePalettes.clear();
+            }
+        }
+
+        // Play a note continuously (until stopped)
+        // volumeMultiplier: 0.0 to 1.0 (1.0 = 0dB, 0.158 = -16dB)
+        function playNoteContinuous(frequency, keyElement, volumeMultiplier = 1.0) {
+            if (!waterSynth) {
+                initAudio();
+            }
+            
+            if (waterSynth && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+
+            // Use WaterSynth's createSustainedNote method
+            if (waterSynth) {
+                const note = waterSynth.createSustainedNote(frequency);
+                
+                // Store original frequency for pitch glide
+                note.baseFrequency = frequency;
+                
+                // Store original gain values for volume updates
+                note.originalGainPeak = 0.5;
+                note.originalGainSustain = 0.35;
+                
+                // Store start time for dynamic release calculation
+                note.startTime = waterSynth.audioContext.currentTime;
+                
+                // Apply volume multiplier to gain node
+                if (note.gainNode && volumeMultiplier !== 1.0) {
+                    const now = waterSynth.audioContext.currentTime;
+                    // Cancel existing scheduled values and scale the envelope
+                    note.gainNode.gain.cancelScheduledValues(now);
+                    note.gainNode.gain.setValueAtTime(0, now);
+                    // Reapply the envelope with volume scaling
+                    const attackTime = 0.02;
+                    const sustainLevel = 0.35 * volumeMultiplier;
+                    note.gainNode.gain.linearRampToValueAtTime(0.4 * volumeMultiplier, now + attackTime);
+                    note.gainNode.gain.linearRampToValueAtTime(0.5 * volumeMultiplier, now + attackTime + 0.01);
+                    note.gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + 0.15);
+                    // Explicitly maintain sustain level indefinitely (until stopped)
+                    note.gainNode.gain.setValueAtTime(sustainLevel, now + 0.15 + 0.001);
+                }
+                
+                const keyId = keyElement ? keyElement.dataset.noteId : `note_${frequency}`;
+                if (!activeOscillators[keyId]) {
+                    activeOscillators[keyId] = [];
+                }
+                if (Array.isArray(activeOscillators[keyId])) {
+                    activeOscillators[keyId].push(note);
+                } else {
+                    activeOscillators[keyId] = [note];
+                }
+                return note;
+            }
+            return null;
+        }
+
+        // Play full chord palette (all notes)
+        // Returns array of oscillators that can be stopped later
+        // volumeMultiplier: 0.0 to 1.0 (1.0 = 0dB, 0.158 = -16dB)
+        function playCurrentChord(volumeMultiplier = 1.0) {
+            if (!window.currentLiveChord || !window.currentLiveChord.noteIndices) {
+                return [];
+            }
+            
+            const chord = window.currentLiveChord;
+            const oscillators = [];
+            
+            // Play all notes in the palette (no highlighting - user interactions don't affect CSS)
+            chord.noteIndices.forEach(noteIndex => {
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    const note = pianoNotes[noteIndex];
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        const osc = playNoteContinuous(note.freq, keyElement, volumeMultiplier);
+                        oscillators.push(osc);
+                    } else {
+                        const osc = playNoteContinuous(note.freq, null, volumeMultiplier);
+                        oscillators.push(osc);
+                    }
+                }
+            });
+            
+            return oscillators;
+        }
+        
+        // Stop oscillators with dynamic release tail based on hold duration
+        function stopOscillators(oscillators) {
+            if (oscillators && Array.isArray(oscillators) && waterSynth && waterSynth.audioContext) {
+                const now = waterSynth.audioContext.currentTime;
+                
+                oscillators.forEach(osc => {
+                    if (osc && osc.gainNode) {
+                        try {
+                            // Calculate hold duration
+                            const holdDuration = osc.startTime ? (now - osc.startTime) : 0;
+                            // Dynamic release: shorter hold = shorter release, longer hold = longer release
+                            // Minimum 0.01s for very short taps, maximum 0.1s for longer holds
+                            const releaseTime = Math.min(0.1, Math.max(0.01, holdDuration * 0.3));
+                            
+                            // Fade out with dynamic release time
+                            const currentGain = osc.gainNode.gain.value;
+                            osc.gainNode.gain.cancelScheduledValues(now);
+                            osc.gainNode.gain.setValueAtTime(currentGain, now);
+                            osc.gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+                            
+                            // Cleanup function to disconnect all nodes
+                            const cleanup = () => {
+                                try {
+                                    if (osc.oscillator) osc.oscillator.disconnect();
+                                    if (osc.gainNode) osc.gainNode.disconnect();
+                                    if (osc.panNode) osc.panNode.disconnect();
+                                    if (osc.noise) osc.noise.disconnect();
+                                    if (osc.noiseGain) osc.noiseGain.disconnect();
+                                } catch (e) {
+                                    // Nodes might already be disconnected
+                                }
+                            };
+                            
+                            // Stop oscillator after fade and cleanup
+                            if (osc.oscillator) {
+                                osc.oscillator.onended = cleanup;
+                                osc.oscillator.stop(now + releaseTime);
+                            }
+                            if (osc.noise) {
+                                osc.noise.onended = cleanup;
+                                osc.noise.stop(now + releaseTime);
+                            }
+                        } catch (e) {
+                            // Oscillator might already be stopped
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Expose globally for piano key handlers
+        window.playCurrentChord = playCurrentChord;
+        window.stopOscillators = stopOscillators;
+
+        // Helper function to highlight chord keys (used by both play mode and live mode)
+        function highlightChordKeys(rootNote, chordType) {
+            // Check for slash chord (e.g., C/E)
+            let bassNoteName = null;
+            const slashMatch = rootNote.match(/\/([A-G][#b]?)/);
+            if (slashMatch) {
+                bassNoteName = slashMatch[1];
+            }
+
+            const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+            const rootIndex = noteToIndex[rootNoteName];
+            if (rootIndex === undefined) {
+                console.warn('Root note not found:', rootNoteName);
+                return [];
+            }
+
+            const intervals = chordIntervals[chordType];
+            if (!intervals) {
+                console.warn('Chord intervals not found for:', chordType);
+                return [];
+            }
+
+            const chordNoteIndices = [];
+
+            // Highlight bass note if it's a slash chord
+            if (bassNoteName) {
+                const bassIndex = noteToIndex[bassNoteName];
+                if (bassIndex !== undefined) {
+                    const bassNoteInLowerOctave = 0 + bassIndex;
+                    if (bassNoteInLowerOctave < pianoNotes.length) {
+                        const bassKeyElement = document.querySelector(`[data-note-id="${bassNoteInLowerOctave}"]`);
+                        if (bassKeyElement) {
+                            bassKeyElement.classList.add('key-highlighted');
+                        }
+                        chordNoteIndices.push(bassNoteInLowerOctave);
+                    }
+                }
+            }
+
+            // Highlight upper chord notes
+            const rootNoteInMiddleOctave = 12 + rootIndex;
+            const e5Index = 28;
+
+            intervals.forEach((interval) => {
+                let noteIndex = rootNoteInMiddleOctave + interval;
+                while (noteIndex > e5Index && noteIndex >= 0) {
+                    noteIndex = noteIndex - 12;
+                }
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        keyElement.classList.add('key-highlighted');
+                    }
+                    chordNoteIndices.push(noteIndex);
+                }
+            });
+
+            return chordNoteIndices;
+        }
+
+        // Play a chord
+        function playChord(rootNote, chordType, durationSec = 1.5, clearPalettesFirst = true) {
+            if (!rootNote || !chordType) return;
+
+            const isLiveMode = window.liveMode !== undefined ? window.liveMode : false;
+            
+            // Clear previous palettes/highlights if needed
+            if (clearPalettesFirst) {
+                if (isLiveMode) {
+                    clearPalettes();
+                }
+                clearKeyHighlights();
+            }
+
+            // Use same highlighting function for both modes
+            const chordNoteIndices = highlightChordKeys(rootNote, chordType);
+            if (chordNoteIndices.length === 0) return;
+
+            // Live mode: add palettes and store chord info, skip audio
+            if (isLiveMode) {
+                // Add palettes for all chord notes
+                chordNoteIndices.forEach(noteIndex => {
+                    addPalette(noteIndex);
+                });
+                
+                // Calculate lowest note index and categorize notes for live mode storage
+                const sortedNotes = [...chordNoteIndices].sort((a, b) => a - b);
+                const lowestNoteIndex = sortedNotes[0];
+                const noteA = sortedNotes[0];
+                const remainingNotes = sortedNotes.slice(1);
+                const midPoint = Math.ceil(remainingNotes.length / 2);
+                const notesB = remainingNotes.slice(0, midPoint);
+                const notesC = remainingNotes.slice(midPoint);
+                
+                // Store current chord info for live mode
+                currentLiveChord = {
+                    rootNote: rootNote,
+                    chordType: chordType,
+                    noteIndices: chordNoteIndices,
+                    lowestNoteIndex: lowestNoteIndex,
+                    noteA: noteA,
+                    notesB: notesB,
+                    notesC: notesC
+                };
+                window.currentLiveChord = currentLiveChord;
+                
+                return; // Don't play sounds in live mode
+            }
+
+            // Play mode: play sounds
+            if (!waterSynth) {
+                initAudio();
+            }
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+
+            // Play sounds for highlighted keys
+            chordNoteIndices.forEach(noteIndex => {
+                if (noteIndex >= 0 && noteIndex < pianoNotes.length) {
+                    const noteFreq = pianoNotes[noteIndex].freq;
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        playNote(noteFreq, keyElement, false, durationSec);
+                    } else {
+                        playNote(noteFreq, null, false, durationSec);
+                    }
+                }
+            });
+        }
+
+        // Highlight a single note
+        function highlightNote(rootNote) {
+            if (!rootNote) return;
+
+            const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+            const rootIndex = noteToIndex[rootNoteName];
+            if (rootIndex === undefined) return;
+
+            // Don't add visual highlights in live mode
+            if (window.liveMode) {
+                return;
+            }
+
+            // Clear previous highlights
+            clearKeyHighlights();
+
+            const rootNoteInMiddleOctave = 12 + rootIndex;
+            
+            for (let octave = 0; octave < 3; octave++) {
+                const noteIndex = (octave * 12) + rootIndex;
+                if (noteIndex < pianoNotes.length) {
+                    const keyElement = document.querySelector(`[data-note-id="${noteIndex}"]`);
+                    if (keyElement) {
+                        keyElement.classList.add('key-highlighted');
+                    }
+                }
+            }
+        }
+
+        // Handle dropdown changes
+        function setupChordControls() {
+            const noteSelect = document.getElementById('noteSelect');
+            const qualitySelect = document.getElementById('qualitySelect');
+            const chordTypeSelect = document.getElementById('chordTypeSelect');
+            
+            // Flag to track if we're still in initial setup (skip audio during this)
+            let isInitialSetup = true;
+
+            function ensureAudioReady() {
+                // Initialize audio context on first user interaction
+                if (!waterSynth) {
+                    initAudio();
+                }
+                if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                    waterSynth.audioContext.resume();
+                }
+            }
+            
+            // Expose ensureAudioReady globally for piano key handlers
+            window.ensureAudioReady = ensureAudioReady;
+
+            // Update chord type dropdown based on quality selection
+            qualitySelect.addEventListener('change', (e) => {
+                // Only mark as user interaction if it's not a programmatic event
+                if (e.isTrusted) {
+                    isInitialSetup = false;
+                }
+                if (!isInitialSetup) {
+                    ensureAudioReady();
+                }
+                const quality = qualitySelect.value;
+                chordTypeSelect.innerHTML = '<option value="">Select type</option>';
+                
+                if (quality && chordTypeOptions[quality]) {
+                    chordTypeOptions[quality].forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option.value;
+                        optionElement.textContent = option.label;
+                        chordTypeSelect.appendChild(optionElement);
+                    });
+                    
+                    if (chordTypeOptions[quality].length > 0) {
+                        chordTypeSelect.value = chordTypeOptions[quality][0].value;
+                    }
+                }
+                
+                setTimeout(() => {
+                    updateChord();
+                }, 10);
+            });
+
+            function updateChord() {
+                const rootNote = noteSelect.value;
+                const quality = qualitySelect.value;
+                const chordType = chordTypeSelect.value;
+                
+                // Update save button state
+                updateSaveButtonState(rootNote, quality, chordType);
+                
+                // If all three dropdowns have values and there are selected cells, replace them
+                if (rootNote && quality && chordType && selectedCells.size > 0) {
+                    // Replace values in selected cells
+                    selectedCells.forEach(idx => {
+                        if (idx >= 0 && idx < cellValues.length) {
+                            const existingChord = cellValues[idx];
+                            // Preserve passing chord if it exists
+                            const preservedPassingChord = existingChord && existingChord.passingChord ? existingChord.passingChord : '';
+                            const chord = {
+                                note: rootNote,
+                                quality: quality,
+                                type: chordType,
+                                chordKey: `${quality}-${chordType}`,
+                                passingChord: preservedPassingChord
+                            };
+                            cellValues[idx] = chord;
+                        }
+                    });
+                    
+                    // Update cell displays
+                    updateCells();
+                    
+                    // Update play button state
+                    setTimeout(() => {
+                        updatePlayButtonState();
+                    }, 0);
+                }
+                
+                document.querySelectorAll('.key-highlighted').forEach(key => {
+                    key.classList.remove('key-highlighted');
+                });
+
+                // Only initialize audio and play when user actually interacts (not on page load)
+                if (!isInitialSetup) {
+                    if (rootNote && quality && chordType) {
+                        ensureAudioReady();
+                        const chordKey = `${quality}-${chordType}`;
+                        playChord(rootNote, chordKey);
+                    } else if (rootNote) {
+                        ensureAudioReady();
+                        highlightNote(rootNote);
+                        
+                        // Play the note sound
+                        const rootNoteName = rootNote.replace(/\/.*/, '').trim();
+                        const rootIndex = noteToIndex[rootNoteName];
+                        if (rootIndex !== undefined) {
+                            const rootNoteInMiddleOctave = 12 + rootIndex;
+                            const noteFreq = pianoNotes[rootNoteInMiddleOctave].freq;
+                            const keyElement = document.querySelector(`[data-note-id="${rootNoteInMiddleOctave}"]`);
+                            
+                            if (keyElement) {
+                                playNote(noteFreq, keyElement);
+                            } else {
+                                playNote(noteFreq, null);
+                            }
+                        }
+                    }
+                }
+            }
+
+            function updateSaveButtonState(rootNote, quality, chordType) {
+                const saveButton = document.getElementById('saveButton');
+                if (rootNote && quality && chordType) {
+                    saveButton.disabled = false;
+                } else {
+                    saveButton.disabled = true;
+                }
+            }
+
+            // Variable to store saved chords
+            let savedChords = [];
+            
+            // Array to remember each cell's value (80 cells: 10 rows x 8 cells)
+            let cellValues = new Array(80).fill(null);
+
+            // Playback state (declared early so helpers can access)
+            let isPlaying = false;
+            let playTimeout = null;
+            let currentPlayIndex = 0;
+            let playSequence = [];
+            let playbackBpm = 95; // default BPM
+            let liveMode = false; // Live mode: chords show as palettes, user clicks to play
+            let activePalettes = new Set(); // Track which note indices are currently active palettes
+            let currentLiveChord = null; // Track current chord info for live mode (note, chordKey, noteIndices)
+            
+            // Expose liveMode and activePalettes globally for piano key handlers
+            window.liveMode = liveMode;
+            window.activePalettes = activePalettes;
+            window.currentLiveChord = currentLiveChord;
+            // keySignature and showSolfege are defined at top level
+
+        // Track selected cells
+        const selectedCells = new Set();
+        // Track dragged selection payload
+        let dragSelection = [];
+
+            // Function to check if a passing chord type is valid based on interval and key
+            function isValidPassingChord(passingType, currentChord, targetChord) {
+                if (!currentChord || !targetChord) return false;
+                
+                const currentRoot = currentChord.note.replace(/\/.*/, '').trim();
+                const targetRoot = targetChord.note.replace(/\/.*/, '').trim();
+                const currentRootIndex = noteToIndex[currentRoot];
+                const targetRootIndex = noteToIndex[targetRoot];
+                
+                if (currentRootIndex === undefined || targetRootIndex === undefined) return false;
+                
+                // Calculate interval distance (in semitones)
+                let intervalDistance = (targetRootIndex - currentRootIndex + 12) % 12;
+                if (intervalDistance === 0) intervalDistance = 12;
+                
+                // Leading Tone: Works best for intervals of 4th (5 semitones) or 5th (7 semitones)
+                // The leading tone should create good voice leading toward the target
+                if (passingType === 'leadingTone') {
+                    // Leading tone works well for 4th (5), 5th (7), or when moving up by step
+                    // Also works for descending motion where leading tone pulls up
+                    return intervalDistance === 5 || intervalDistance === 7 || 
+                           intervalDistance === 4 || intervalDistance === 3 || 
+                           intervalDistance === 9 || intervalDistance === 8;
+                }
+                
+                // Passing Diminished: Works for stepwise motion (2nd = 2 semitones) or 
+                // when creating a smooth chromatic line (3rd = 3-4 semitones)
+                // Also works for larger intervals when there's a good chromatic path
+                if (passingType === 'passingDiminished') {
+                    // Works for 2nd (2), minor 3rd (3), major 3rd (4), or when creating chromatic motion
+                    return intervalDistance === 2 || intervalDistance === 3 || 
+                           intervalDistance === 4 || intervalDistance === 10 || 
+                           intervalDistance === 9 || intervalDistance === 8;
+                }
+                
+                // Secondary Dominant, Two-Five-One, Tritone Sub: Always valid (only depend on target)
+                if (passingType === 'secondaryDominant' || 
+                    passingType === 'twoFiveOne' || 
+                    passingType === 'tritoneSub') {
+                    return true;
+                }
+                
+                return false;
+            }
+
+            // Function to update passing chord dropdown options (simplified - only 2beat mode)
+            function updatePassingChordDropdown(passingSelect, cellValue, cellIndex) {
+                // Clear existing options
+                passingSelect.innerHTML = '';
+                
+                // Always show dropdown
+                passingSelect.style.display = 'block';
+                
+                // Get the next cell's chord (target chord) for passing chord calculation
+                const nextCellIndex = cellIndex + 1;
+                const targetChord = (nextCellIndex < cellValues.length) ? cellValues[nextCellIndex] : null;
+                
+                // Get current passing chord value
+                let currentPassing = cellValue && cellValue.passingChord ? cellValue.passingChord : '';
+                
+                // Build options list - empty option for fullbar (no passing)
+                const allOptions = [];
+                
+                // Empty option = fullbar (no passing chord)
+                allOptions.push({ value: '', label: '𝅝' }); // fullbar symbol
+                
+                // Two-Five-One: Always available
+                allOptions.push({ value: 'twoFiveOne', label: 'ii-V-I' });
+                
+                // Leading Tone: Only if valid interval
+                if (targetChord && isValidPassingChord('leadingTone', cellValue, targetChord)) {
+                    allOptions.push({ value: 'leadingTone', label: 'Leading Tone' });
+                }
+                
+                // Passing Diminished: Only if valid interval
+                if (targetChord && isValidPassingChord('passingDiminished', cellValue, targetChord)) {
+                    allOptions.push({ value: 'passingDiminished', label: 'Passing Dim' });
+                }
+                
+                // Secondary Dominant: Always available
+                allOptions.push({ value: 'secondaryDominant', label: 'Sec Dominant' });
+                
+                // Tritone Sub: Always available
+                allOptions.push({ value: 'tritoneSub', label: 'Tritone Sub' });
+                
+                // Helper function to get label for passing chord type
+                function getPassingChordLabel(value) {
+                    const labels = {
+                        '': '𝅝',
+                        'twoFiveOne': 'ii-V-I',
+                        'leadingTone': 'Leading Tone',
+                        'passingDiminished': 'Passing Dim',
+                        'secondaryDominant': 'Sec Dominant',
+                        'tritoneSub': 'Tritone Sub'
+                    };
+                    return labels[value] || value;
+                }
+                
+                // If current selection is not in valid options, preserve it as disabled option
+                // This prevents losing user's selection when target chord changes
+                if (currentPassing && !allOptions.find(opt => opt.value === currentPassing)) {
+                    const preservedOption = document.createElement('option');
+                    preservedOption.value = currentPassing;
+                    preservedOption.textContent = getPassingChordLabel(currentPassing) + ' (invalid)';
+                    preservedOption.disabled = true;
+                    preservedOption.selected = true;
+                    passingSelect.appendChild(preservedOption);
+                }
+                
+                // Add valid options to dropdown
+                allOptions.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.label;
+                    passingSelect.appendChild(option);
+                });
+                
+                // Set the selected value - preserve current selection if it exists
+                if (currentPassing) {
+                    passingSelect.value = currentPassing;
+                } else {
+                    passingSelect.value = '';
+                }
+            }
+
+            // Function to update cell display
+            function updateCells() {
+                cellValues.forEach((value, index) => {
+                    const cell = document.querySelector(`[data-index="${index}"]`);
+                    if (cell) {
+                        // Clear existing content
+                        cell.innerHTML = '';
+                        
+                        // Create first row (chord text)
+                        const row1 = document.createElement('div');
+                        row1.className = 'segment-cell-row';
+                        
+                        // Create second row (passing chord dropdown)
+                        const row2 = document.createElement('div');
+                        row2.className = 'segment-cell-row';
+                        
+                        if (value) {
+                            const displayText = formatChordLabel(value);
+                            row1.textContent = displayText;
+                            
+                            // Add passing chord dropdown (controls both duration and passing type)
+                            const passingSelect = document.createElement('select');
+                            passingSelect.className = 'cell-duration-select';
+                            
+                            // Populate passing chord options
+                            updatePassingChordDropdown(passingSelect, value, index);
+                            
+                            // Prevent dropdown from triggering cell click
+                            passingSelect.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                            });
+                            
+                            // Update passing chord when changed
+                            passingSelect.addEventListener('change', (e) => {
+                                e.stopPropagation();
+                                if (value) {
+                                    value.passingChord = passingSelect.value;
+                                    // Update options in case target chord changed
+                                    updatePassingChordDropdown(passingSelect, value, index);
+                                }
+                            });
+                            
+                            row2.appendChild(passingSelect);
+                        }
+                        
+                        cell.appendChild(row1);
+                        cell.appendChild(row2);
+                    }
+                });
+                // Update play button state after cells change
+                if (typeof updatePlayButtonState === 'function') {
+                    updatePlayButtonState();
+                }
+            }
+
+        // Short label formatting for cells
+        function formatChordLabel(chord) {
+            const { note, quality, type } = chord;
+
+            const majorMap = {
+                triad: '',
+                '6th': '6',
+                '7th': 'M7',
+                '9th': 'M9',
+                '11th': 'M11',
+                '13th': 'M13',
+                add9: 'add9',
+                add11: 'add11',
+                '6/9': '6/9',
+                '7sharp11': 'M7#11',
+                '9sharp11': 'M9#11'
+            };
+
+            const minorMap = {
+                triad: 'm',
+                '6th': 'm6',
+                '7th': 'm7',
+                '9th': 'm9',
+                '11th': 'm11',
+                '13th': 'm13',
+                add9: 'madd9',
+                add11: 'madd11',
+                '6/9': 'm6/9',
+                maj7: 'mMaj7',
+                '9maj7': 'm9Maj7'
+            };
+
+            const domMap = {
+                '7th': '7',
+                '9th': '9',
+                '11th': '11',
+                '13th': '13',
+                '7sharp9': '7#9',
+                '7flat9': '7b9',
+                '7sharp11': '7#11',
+                '9sharp11': '9#11',
+                '7sus4': '7sus4'
+            };
+
+            const dimMap = {
+                triad: 'dim',
+                '7th': 'dim7',
+                halfdim7: 'ø7'
+            };
+
+            const augMap = {
+                triad: 'aug',
+                '7th': 'aug7',
+                maj7: 'augMaj7'
+            };
+
+            const susMap = {
+                sus2: 'sus2',
+                sus4: 'sus4',
+                '7sus2': '7sus2',
+                '7sus4': '7sus4',
+                '9sus4': '9sus4'
+            };
+
+            let suffix = '';
+
+            switch (quality) {
+                case 'major':
+                    suffix = majorMap[type] ?? '';
+                    break;
+                case 'minor':
+                    suffix = minorMap[type] ?? 'm';
+                    break;
+                case 'dominant':
+                    suffix = domMap[type] ?? '';
+                    break;
+                case 'diminished':
+                    suffix = dimMap[type] ?? 'dim';
+                    break;
+                case 'augmented':
+                    suffix = augMap[type] ?? 'aug';
+                    break;
+                case 'sus':
+                    suffix = susMap[type] ?? 'sus';
+                    break;
+                default:
+                    suffix = '';
+            }
+
+            // If major triad (suffix empty), just show note.
+            if (quality === 'major' && (type === 'triad' || suffix === '')) {
+                return note;
+            }
+
+            // If suffix already includes the quality (like m6), just prepend note.
+            if (suffix) {
+                return `${note}${suffix}`;
+            }
+
+            // Fallback to note + quality
+            return `${note}${quality}`;
+        }
+
+        function clearSelection() {
+            selectedCells.clear();
+            document.querySelectorAll('.segment-cell.cell-selected').forEach(cell => {
+                cell.classList.remove('cell-selected');
+            });
+            // Update play button state after selection changes
+            if (typeof updatePlayButtonState === 'function') {
+                updatePlayButtonState();
+            }
+        }
+
+        function attachCellListeners() {
+            document.querySelectorAll('.segment-cell').forEach(cell => {
+                // make draggable
+                cell.setAttribute('draggable', 'true');
+
+                cell.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering body click handler
+                    const idx = Number(cell.dataset.index);
+                    const hasAnyValue = cellValues.some(val => val !== null);
+                    // Allow selection if cell has a value, or if at least one cell has a value
+                    if (cellValues[idx] || hasAnyValue) {
+                        if (selectedCells.has(idx)) {
+                            selectedCells.delete(idx);
+                            cell.classList.remove('cell-selected');
+                        } else {
+                            selectedCells.add(idx);
+                            cell.classList.add('cell-selected');
+                        }
+                        // Update play button state after selection changes
+                        if (typeof updatePlayButtonState === 'function') {
+                            updatePlayButtonState();
+                        }
+
+                        // Play the chord assigned to this cell (if any)
+                        const chord = cellValues[idx];
+                        if (chord && chord.chordKey) {
+                            ensureAudioReady();
+                            // Infer duration from passing chord: empty = fullbar (4 beats), set = 2beat (2 beats)
+                            const hasPassingChord = chord.passingChord && chord.passingChord !== '';
+                            const beats = hasPassingChord ? 2 : 4;
+                            const cellDurationMs = (60000 / playbackBpm) * beats;
+                            const durationSec = cellDurationMs / 1000;
+                            playChord(chord.note, chord.chordKey, durationSec);
+                        }
+                    }
+                });
+
+                cell.addEventListener('dragstart', (e) => {
+                    const idx = Number(cell.dataset.index);
+                    const hasAnyValue = cellValues.some(val => val !== null);
+                    // Only allow drag if there is at least one selected cell or this cell has a value
+                    if (!hasAnyValue) {
+                        e.preventDefault();
+                        return;
+                    }
+                    const selectionIndices = selectedCells.size > 0
+                        ? Array.from(selectedCells).sort((a, b) => a - b)
+                        : (cellValues[idx] ? [idx] : []);
+                    dragSelection = selectionIndices
+                        .map(i => cellValues[i])
+                        .filter(v => v !== null);
+                    if (dragSelection.length === 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+
+                cell.addEventListener('dragover', (e) => {
+                    // Allow drop
+                    if (dragSelection.length > 0) {
+                        e.preventDefault();
+                    }
+                });
+
+                cell.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (dragSelection.length === 0) return;
+                    const targetIdx = Number(cell.dataset.index);
+                    // Place dragged chords into target and subsequent cells
+                    dragSelection.forEach((chord, i) => {
+                        const idx = targetIdx + i;
+                        if (idx < cellValues.length) {
+                            cellValues[idx] = chord;
+                        }
+                    });
+                    updateCells();
+                    dragSelection = [];
+                });
+
+                cell.addEventListener('dragend', () => {
+                    dragSelection = [];
+                });
+            });
+        }
+
+            // Save chord button handler
+            const saveButton = document.getElementById('saveButton');
+            saveButton.addEventListener('click', () => {
+                // Initialize audio on plus button click
+                ensureAudioReady();
+                
+                const rootNote = noteSelect.value;
+                const quality = qualitySelect.value;
+                const chordType = chordTypeSelect.value;
+                
+                if (rootNote && quality && chordType) {
+                    let chord = null; // Declare chord outside blocks
+                    
+                    // If there are selected cells, update those cells
+                    if (selectedCells.size > 0) {
+                        selectedCells.forEach(idx => {
+                            if (idx >= 0 && idx < cellValues.length) {
+                                const existingChord = cellValues[idx];
+                                // Preserve passing chord if it exists
+                                const preservedPassingChord = existingChord && existingChord.passingChord ? existingChord.passingChord : '';
+                                chord = {
+                                    note: rootNote,
+                                    quality: quality,
+                                    type: chordType,
+                                    chordKey: `${quality}-${chordType}`,
+                                    passingChord: preservedPassingChord
+                                };
+                                cellValues[idx] = chord;
+                                savedChords.push(chord);
+                            }
+                        });
+                    } else {
+                        // No selected cells - add to first empty cell
+                        chord = {
+                            note: rootNote,
+                            quality: quality,
+                            type: chordType,
+                            chordKey: `${quality}-${chordType}`,
+                            passingChord: '' // default to empty (fullbar, no passing)
+                        };
+                        savedChords.push(chord);
+                        
+                        const firstEmptyIndex = cellValues.findIndex(val => val === null);
+                        if (firstEmptyIndex !== -1) {
+                            cellValues[firstEmptyIndex] = chord;
+                        } else {
+                            // If all cells are filled, append to the end (shifts array)
+                            cellValues.push(chord);
+                            if (cellValues.length > 80) {
+                                cellValues.shift(); // Remove first item if exceeds 80
+                            }
+                        }
+                    }
+                    
+                    // Update cell displays
+                    updateCells();
+                    
+                    // Update play button state after saving chord
+                    // Will be called after updatePlayButtonState is defined
+                    setTimeout(() => {
+                        updatePlayButtonState();
+                    }, 0);
+                    
+                    if (chord) {
+                        console.log('Saved chord:', chord);
+                        console.log('All saved chords:', savedChords);
+                        console.log('Cell values:', cellValues);
+                    }
+                }
+            });
+            
+            // Get button references early
+            const playButton = document.getElementById('playButton');
+            const menuToggle = document.getElementById('menuToggle');
+            const settingsButton = document.getElementById('settingsButton');
+            const settingsOverlay = document.getElementById('settingsOverlay');
+            const settingsModal = document.getElementById('settingsModal');
+            const bpmSlider = document.getElementById('bpmSlider');
+            const bpmValue = document.getElementById('bpmValue');
+            const keySelect = document.getElementById('keySelect');
+            const showSolfegeCheckbox = document.getElementById('showSolfegeCheckbox');
+            const settingsSave = document.getElementById('settingsSave');
+            const settingsCancel = document.getElementById('settingsCancel');
+            const titleLink = document.querySelector('.title-link');
+            const infoModal = document.getElementById('infoModal');
+            
+            // Menu toggle button - toggles live mode
+            menuToggle.addEventListener('click', () => {
+                liveMode = !liveMode;
+                window.liveMode = liveMode; // Update global reference
+                
+                if (liveMode) {
+                    // Enable live mode
+                    document.body.classList.add('live-mode');
+                    menuToggle.textContent = '☰ LIVE';
+                    // Clear any existing highlights
+                    clearKeyHighlights();
+                    clearPalettes();
+                    // Initialize drum machine
+                    initDrumMachine();
+                    // Start playback from the beginning
+                    if (!isPlaying) {
+                        playButton.click(); // Start playback
+                    } else {
+                        // If already playing, restart from beginning
+                        stopPlayback();
+                        playButton.click();
+                    }
+                } else {
+                    // Disable live mode
+                    document.body.classList.remove('live-mode');
+                    menuToggle.textContent = '☰';
+                    clearPalettes();
+                    // Stop drum machine
+                    if (drumApp) {
+                        drumApp.patternPlayer.stop();
+                    }
+                    // Stop playback when exiting live mode
+                    if (isPlaying) {
+                        stopPlayback();
+                    }
+                }
+            });
+            
+            // Initialize cells display
+            updateCells();
+        attachCellListeners();
+
+            // Deselect cells when clicking on empty space
+            document.body.addEventListener('click', (e) => {
+                // Check if the click target is a cell or inside a cell
+                const clickedCell = e.target.closest('.segment-cell');
+                // Also check if clicking on interactive elements (buttons, selects, modals)
+                const isInteractiveElement = e.target.closest('button, select, .settings-modal, .info-modal, .settings-overlay');
+                
+                // Only clear selection if clicking on empty space (not on a cell or interactive element)
+                if (!clickedCell && !isInteractiveElement) {
+                    clearSelection();
+                }
+            });
+
+            // Function to check if there's anything to play
+            function hasChordsToPlay() {
+                if (selectedCells.size > 0) {
+                    // Check if any selected cell has a value
+                    for (const idx of selectedCells) {
+                        if (cellValues[idx] !== null) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } else {
+                    // Check if any cell has a value
+                    return cellValues.some(val => val !== null);
+                }
+            }
+
+            // Function to update play button state
+            function updatePlayButtonState() {
+                if (!playButton) return; // Safety check - button might not be initialized yet
+                if (hasChordsToPlay() && !isPlaying) {
+                    playButton.disabled = false;
+                } else if (!hasChordsToPlay() && !isPlaying) {
+                    playButton.disabled = true;
+                }
+            }
+            
+            // Expose to global scope so updateCells can access it
+            window.updatePlayButtonState = updatePlayButtonState;
+            
+            function stopPlayback() {
+                isPlaying = false;
+                if (playTimeout) {
+                    clearTimeout(playTimeout);
+                    playTimeout = null;
+                }
+                playButton.textContent = '►';
+                playButton.classList.remove('playing');
+                currentPlayIndex = 0;
+                playSequence = [];
+                
+                // Clear highlights
+                document.querySelectorAll('.key-highlighted').forEach(key => {
+                    key.classList.remove('key-highlighted');
+                });
+                
+                // Clear palettes
+                clearPalettes();
+                
+                // Clear cell playing state
+                document.querySelectorAll('.cell-playing').forEach(cell => {
+                    cell.classList.remove('cell-playing');
+                });
+                
+                // Update button state after stopping
+                updatePlayButtonState();
+            }
+
+            // Function to calculate passing chord based on type, current chord, and target chord
+            function calculatePassingChord(passingType, currentChord, targetChord) {
+                if (!targetChord || !currentChord) return null;
+                
+                const currentRoot = currentChord.note.replace(/\/.*/, '').trim();
+                const targetRoot = targetChord.note.replace(/\/.*/, '').trim();
+                const currentRootIndex = noteToIndex[currentRoot];
+                const targetRootIndex = noteToIndex[targetRoot];
+                
+                if (currentRootIndex === undefined || targetRootIndex === undefined) return null;
+                
+                // Calculate interval distance between current and target
+                let intervalDistance = (targetRootIndex - currentRootIndex + 12) % 12;
+                if (intervalDistance === 0) intervalDistance = 12; // Same note, consider as octave
+                
+                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                let passingChord = null;
+                
+                switch (passingType) {
+                    case 'leadingTone': {
+                        // Leading tone: semitone below target root in bass
+                        // Example: C --> C/E --> F (E is leading tone to F)
+                        const leadingToneIndex = (targetRootIndex - 1 + 12) % 12;
+                        const leadingToneName = noteNames[leadingToneIndex];
+                        // Create slash chord with leading tone in bass
+                        passingChord = { note: currentRoot + '/' + leadingToneName, quality: 'major', type: 'triad', chordKey: 'major-triad' };
+                        break;
+                    }
+                    case 'secondaryDominant': {
+                        // V7 of target chord
+                        // Example: Target = Am, V7 of Am = E7
+                        const v7Index = (targetRootIndex + 7) % 12;
+                        const v7Note = noteNames[v7Index];
+                        passingChord = { note: v7Note, quality: 'dominant', type: '7th', chordKey: 'dominant-7th' };
+                        break;
+                    }
+                    case 'twoFiveOne': {
+                        // For 2beat: play ii-V7 of target (two chords)
+                        // Return an array with both chords
+                        const iiIndex = (targetRootIndex + 2) % 12;
+                        const iiNote = noteNames[iiIndex];
+                        const v7Index = (targetRootIndex + 7) % 12;
+                        const v7Note = noteNames[v7Index];
+                        // Return array: [ii chord, V7 chord]
+                        passingChord = [
+                            { note: iiNote, quality: 'minor', type: '7th', chordKey: 'minor-7th' },
+                            { note: v7Note, quality: 'dominant', type: '7th', chordKey: 'dominant-7th' }
+                        ];
+                        break;
+                    }
+                    case 'passingDiminished': {
+                        // Passing diminished: create a chord between current and target
+                        // If interval is large, use a note in between; if small, raise current by semitone
+                        let dimIndex;
+                        if (intervalDistance > 6) {
+                            // Large interval: use a note closer to target
+                            dimIndex = (currentRootIndex + Math.floor(intervalDistance / 2)) % 12;
+                        } else if (intervalDistance > 2) {
+                            // Medium interval: use midpoint
+                            dimIndex = (currentRootIndex + Math.floor(intervalDistance / 2)) % 12;
+                        } else {
+                            // Small interval: raise current by semitone
+                            dimIndex = (currentRootIndex + 1) % 12;
+                        }
+                        const dimNote = noteNames[dimIndex];
+                        passingChord = { note: dimNote, quality: 'diminished', type: '7th', chordKey: 'diminished-7th' };
+                        break;
+                    }
+                    case 'tritoneSub': {
+                        // Tritone substitution: dominant 7th a semitone above target
+                        const tritoneIndex = (targetRootIndex + 1) % 12;
+                        const tritoneNote = noteNames[tritoneIndex];
+                        passingChord = { note: tritoneNote, quality: 'dominant', type: '7th', chordKey: 'dominant-7th' };
+                        break;
+                    }
+                }
+                
+                return passingChord;
+            }
+
+            function playNextChord() {
+                if (!isPlaying) {
+                    stopPlayback();
+                    return;
+                }
+                
+                // Loop continuously when reaching the end
+                if (currentPlayIndex >= playSequence.length) {
+                    // Loop back to beginning
+                    currentPlayIndex = 0;
+                }
+
+                const chordIndex = playSequence[currentPlayIndex];
+                const chord = cellValues[chordIndex];
+                
+                if (chord) {
+                    // Highlight the cell being played
+                    const cell = document.querySelector(`[data-index="${chordIndex}"]`);
+                    if (cell) {
+                        cell.classList.add('cell-playing');
+                    }
+                    
+                    // Infer duration from passing chord selection
+                    // Empty passing chord = fullbar (4 beats), any passing chord = 2beat (2 beats)
+                    const chordKey = chord.chordKey;
+                    const hasPassingChord = chord.passingChord && chord.passingChord !== '';
+                    const chordBeats = hasPassingChord ? 2 : 4; // 2beat if passing, fullbar if not
+                    const chordDurationMs = (60000 / playbackBpm) * chordBeats;
+                    const chordDurationSec = chordDurationMs / 1000;
+                    playChord(chord.note, chordKey, chordDurationSec);
+                    
+                    // Check if there's a passing chord to play in remaining beats
+                    const remainingBeats = 4 - chordBeats;
+                    if (remainingBeats > 0 && hasPassingChord) {
+                        // Get target chord (next cell)
+                        const nextCellIndex = chordIndex + 1;
+                        const targetChord = (nextCellIndex < cellValues.length) ? cellValues[nextCellIndex] : null;
+                        
+                        if (targetChord) {
+                            // Calculate passing chord(s)
+                            const passingChord = calculatePassingChord(chord.passingChord, chord, targetChord);
+                            if (passingChord) {
+                                // Check if it's an array (twoFiveOne with 2 beats) or single chord
+                                if (Array.isArray(passingChord)) {
+                                    // Two chords: play them sequentially, each for 1 beat
+                                    const beatDurationMs = (60000 / playbackBpm);
+                                    const beatDurationSec = beatDurationMs / 1000;
+                                    
+                                    // Play first chord after main chord
+                                    setTimeout(() => {
+                                        // In live mode, replace main chord palettes with passing chord palettes
+                                        playChord(passingChord[0].note, passingChord[0].chordKey, beatDurationSec, true);
+                                        
+                                        // Play second chord after first chord
+                                        setTimeout(() => {
+                                            playChord(passingChord[1].note, passingChord[1].chordKey, beatDurationSec, true);
+                                        }, beatDurationMs);
+                                    }, chordDurationMs);
+                                } else {
+                                    // Single chord: play for all remaining beats
+                                    const passingBeats = remainingBeats;
+                                    const passingDurationMs = (60000 / playbackBpm) * passingBeats;
+                                    const passingDurationSec = passingDurationMs / 1000;
+                                    
+                                    // Play passing chord after main chord duration
+                                    setTimeout(() => {
+                                        // In live mode, replace main chord palettes with passing chord palettes
+                                        playChord(passingChord.note, passingChord.chordKey, passingDurationSec, true);
+                                    }, chordDurationMs);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Move to next chord after full bar duration (always 4 beats = 240/bpm)
+                    // regardless of chord duration
+                    currentPlayIndex++;
+                    const barIntervalMs = (60000 / playbackBpm) * 4; // Always 4 beats per bar
+                    playTimeout = setTimeout(() => {
+                        // Remove highlight from current cell
+                        if (cell) {
+                            cell.classList.remove('cell-playing');
+                        }
+                        // Clear palettes and highlights when moving to next chord (in live mode)
+                        if (liveMode) {
+                            clearPalettes();
+                            clearKeyHighlights();
+                        }
+                        playNextChord();
+                    }, barIntervalMs);
+                } else {
+                    // Skip empty cells, but still wait full bar duration
+                    currentPlayIndex++;
+                    const barIntervalMs = (60000 / playbackBpm) * 4; // Always 4 beats per bar
+                    playTimeout = setTimeout(() => {
+                        playNextChord();
+                    }, barIntervalMs);
+                }
+            }
+
+            playButton.addEventListener('click', () => {
+                if (playButton.disabled) return;
+                
+                // Initialize audio on play button click
+                ensureAudioReady();
+                
+                if (isPlaying) {
+                    // Stop playback
+                    stopPlayback();
+                } else {
+                    // Start playback
+                    isPlaying = true;
+                    playButton.textContent = '■';
+                    playButton.classList.add('playing');
+                    playButton.disabled = false; // Keep enabled while playing so user can stop
+                    playButton.disabled = false; // Keep enabled while playing so user can stop
+                    
+                    // Determine starting point
+                    // In live mode, always play from start regardless of selection
+                    if (liveMode) {
+                        // Play from first cell with value (all cells, ignoring selection)
+                        playSequence = [];
+                        for (let i = 0; i < cellValues.length; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    } else if (selectedCells.size > 0) {
+                        // Play all cells from first selected to last selected (inclusive range)
+                        const selectedArray = Array.from(selectedCells).sort((a, b) => a - b);
+                        const firstSelected = selectedArray[0];
+                        const lastSelected = selectedArray[selectedArray.length - 1];
+                        playSequence = [];
+                        for (let i = firstSelected; i <= lastSelected; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    } else {
+                        // Play from first cell with value
+                        playSequence = [];
+                        for (let i = 0; i < cellValues.length; i++) {
+                            if (cellValues[i] !== null) {
+                                playSequence.push(i);
+                            }
+                        }
+                    }
+                    
+                    currentPlayIndex = 0;
+                    if (playSequence.length > 0) {
+                        playNextChord();
+                    } else {
+                        stopPlayback();
+                    }
+                }
+            });
+            
+            // Initialize play button state (ensure it's disabled on page load)
+            // Since cellValues starts as all null, button should be disabled
+            playButton.disabled = true;
+            updatePlayButtonState();
+
+            // Store original values for cancel functionality
+            let originalKeySignature = keySignature;
+            let originalShowSolfege = showSolfege;
+
+            // Settings button to adjust BPM
+            settingsButton.addEventListener('click', () => {
+                // Store original values
+                originalKeySignature = keySignature;
+                originalShowSolfege = showSolfege;
+                
+                // Populate current values
+                bpmSlider.value = playbackBpm;
+                bpmValue.textContent = playbackBpm.toString();
+                keySelect.value = keySignature;
+                showSolfegeCheckbox.checked = showSolfege;
+                settingsOverlay.style.display = 'block';
+                settingsModal.style.display = 'block';
+            });
+
+            bpmSlider.addEventListener('input', () => {
+                bpmValue.textContent = bpmSlider.value;
+            });
+
+            // Real-time updates for solfege display (temporary, only applied on save)
+            showSolfegeCheckbox.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
+            });
+
+            keySelect.addEventListener('change', () => {
+                // Temporarily update for preview
+                const tempShowSolfege = showSolfegeCheckbox.checked;
+                const tempKeySignature = keySelect.value;
+                updatePianoKeysSolfegeWithValues(tempKeySignature, tempShowSolfege);
+            });
+
+            function closeSettings() {
+                settingsOverlay.style.display = 'none';
+                settingsModal.style.display = 'none';
+                infoModal.style.display = 'none';
+            }
+
+            settingsCancel.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
+                closeSettings();
+            });
+
+            settingsOverlay.addEventListener('click', () => {
+                // Restore original values
+                keySignature = originalKeySignature;
+                showSolfege = originalShowSolfege;
+                updatePianoKeysSolfege();
+                closeSettings();
+            });
+
+            settingsSave.addEventListener('click', () => {
+                const value = parseInt(bpmSlider.value, 10);
+                const clamped = Math.min(300, Math.max(20, value));
+                playbackBpm = clamped;
+                keySignature = keySelect.value;
+                showSolfege = showSolfegeCheckbox.checked;
+                updatePianoKeysSolfege();
+                if (isPlaying) {
+                    stopPlayback();
+                }
+                closeSettings();
+            });
+
+            // Title click (Chord Canvas) opens info modal (only the link, not the whole bar)
+            if (titleLink) {
+                titleLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    settingsOverlay.style.display = 'block';
+                    infoModal.style.display = 'block';
+                });
+            }
+
+            noteSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
+            chordTypeSelect.addEventListener('change', (e) => {
+                if (e.isTrusted) {
+                    isInitialSetup = false; // Mark that user has interacted
+                }
+                updateChord();
+            });
+            
+            // Initial button state
+            updateSaveButtonState(noteSelect.value, qualitySelect.value, chordTypeSelect.value);
+
+            // Set default selection: C major 7 (without triggering audio)
+            noteSelect.value = 'C';
+            qualitySelect.value = 'major';
+            qualitySelect.dispatchEvent(new Event('change')); // This won't set isInitialSetup=false because e.isTrusted is false
+            // After options are populated, set to 7th if available
+            const defaultChordType = '7th';
+            if (Array.from(chordTypeSelect.options).some(opt => opt.value === defaultChordType)) {
+                chordTypeSelect.value = defaultChordType;
+            }
+            updateChord(); // This will skip audio because isInitialSetup is still true
+        }
+
+        // Piano pattern: black keys appear between C-D, D-E, F-G, G-A, A-B
+        // But NOT between E-F and B-C
+        // For 21 white keys (3 octaves), black keys appear at these positions:
+        const blackKeyPositions = [
+            0.5,   // Between C-D (keys 0-1)
+            1.5,   // Between D-E (keys 1-2)
+            // Skip between E-F (keys 2-3)
+            3.5,   // Between F-G (keys 3-4)
+            4.5,   // Between G-A (keys 4-5)
+            5.5,   // Between A-B (keys 5-6)
+            // Skip between B-C (keys 6-7)
+            7.5,   // Between C-D (keys 7-8)
+            8.5,   // Between D-E (keys 8-9)
+            // Skip between E-F (keys 9-10)
+            10.5,  // Between F-G (keys 10-11)
+            11.5,  // Between G-A (keys 11-12)
+            12.5,  // Between A-B (keys 12-13)
+            // Skip between B-C (keys 13-14)
+            14.5,  // Between C-D (keys 14-15)
+            15.5,  // Between D-E (keys 15-16)
+            // Skip between E-F (keys 16-17)
+            17.5,  // Between F-G (keys 17-18)
+            18.5,  // Between G-A (keys 18-19)
+            19.5   // Between A-B (keys 19-20)
+        ];
+
+        const container = document.querySelector('.piano-container');
+        
+        // Three zones: left (A), mid (B), right (C)
+        function getClickZone(e) {
+            const rect = container.getBoundingClientRect();
+            const clickX = (e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - rect.left;
+            const third = rect.width / 3;
+            if (clickX < third) {
+                return 'left'; // A (lowest note)
+            } else if (clickX < third * 2) {
+                return 'mid'; // B (lower part of remaining)
+            } else {
+                return 'right'; // C (higher part of remaining)
+            }
+        }
+        
+        window.getClickZone = getClickZone;
+        
+        // Remove existing white keys
+        container.innerHTML = '';
+
+        // Create white keys first
+        let whiteKeyIndex = 0;
+        pianoNotes.forEach((note, index) => {
+            if (!note.isBlack) {
+                const key = document.createElement('div');
+                key.className = 'white-key';
+                key.dataset.noteId = index;
+                key.dataset.frequency = note.freq;
+                key.dataset.noteName = note.name;
+                
+                // Mark zone for visual feedback (21 white keys: 0-6=left, 7-13=mid, 14-20=right)
+                if (whiteKeyIndex < 7) {
+                    key.dataset.zone = 'left';
+                } else if (whiteKeyIndex < 14) {
+                    key.dataset.zone = 'mid';
+                } else {
+                    key.dataset.zone = 'right';
+                }
+                
+                container.appendChild(key);
+                whiteKeyIndex++;
+            }
+        });
+
+        // Create black keys positioned between white keys
+        let positionIndex = 0;
+        pianoNotes.forEach((note, index) => {
+            if (note.isBlack && positionIndex < blackKeyPositions.length) {
+                const key = document.createElement('div');
+                key.className = 'black-key';
+                key.dataset.noteId = index;
+                key.dataset.frequency = note.freq;
+                key.dataset.noteName = note.name;
+                key.setAttribute('data-position', blackKeyPositions[positionIndex].toString());
+                
+                // Mark zone for visual feedback (black keys are between white keys)
+                // Positions 0.5-6.5 are in left zone, 7.5-13.5 in mid, 14.5+ in right
+                const position = blackKeyPositions[positionIndex];
+                if (position <= 6.5) {
+                    key.dataset.zone = 'left';
+                } else if (position <= 13.5) {
+                    key.dataset.zone = 'mid';
+                } else {
+                    key.dataset.zone = 'right';
+                }
+                
+                container.appendChild(key);
+                positionIndex++;
+            }
+        });
+
+        // Track active oscillators per touch for multitouch support
+        // Map: touchId -> { oscillators, baseFrequencies }
+        let activeTouches = new Map();
+        let mouseActive = false;
+        let mouseOscillators = [];
+        
+        // Calculate volume multiplier from Y position (0dB at bottom, -16dB at top)
+        // Returns value between 0.158 (top, -16dB) and 1.0 (bottom, 0dB)
+        function calculateVolumeFromY(y, containerElement) {
+            const rect = containerElement.getBoundingClientRect();
+            const relativeY = y - rect.top;
+            const height = rect.height;
+            // Normalize: 0 at bottom, 1 at top
+            const normalizedY = 1 - (relativeY / height);
+            // Clamp between 0 and 1
+            const clampedY = Math.max(0, Math.min(1, normalizedY));
+            // Map: 0 (bottom) = 1.0 (0dB), 1 (top) = 0.158 (-16dB)
+            // Linear interpolation: volume = 1.0 - (clampedY * 0.842)
+            return 1.0 - (clampedY * 0.842);
+        }
+        
+        // Calculate pitch glide from X position
+        // Middle 40% (30-70%) = safe zone (0 half steps)
+        // Left 30% (0-30%) = -5 to 0 half steps
+        // Right 30% (70-100%) = 0 to +5 half steps
+        // Returns frequency multiplier (1.0 = no change, <1.0 = lower, >1.0 = higher)
+        function calculatePitchFromX(x, containerElement) {
+            const rect = containerElement.getBoundingClientRect();
+            const relativeX = x - rect.left;
+            const width = rect.width;
+            const normalizedX = relativeX / width; // 0 = left edge, 1 = right edge
+            
+            let halfSteps = 0;
+            
+            if (normalizedX < 0.3) {
+                // Left zone: 0-30% = -5 to 0 half steps (more left = lower pitch)
+                halfSteps = -5 * ((0.3 - normalizedX) / 0.3);
+            } else if (normalizedX > 0.7) {
+                // Right zone: 70-100% = 0 to +5 half steps
+                halfSteps = 5 * ((normalizedX - 0.7) / 0.3);
+            }
+            // Middle zone: 30-70% = 0 half steps (safe zone)
+            
+            // Convert half steps to frequency multiplier: 2^(halfSteps/12)
+            return Math.pow(2, halfSteps / 12);
+        }
+        
+        // Update volume for oscillators
+        function updateOscillatorsVolume(oscillators, volumeMultiplier) {
+            if (!oscillators || !waterSynth) return;
+            const now = waterSynth.audioContext.currentTime;
+            
+            oscillators.forEach(osc => {
+                if (osc && osc.gainNode) {
+                    try {
+                        // Store original gain envelope values if not already stored
+                        if (!osc.originalGainPeak) {
+                            osc.originalGainPeak = 0.5; // Default peak gain
+                            osc.originalGainSustain = 0.35; // Default sustain gain
+                        }
+                        
+                        // Cancel ALL scheduled values to prevent any fade-outs or decays
+                        osc.gainNode.gain.cancelScheduledValues(now);
+                        
+                        // Get current gain value
+                        const currentGain = osc.gainNode.gain.value;
+                        
+                        // Calculate target sustain level with volume multiplier
+                        const sustainLevel = osc.originalGainSustain * volumeMultiplier;
+                        
+                        // Immediately set current value, then smoothly ramp to target
+                        osc.gainNode.gain.setValueAtTime(currentGain, now);
+                        // Very short ramp for smooth transition (5ms)
+                        osc.gainNode.gain.linearRampToValueAtTime(sustainLevel, now + 0.005);
+                        // Immediately maintain sustain level indefinitely - NO decay, NO fade
+                        osc.gainNode.gain.setValueAtTime(sustainLevel, now + 0.005 + 0.0001);
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                }
+            });
+        }
+        
+        // Update pitch for oscillators
+        function updateOscillatorsPitch(oscillators, pitchMultiplier) {
+            if (!oscillators || !waterSynth) return;
+            const now = waterSynth.audioContext.currentTime;
+            
+            oscillators.forEach(osc => {
+                if (osc && osc.oscillator && osc.baseFrequency) {
+                    try {
+                        const newFrequency = osc.baseFrequency * pitchMultiplier;
+                        osc.oscillator.frequency.cancelScheduledValues(now);
+                        osc.oscillator.frequency.setValueAtTime(newFrequency, now);
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                }
+            });
+        }
+        
+        // Simple: tap anywhere on piano to trigger full chord palette
+        container.addEventListener('mousedown', (e) => {
+            if (!window.liveMode || !window.currentLiveChord) {
+                return;
+            }
+            
+            // Only handle left mouse button (button === 0)
+            if (e.button !== 0) return;
+            
+            e.preventDefault(); // Prevent default behavior
+            
+            if (window.ensureAudioReady) {
+                window.ensureAudioReady();
+            } else if (!waterSynth) {
+                initAudio();
+            }
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+            
+            // Stop any previous mouse oscillators
+            stopOscillators(mouseOscillators);
+            mouseActive = true;
+            
+            // Calculate volume and pitch based on initial tap position
+            const volumeMultiplier = calculateVolumeFromY(e.clientY, container);
+            const pitchMultiplier = calculatePitchFromX(e.clientX, container);
+            
+            // Start playing full chord and store oscillators
+            // Visual feedback is provided by the existing green palette highlight
+            if (window.playCurrentChord) {
+                mouseOscillators = window.playCurrentChord(volumeMultiplier);
+                // Apply initial pitch
+                updateOscillatorsPitch(mouseOscillators, pitchMultiplier);
+            }
+        });
+        
+        container.addEventListener('mousemove', (e) => {
+            // Only update if mouse button is actually pressed (e.buttons === 1 for left button)
+            if (window.liveMode && mouseActive && mouseOscillators.length > 0 && e.buttons === 1) {
+                e.preventDefault(); // Prevent any default behavior
+                // Update volume and pitch continuously during drag
+                const volumeMultiplier = calculateVolumeFromY(e.clientY, container);
+                const pitchMultiplier = calculatePitchFromX(e.clientX, container);
+                updateOscillatorsVolume(mouseOscillators, volumeMultiplier);
+                updateOscillatorsPitch(mouseOscillators, pitchMultiplier);
+            }
+        });
+        
+        container.addEventListener('mouseup', (e) => {
+            // Only handle left mouse button (button === 0)
+            if (e.button !== 0) return;
+            
+            if (window.liveMode && mouseActive) {
+                e.preventDefault();
+                // Stop mouse oscillators when mouse is released (with dynamic tail)
+                stopOscillators(mouseOscillators);
+                mouseOscillators = [];
+                mouseActive = false;
+            }
+        });
+        
+        container.addEventListener('mouseleave', (e) => {
+            // Only stop if mouse button was pressed (e.buttons === 1)
+            if (window.liveMode && mouseActive && e.buttons === 1) {
+                // Stop mouse oscillators when mouse leaves container while dragging (with dynamic tail)
+                stopOscillators(mouseOscillators);
+                mouseOscillators = [];
+                mouseActive = false;
+            }
+        });
+        
+        container.addEventListener('touchstart', (e) => {
+            if (!window.liveMode || !window.currentLiveChord) {
+                return;
+            }
+            
+            e.preventDefault(); // Prevent scrolling and other default behaviors
+            
+            if (window.ensureAudioReady) {
+                window.ensureAudioReady();
+            } else if (!waterSynth) {
+                initAudio();
+            }
+            if (waterSynth && waterSynth.audioContext && waterSynth.audioContext.state === 'suspended') {
+                waterSynth.audioContext.resume();
+            }
+            
+            // Handle each touch point separately for multitouch support
+            Array.from(e.changedTouches).forEach(touch => {
+                const touchId = touch.identifier;
+                
+                // Calculate volume and pitch based on initial tap position
+                const volumeMultiplier = calculateVolumeFromY(touch.clientY, container);
+                const pitchMultiplier = calculatePitchFromX(touch.clientX, container);
+                
+                // Start playing full chord and store oscillators for this touch
+                let oscillators = [];
+                if (window.playCurrentChord) {
+                    oscillators = window.playCurrentChord(volumeMultiplier);
+                    // Apply initial pitch
+                    updateOscillatorsPitch(oscillators, pitchMultiplier);
+                }
+                
+                // Store this touch
+                activeTouches.set(touchId, {
+                    oscillators: oscillators
+                });
+            });
+            // Visual feedback is provided by the existing green palette highlight
+        });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!window.liveMode) return;
+            
+            e.preventDefault(); // Prevent scrolling
+            
+            // Update volume and pitch for each active touch
+            // Use e.touches to get ALL active touches, not just changed ones
+            Array.from(e.touches).forEach(touch => {
+                const touchId = touch.identifier;
+                const touchData = activeTouches.get(touchId);
+                
+                if (touchData && touchData.oscillators) {
+                    const volumeMultiplier = calculateVolumeFromY(touch.clientY, container);
+                    const pitchMultiplier = calculatePitchFromX(touch.clientX, container);
+                    updateOscillatorsVolume(touchData.oscillators, volumeMultiplier);
+                    updateOscillatorsPitch(touchData.oscillators, pitchMultiplier);
+                }
+            });
+        });
+        
+        container.addEventListener('touchend', (e) => {
+            if (window.liveMode) {
+                e.preventDefault(); // Prevent default behavior
+                // Handle each ended touch separately
+                Array.from(e.changedTouches).forEach(touch => {
+                    const touchId = touch.identifier;
+                    const touchData = activeTouches.get(touchId);
+                    
+                    if (touchData) {
+                        // Stop oscillators for this specific touch (with dynamic tail)
+                        stopOscillators(touchData.oscillators);
+                        // Remove this touch
+                        activeTouches.delete(touchId);
+                    }
+                });
+            }
+        });
+        
+        container.addEventListener('touchcancel', (e) => {
+            if (window.liveMode) {
+                e.preventDefault(); // Prevent default behavior
+                // Handle each cancelled touch separately
+                Array.from(e.changedTouches).forEach(touch => {
+                    const touchId = touch.identifier;
+                    const touchData = activeTouches.get(touchId);
+                    
+                    if (touchData) {
+                        // Stop oscillators for this specific touch (with dynamic tail)
+                        stopOscillators(touchData.oscillators);
+                        // Remove this touch
+                        activeTouches.delete(touchId);
+                    }
+                });
+            }
+        });
+
+        // Initialize (audio context will be initialized on user interaction)
+        setupChordControls();
+        
+        // Update solfege names on piano keys if enabled
+        updatePianoKeysSolfege();
+
+        // Drum machine initialization for live mode
+        let drumApp = null;
+        let drumControlDot = null;
+        let drumControlCanvas = null;
+        let drumPatternSelect = null;
+        let isDraggingDrum = false;
+
+        function initMasterAudioRouting() {
+            if (!masterAudioContext) {
+                // Create master AudioContext (or use existing one if already set)
+                if (window.masterAudioContext) {
+                    masterAudioContext = window.masterAudioContext;
+                } else {
+                    masterAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Create master compressor (smoother compression)
+                masterCompressor = masterAudioContext.createDynamicsCompressor();
+                masterCompressor.threshold.value = -12; // Start compressing at -12dB
+                masterCompressor.knee.value = 10; // Soft knee for smooth compression
+                masterCompressor.ratio.value = 4; // 4:1 ratio
+                masterCompressor.attack.value = 0.003; // Fast attack (3ms)
+                masterCompressor.release.value = 0.1; // Quick release (100ms)
+                
+                // Create master limiter (hard limit to prevent clipping)
+                masterLimiter = masterAudioContext.createDynamicsCompressor();
+                masterLimiter.threshold.value = -3; // Lower threshold to catch peaks earlier (mobile-friendly)
+                masterLimiter.knee.value = 0; // Hard knee
+                masterLimiter.ratio.value = 20; // High ratio for limiting
+                masterLimiter.attack.value = 0.001; // Very fast attack (1ms)
+                masterLimiter.release.value = 0.01; // Very quick release (10ms)
+                
+                // Master gain for overall volume control
+                masterGainNode = masterAudioContext.createGain();
+                // Lower gain on mobile for weaker audio hardware
+                masterGainNode.gain.value = isMobile ? 0.6 : 0.7; // Mobile: 60%, Desktop: 70%
+                
+                // Connect: compressor -> limiter -> gain -> destination
+                masterCompressor.connect(masterLimiter);
+                masterLimiter.connect(masterGainNode);
+                masterGainNode.connect(masterAudioContext.destination);
+                
+                // Expose globally for other audio sources
+                window.masterAudioContext = masterAudioContext;
+                window.masterCompressor = masterCompressor;
+            }
+        }
+
+        // Initialize drum machine when live mode is enabled
+        function initDrumMachine() {
+            if (!drumPatternSelect) return;
+            
+            // Initialize master audio routing if needed
+            initMasterAudioRouting();
+            
+            // Create or restart drum machine
+            if (!drumApp) {
+                drumApp = new RealDrumApp();
+            }
+            
+            // Set default: random pattern, 40% excitement, 40% low pass
+            const patterns = ['house', 'break', 'trap', 'glitch', 'brostep', 'dnb', 'garage', 'lofi', 'afro', 'chillstep', 'drill', 'reggaeton', 'jersey', 'amapiano', 'techno', 'baile'];
+            const randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
+            drumPatternSelect.value = randomPattern;
+            drumApp.patternPlayer.setPattern(randomPattern);
+            drumApp.patternPlayer.setExcitement(0.4);
+            drumApp.drumMachine.setLowPass(0.4);
+            
+            // Position dot at 40%, 40% (X = low pass, Y = excitement, but Y is inverted)
+            if (drumControlCanvas && drumControlDot) {
+                const xPercent = 0.4; // 40% low pass
+                const yPercent = 0.6; // 40% excitement (inverted: 100% - 40% = 60%)
+                drumControlDot.style.left = (xPercent * 100) + '%';
+                drumControlDot.style.top = (yPercent * 100) + '%';
+            }
+            
+            // Route drum machine through master compressor
+            if (masterCompressor && drumApp.drumMachine.saturator && window.masterAudioContext) {
+                // Only connect if both use the same AudioContext
+                if (drumApp.drumMachine.ctx === window.masterAudioContext) {
+                    try {
+                        // Disconnect from its own destination
+                        drumApp.drumMachine.saturator.disconnect();
+                        // Connect to master compressor instead
+                        drumApp.drumMachine.saturator.connect(masterCompressor);
+                    } catch (e) {
+                        // May already be connected differently, reconnect anyway
+                        try {
+                            drumApp.drumMachine.saturator.disconnect();
+                            drumApp.drumMachine.saturator.connect(masterCompressor);
+                        } catch (e2) {
+                            // Ignore errors - will use direct connection
+                            console.warn('Could not connect drum machine to master compressor:', e2);
+                        }
+                    }
+                }
+            }
+            
+            // Always restart the pattern player (even if it was stopped)
+            if (drumApp.patternPlayer.looping) {
+                drumApp.patternPlayer.stop();
+            }
+            drumApp.patternPlayer.start();
+        }
+
+        // Setup drum control area
+        function setupDrumControl() {
+            drumControlDot = document.getElementById('drumControlDot');
+            drumControlCanvas = document.getElementById('drumControlCanvas');
+            drumPatternSelect = document.getElementById('drumPatternSelect');
+            const bassTypeSelect = document.getElementById('bassTypeSelect');
+
+            if (!drumControlDot || !drumControlCanvas || !drumPatternSelect) return;
+            
+            // Bass control variables
+            let activeBassSound = null;
+            let isBassActive = false;
+
+            // Pattern selection handler
+            drumPatternSelect.addEventListener('change', (e) => {
+                if (drumApp) {
+                    drumApp.patternPlayer.setPattern(e.target.value);
+                }
+            });
+
+            // Helper function to calculate volume from Y position
+            function calculateVolumeFromY(clientY, container) {
+                const rect = container.getBoundingClientRect();
+                const y = clientY - rect.top;
+                const yPercent = Math.max(0, Math.min(1, y / rect.height));
+                // Top = quiet (0.158), bottom = loud (1.0)
+                // 0.158 = -16dB, 1.0 = 0dB
+                return 0.158 + (1.0 - 0.158) * yPercent;
+            }
+            
+            // Start bass sound on tap/hold
+            function startBassSound(e) {
+                if (!window.liveMode || isBassActive) return;
+                
+                const bassType = bassTypeSelect ? bassTypeSelect.value : 'deep';
+                if (bassType === 'none' || !window.growlSoundCreators || !window.growlSoundCreators[bassType]) return;
+                
+                // Check if we have a current chord palette
+                if (!window.currentLiveChord || !window.currentLiveChord.lowestNoteIndex) return;
+                
+                e.preventDefault();
+                
+                // Initialize audio context if needed
+                if (window.initGrowlAudioContext) {
+                    window.initGrowlAudioContext();
+                }
+                if (window.ensureGrowlMasterGain) {
+                    window.ensureGrowlMasterGain();
+                }
+                
+                // Get the lowest note frequency from the current chord palette
+                const lowestNoteIndex = window.currentLiveChord.lowestNoteIndex;
+                let lowestNoteFreq = pianoNotes[lowestNoteIndex] ? pianoNotes[lowestNoteIndex].freq : 55;
+                
+                // Divide by 4 to get two octaves lower (bass range, matching the example)
+                // This ensures the bass plays in a proper bass frequency range
+                // Example: C4 (261.63 Hz) -> C2 (65.4 Hz) for deep bass
+                lowestNoteFreq = lowestNoteFreq / 4;
+                
+                // Calculate initial volume from Y position
+                const clickY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+                const volumeMultiplier = calculateVolumeFromY(clickY, drumControlCanvas);
+                
+                // Create and start bass sound with the lowest note frequency (one octave lower)
+                activeBassSound = window.growlSoundCreators[bassType](lowestNoteFreq);
+                activeBassSound.start();
+                
+                // Set initial volume
+                if (activeBassSound.updateVolume) {
+                    activeBassSound.updateVolume(volumeMultiplier);
+                }
+                
+                // Set initial lowpass from X position
+                const rect = drumControlCanvas.getBoundingClientRect();
+                const clickX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                const x = clickX - rect.left;
+                const xPercent = Math.max(0, Math.min(1, x / rect.width));
+                if (activeBassSound.updateLowpass) {
+                    activeBassSound.updateLowpass(xPercent);
+                }
+                
+                isBassActive = true;
+            }
+            
+            // Update bass lowpass during drag
+            function updateBassLowpass(e) {
+                if (!isBassActive || !activeBassSound) return;
+                
+                const rect = drumControlCanvas.getBoundingClientRect();
+                const x = (e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - rect.left;
+                const xPercent = Math.max(0, Math.min(1, x / rect.width));
+                
+                if (activeBassSound.updateLowpass) {
+                    activeBassSound.updateLowpass(xPercent);
+                }
+            }
+            
+            // Stop bass sound on release
+            function stopBassSound(e) {
+                if (!isBassActive || !activeBassSound) return;
+                
+                if (activeBassSound.stop) {
+                    activeBassSound.stop();
+                }
+                activeBassSound = null;
+                isBassActive = false;
+            }
+            
+            // Mouse drag handlers - check if clicking near dot (drum) or elsewhere (bass)
+            drumControlCanvas.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Only left mouse button
+                
+                // Check if clicking on or near the dot
+                const rect = drumControlCanvas.getBoundingClientRect();
+                const dotRect = drumControlDot.getBoundingClientRect();
+                const dotCenterX = dotRect.left + dotRect.width / 2;
+                const dotCenterY = dotRect.top + dotRect.height / 2;
+                const clickX = e.clientX;
+                const clickY = e.clientY;
+                const distance = Math.sqrt(
+                    Math.pow(clickX - dotCenterX, 2) + Math.pow(clickY - dotCenterY, 2)
+                );
+                
+                if (distance <= 20) {
+                    // Clicking near dot - handle drum control
+                    isDraggingDrum = true;
+                    e.preventDefault();
+                } else {
+                    // Clicking elsewhere - handle bass control
+                    startBassSound(e);
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDraggingDrum) {
+                    updateDrumControl(e);
+                } else if (isBassActive && e.buttons === 1) {
+                    updateBassLowpass(e);
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (e.button === 0) {
+                    isDraggingDrum = false;
+                    stopBassSound(e);
+                }
+            });
+
+            // Touch handlers - check if touching near dot (drum) or elsewhere (bass)
+            drumControlCanvas.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                if (!touch) return;
+                
+                // Check if touching on or near the dot
+                const rect = drumControlCanvas.getBoundingClientRect();
+                const dotRect = drumControlDot.getBoundingClientRect();
+                const dotCenterX = dotRect.left + dotRect.width / 2;
+                const dotCenterY = dotRect.top + dotRect.height / 2;
+                const touchX = touch.clientX;
+                const touchY = touch.clientY;
+                const distance = Math.sqrt(
+                    Math.pow(touchX - dotCenterX, 2) + Math.pow(touchY - dotCenterY, 2)
+                );
+                
+                if (distance <= 20) {
+                    // Touching near dot - handle drum control
+                    isDraggingDrum = true;
+                    e.preventDefault();
+                } else {
+                    // Touching elsewhere - handle bass control
+                    startBassSound(e);
+                }
+            });
+
+            document.addEventListener('touchmove', (e) => {
+                if (isDraggingDrum && e.touches.length > 0) {
+                    e.preventDefault();
+                    updateDrumControl(e.touches[0]);
+                } else if (isBassActive && e.touches.length > 0) {
+                    e.preventDefault();
+                    updateBassLowpass(e.touches[0]);
+                }
+            });
+
+            document.addEventListener('touchend', (e) => {
+                isDraggingDrum = false;
+                stopBassSound(e);
+            });
+            
+            document.addEventListener('touchcancel', (e) => {
+                isDraggingDrum = false;
+                stopBassSound(e);
+            });
+
+            function updateDrumControl(e) {
+                const rect = drumControlCanvas.getBoundingClientRect();
+                const x = (e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0)) - rect.left;
+                const y = (e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0)) - rect.top;
+                
+                // Clamp to canvas bounds
+                const xPercent = Math.max(0, Math.min(1, x / rect.width));
+                const yPercent = Math.max(0, Math.min(1, y / rect.height));
+                
+                // Update dot position
+                drumControlDot.style.left = (xPercent * 100) + '%';
+                drumControlDot.style.top = (yPercent * 100) + '%';
+                
+                // X = low pass (0-1)
+                const lowPass = xPercent;
+                // Y = excitement (0-1, but inverted: top = 0%, bottom = 100%)
+                const excitement = 1 - yPercent;
+                
+                // Update drum machine
+                if (drumApp) {
+                    drumApp.drumMachine.setLowPass(lowPass);
+                    drumApp.patternPlayer.setExcitement(excitement);
+                }
+            }
+            
+        }
+
+        // Initialize drum control when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupDrumControl);
+        } else {
+            setupDrumControl();
+        }
+
+    </script>
+</body>
+</html>

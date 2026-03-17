@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <button class="menu-button" id="menuButton">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="header-content">
+            <h1>
+                Chord Canvas
+                <span class="beat-dots">
+                    <span class="beat-dot" id="beatDot0"></span>
+                    <span class="beat-dot" id="beatDot1"></span>
+                    <span class="beat-dot" id="beatDot2"></span>
+                    <span class="beat-dot" id="beatDot3"></span>
+                </span>
+            </h1>
+            <div class="developed-by">
+                developed by <a href="https://youtube.com/beatsaway" target="_blank" rel="noopener noreferrer">beatsaway</a>
+            </div>
+        </div>
+        <span class="help-button" id="helpButton">?</span>
+    </header>
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-content">
+            <span class="settings-close" id="settingsClose">×</span>
+            <nav class="settings-nav">
+                <button class="settings-nav-item active" data-section="sound">Sound</button>
+                <button class="settings-nav-item" data-section="playback">Playback</button>
+                <button class="settings-nav-item" data-section="performance">Performance</button>
+            </nav>
+            <div class="settings-sections">
+                <div class="settings-section" id="soundSection">
+                    <div class="sound-diagrams-container">
+                        <div class="sound-diagram" id="soundDiagram1" title="SOUND1 is a merge of Layer 1 and Layer 2">
+                            <div class="connection-lines" id="connectionLines1"></div>
+                            <div class="layers-container" id="layersContainer1">
+                                <div class="sound-output active" id="soundOutput1" data-sound="1">
+                                    <span>SOUND1</span>
+                                    <span class="sound-percentage" id="soundPercentage1">100%</span>
+                                </div>
+                                <select class="layer-select" id="layerSelect1_1"></select>
+                                <select class="layer-select" id="layerSelect1_2"></select>
+                            </div>
+                        </div>
+                        <div class="sound-diagram" id="soundDiagram2" title="SOUND2 is a merge of Layer 1 and Layer 2">
+                            <div class="connection-lines" id="connectionLines2"></div>
+                            <div class="layers-container" id="layersContainer2">
+                                <div class="sound-output" id="soundOutput2" data-sound="2">
+                                    <span>SOUND2</span>
+                                    <span class="sound-percentage" id="soundPercentage2">0%</span>
+                                </div>
+                                <select class="layer-select" id="layerSelect2_1"></select>
+                                <select class="layer-select" id="layerSelect2_2"></select>
+                            </div>
+                        </div>
+                        <div class="sound-diagram" id="soundDiagram3" title="SOUND3 is a merge of Layer 1 and Layer 2">
+                            <div class="connection-lines" id="connectionLines3"></div>
+                            <div class="layers-container" id="layersContainer3">
+                                <div class="sound-output" id="soundOutput3" data-sound="3">
+                                    <span>SOUND3</span>
+                                    <span class="sound-percentage" id="soundPercentage3">0%</span>
+                                </div>
+                                <select class="layer-select" id="layerSelect3_1"></select>
+                                <select class="layer-select" id="layerSelect3_2"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                        <select id="autoManageSelect" style="flex: 1; padding: 8px; font-size: 12px; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 4px; background: white; cursor: pointer;">
+                            <option value="none">none</option>
+                            <option value="autoautocrossfade">autoautocrossfade</option>
+                            <option value="autojump">autojump</option>
+                            <option value="autorandom">autorandom</option>
+                        </select>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                        <select id="crossfadeSpeedSelect" style="flex: 1; padding: 8px; font-size: 12px; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 4px; background: white; cursor: pointer;">
+                            <option value="1">1 bar (240/bpm)</option>
+                            <option value="4">4 bar (960/bpm)</option>
+                            <option value="8" selected>8 bar (1920/bpm)</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="settings-section" id="playbackSection" style="display: none;">
+                    <label>BPM: <span id="bpmValue">120</span></label>
+                    <input type="range" id="bpmInput" value="120" min="30" max="400">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                        <select id="playbackModeSelect" style="flex: 1; padding: 8px; font-size: 12px; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 4px; background: white; cursor: pointer;">
+                            <option value="normal">normal</option>
+                            <option value="pairlow">pair low</option>
+                            <option value="pairhigh">pair high</option>
+                            <option value="threeclose">three close</option>
+                            <option value="threegap" selected>three gap</option>
+                            <option value="fourrandom">4 random</option>
+                        </select>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                        <span style="min-width: 80px;">Master Volume:</span>
+                        <span id="masterVolumeValue" style="min-width: 40px; text-align: right;">80</span>
+                        <input type="range" id="masterVolumeInput" value="80" min="0" max="100" style="flex: 1;">
+                    </label>
+                </div>
+                <div class="settings-section" id="performanceSection" style="display: none;">
+                    <p style="margin-bottom: 16px; color: rgba(26, 26, 46, 0.7); font-size: 13px;">
+                        Adjust these settings to optimize CPU usage on slower devices or during intensive use.
+                    </p>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
+                        <input type="checkbox" id="disableMultibandCheckbox" checked>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; margin-bottom: 2px;">Enable Multiband Compression</div>
+                            <div style="font-size: 11px; color: rgba(26, 26, 46, 0.6);">
+                                Uncheck to save ~5-8% CPU. Reduces punchy sound quality when disabled.
+                            </div>
+                        </div>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;">
+                        <input type="checkbox" id="disableAutogainCheckbox" checked>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; margin-bottom: 2px;">Enable Autogain</div>
+                            <div style="font-size: 11px; color: rgba(26, 26, 46, 0.6);">
+                                Uncheck to save ~10-15% CPU. May cause volume inconsistencies when disabled.
+                            </div>
+                        </div>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0, 0, 0, 0.1); cursor: pointer;">
+                        <input type="checkbox" id="performanceModeCheckbox">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; margin-bottom: 2px;">Performance Mode</div>
+                            <div style="font-size: 11px; color: rgba(26, 26, 46, 0.6);">
+                                Disables both features above for maximum CPU savings (~15-23%).
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="textarea-wrapper">
+        <div class="toolbar">
+            <button id="playStopButton">Play</button>
+            <select id="presetSelect" style="flex: 1; padding: 10px; font-size: 12px; border: none; border-right: 1px solid #e0e0e0; background: transparent; cursor: pointer;">
+            </select>
+            <button id="randomButton">Random</button>
+        </div>
+        <textarea id="chordInput">C, Dm, E7, Fdim, Gaug, Am, B, Cmaj7, Dm7, E9, Fsus4, G6, Am9</textarea>
+
+        <div id="chordsDisplay" class="chords-display" style="display: none;"></div>
+    </div>
+
+    <div id="pianoContainer" class="piano-container"></div>
+
+    <div id="noteArraysDisplay" class="note-arrays-display" style="display: none;"></div>
+
+    <!-- Test Panel - Fixed at bottom of screen -->
+    <div class="test-panel-container">
+        <!-- Soundbar above test panel -->
+        <div class="soundbar" id="soundbar">
+            <div class="soundbar-item">
+                <div class="soundbar-label active" id="soundbarLabel1" data-sound="1">
+                    <span>SOUND1</span>
+                    <span class="soundbar-dice" id="soundbarDice1" data-sound="1" title="Randomize layers">🎲</span>
+                </div>
+                <div class="soundbar-layers" id="soundbarLayers1">
+                    <!-- Layer selects will be moved here from settings panel -->
+                </div>
+            </div>
+            <div class="soundbar-item">
+                <div class="soundbar-label" id="soundbarLabel2" data-sound="2">
+                    <span>SOUND2</span>
+                    <span class="soundbar-dice" id="soundbarDice2" data-sound="2" title="Randomize layers">🎲</span>
+                </div>
+                <div class="soundbar-layers" id="soundbarLayers2">
+                    <!-- Layer selects will be moved here from settings panel -->
+                </div>
+            </div>
+            <div class="soundbar-item">
+                <div class="soundbar-label" id="soundbarLabel3" data-sound="3">
+                    <span>SOUND3</span>
+                    <span class="soundbar-dice" id="soundbarDice3" data-sound="3" title="Randomize layers">🎲</span>
+                </div>
+                <div class="soundbar-layers" id="soundbarLayers3">
+                    <!-- Layer selects will be moved here from settings panel -->
+                </div>
+            </div>
+        </div>
+        <div class="test-panel" id="testPanel">
+            <div class="cycle-region" data-rate="240" data-type="0"></div>
+            <div class="cycle-region" data-rate="120" data-type="1"></div>
+            <div class="cycle-region" data-rate="60" data-type="2"></div>
+            <div class="cycle-region" data-rate="40" data-type="3"></div>
+            <div class="cycle-region" data-rate="30" data-type="4"></div>
+            <div class="cycle-region" data-rate="20" data-type="5"></div>
+            <div class="cycle-region" data-rate="15" data-type="6"></div>
+        </div>
+    </div>
+
+    <div class="help-overlay" id="helpOverlay">
+        <div class="help-content">
+            <span class="help-close" id="helpClose">×</span>
+            <h2 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Help Guide</h2>
+            
+            <div class="help-nav">
+                <button class="help-nav-item active" data-tab="chords">Chords</button>
+                <button class="help-nav-item" data-tab="transitions">Transitions</button>
+                <button class="help-nav-item" data-tab="panel">Panel</button>
+                <button class="help-nav-item" data-tab="sound">Sound</button>
+            </div>
+            
+            <div class="help-tab-content active" id="helpTab-chords">
+                <h3>How to Type Chords</h3>
+                <p>Enter chords separated by commas in the text area. ChordCanvas supports 20 different chord types:</p>
+                
+                <h4>Basic Chords:</h4>
+                <ul>
+                    <li><strong>Major:</strong> <code>C</code>, <code>D</code>, <code>E</code> (no suffix)</li>
+                    <li><strong>Minor:</strong> <code>Cm</code>, <code>Cmin</code>, <code>C-</code></li>
+                    <li><strong>Diminished:</strong> <code>Cdim</code>, <code>Co</code>, <code>C°</code></li>
+                    <li><strong>Augmented:</strong> <code>Caug</code>, <code>C+</code></li>
+                </ul>
+                
+                <h4>7th Chords:</h4>
+                <ul>
+                    <li><strong>Dominant 7th:</strong> <code>C7</code>, <code>Cdom</code>, <code>Cdom7</code></li>
+                    <li><strong>Minor 7th:</strong> <code>Cm7</code>, <code>Cmin7</code></li>
+                    <li><strong>Major 7th:</strong> <code>Cmaj7</code>, <code>Cmajor7</code>, <code>CM7</code>, <code>Cma7</code></li>
+                    <li><strong>Diminished 7th:</strong> <code>Cdim7</code></li>
+                </ul>
+                
+                <h4>Extended Chords:</h4>
+                <ul>
+                    <li><strong>6th:</strong> <code>C6</code> (major), <code>Cm6</code> (minor)</li>
+                    <li><strong>9th:</strong> <code>C9</code> (dominant), <code>Cmaj9</code> (major), <code>Cm9</code> (minor)</li>
+                    <li><strong>Add:</strong> <code>Cadd9</code>, <code>Cadd11</code>, <code>Cadd13</code></li>
+                    <li><strong>Altered:</strong> <code>C7#11</code>, <code>C9#11</code></li>
+                    <li><strong>Suspended:</strong> <code>Csus2</code>, <code>Csus4</code> (or <code>Csus</code>)</li>
+                </ul>
+                
+                <h4>Examples:</h4>
+                <p><code>C, Dm, E7, Fmaj7, G6, Am9, Bdim</code></p>
+                <p><code>C#, Dbm, Ebm7, F#aug, Gsus4</code></p>
+                
+                <p><strong>Tip:</strong> Click on any chord in the display to see which piano keys it uses (when not playing), or to change its transition (when playing).</p>
+            </div>
+            
+            <div class="help-tab-content" id="helpTab-transitions">
+                <h3>Chord Transitions</h3>
+                <p>Transitions add smooth movement between chords. Click on any chord in the display to set or change its transition type. You can set transitions even when not playing.</p>
+                
+                <h4>Available Transitions:</h4>
+                <ul>
+                    <li><strong>No Transition:</strong> Play the chord as-is</li>
+                    <li><strong>ii-V-I:</strong> Classic jazz progression. Inserts the ii and V chords before the target chord (e.g., Dm7 → G7 → C)</li>
+                    <li><strong>2nd Dominant:</strong> Inserts the V7 chord before the target (e.g., G7 → C)</li>
+                    <li><strong>Tritone Sub:</strong> Inserts a dominant 7th a semitone above the target (e.g., C#7 → C)</li>
+                    <li><strong>Leading Tone:</strong> Inserts the leading tone (semitone below) in the bass as a slash chord</li>
+                    <li><strong>Passing Dim:</strong> Inserts a passing diminished chord between current and target</li>
+                </ul>
+                
+                <h4>How to Use:</h4>
+                <ol>
+                    <li>Enter your chord progression (e.g., <code>C, Am, F, G</code>)</li>
+                    <li>Click on any chord in the display (works even when not playing)</li>
+                    <li>Select a transition type from the menu</li>
+                    <li>Click <strong>Play</strong> to hear your progression with transitions</li>
+                    <li>The transition will play automatically before that chord</li>
+                </ol>
+                
+                <h4>Examples:</h4>
+                <p><strong>2nd Dominant:</strong> If you have any chord → <code>F</code> and set "2nd Dominant" on F, it will play: <code>Any Chord → C7 → F</code></p>
+                <p><strong>ii-V-I:</strong> If you have any chord → <code>C</code> and set "ii-V-I" on C, it will play: <code>Any Chord → Dm7 → G7 → C</code></p>
+                <p><strong>Tritone Sub:</strong> If you have any chord → <code>F</code> and set "Tritone Sub" on F, it will play: <code>Any Chord → F#7 → F</code></p>
+            </div>
+            
+            <div class="help-tab-content" id="helpTab-panel">
+                <h3>Performance Panel</h3>
+                <p>The panel at the bottom of the screen lets you perform and manipulate chords in real-time while playing.</p>
+                
+                <h4>How to Use:</h4>
+                <ol>
+                    <li>Start playback of your chord progression</li>
+                    <li>The panel becomes active (grey when disabled, normal when playing)</li>
+                    <li><strong>Click and drag</strong> on the panel to control the sound</li>
+                </ol>
+                
+                <h4>Panel Regions:</h4>
+                <p>The panel is divided into 7 regions, each with different cycle rates:</p>
+                <ul>
+                    <li><strong>Type 0:</strong> 240/bpm - Lowest 3 notes</li>
+                    <li><strong>Type 1:</strong> 120/bpm - Next selection</li>
+                    <li><strong>Type 2:</strong> 60/bpm</li>
+                    <li><strong>Type 3:</strong> 40/bpm</li>
+                    <li><strong>Type 4:</strong> 30/bpm</li>
+                    <li><strong>Type 5:</strong> 20/bpm</li>
+                    <li><strong>Type 6:</strong> 15/bpm</li>
+                </ul>
+                
+                <h4>Vertical Control:</h4>
+                <ul>
+                    <li><strong>Top half:</strong> Higher pitch (up to +25 cents)</li>
+                    <li><strong>Center:</strong> Normal pitch</li>
+                    <li><strong>Bottom half:</strong> Lower pitch (down to -25 cents)</li>
+                    <li><strong>Volume:</strong> Controlled by distance from center (up to 130%)</li>
+                </ul>
+                
+                <h4>Horizontal Control:</h4>
+                <p>Click different regions to cycle through different note selections from the current chord palette.</p>
+                
+                <p><strong>Tip:</strong> The panel shows the current chord type and notes being played in the info bar at the top.</p>
+            </div>
+            
+            <div class="help-tab-content" id="helpTab-sound">
+                <h3>Sound System</h3>
+                <p>ChordCanvas uses a layered sound system with 3 independent sound slots that can crossfade between each other.</p>
+                
+                <h4>Sound Architecture:</h4>
+                <ul>
+                    <li><strong>SOUND1, SOUND2, SOUND3:</strong> Three independent sound outputs</li>
+                    <li>Each sound is a <strong>merge of 2 layers</strong> (Layer 1 + Layer 2)</li>
+                    <li>You can select different presets for each layer</li>
+                </ul>
+                
+                <h4>How It Works:</h4>
+                <ol>
+                    <li>Open <strong>Settings</strong> (menu button in header)</li>
+                    <li>Go to the <strong>Sound</strong> tab</li>
+                    <li>For each SOUND, select Layer 1 and Layer 2 presets</li>
+                    <li>The percentages show how much each sound is active</li>
+                </ol>
+                
+                <h4>Auto Crossfade:</h4>
+                <ul>
+                    <li>When enabled, sounds automatically crossfade when you switch between them</li>
+                    <li>Crossfade speed can be set to 1, 4, or 8 bars (default: 8 bars)</li>
+                    <li>This creates smooth transitions between different sound textures</li>
+                </ul>
+                
+                <h4>Sound Presets:</h4>
+                <p>Each layer can use different presets like:</p>
+                <ul>
+                    <li>Bright Bell, Vintage Rhodes, Rich Pad</li>
+                    <li>Metallic Organ, Crystal Bell, Ethereal Pad</li>
+                    <li>And many more...</li>
+                </ul>
+                
+                <h4>Performance Settings:</h4>
+                <p>In the <strong>Performance</strong> tab, you can:</p>
+                <ul>
+                    <li>Enable/disable Multiband Compression (~5-8% CPU)</li>
+                    <li>Enable/disable Autogain (~10-15% CPU)</li>
+                    <li>Enable Performance Mode (disables both for ~15-23% CPU savings)</li>
+                </ul>
+                
+                <p><strong>Tip:</strong> Click on SOUND1, SOUND2, or SOUND3 to switch between them. The active sound is shown with a darker background.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load modules in order -->
+    <script src="js/config.js"></script>
+    <script src="js/chord-parser.js"></script>
+    <script src="js/chordpresets.js"></script>
+    <script src="js/chord-player.js"></script>
+    <script src="js/piano-visualizer.js"></script>
+    <script src="js/ui-controller.js"></script>
+    
+    <!-- Load sound system modules -->
+    <script src="js/sound/cpu-manager.js"></script>
+    <script src="js/sound/audio-node-pool.js"></script>
+    <script src="js/sound/synth-methods.js"></script>
+    <script src="js/sound/harmonic-content.js"></script>
+    <script src="js/sound/envelope-shapes.js"></script>
+    <script src="js/sound/harmonic-modulation.js"></script>
+    <script src="js/sound/sound-generator.js"></script>
+    <script src="js/sound/audio-manager.js"></script>
+    <script src="js/sound/sound-presets.js"></script>
+    <script src="js/sound/sound-generator-helper.js"></script>
+    <script src="js/sound/sound-manager.js"></script>
+    
+    <script src="js/app.js"></script>
+    <script src="js/panel-integration.js"></script>
+</body>
+</html>
