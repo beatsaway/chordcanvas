@@ -1,0 +1,4 @@
+# Cache piano WAV samples for 1 year — browser won't re-request on revisit
+# Saves bandwidth, request count, and cost
+/instruments/*
+  Cache-Control: public, max-age=31536000, immutable
